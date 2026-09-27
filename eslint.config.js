@@ -29,4 +29,9 @@ export default tseslint.config(
       'react-hooks/exhaustive-deps': 'warn',
     },
   },
+  {
+    // Test output is consumed by CI annotations — console is the channel.
+    files: ['tests/**/*.ts', 'tests/**/*.tsx'],
+    rules: { 'no-console': 'off' },
+  },
 );
