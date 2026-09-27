@@ -1,0 +1,43 @@
+appId: com.dentiva.pro
+productName: Dentiva Pro
+copyright: © 2026 Dentiva Pro — Shohan Khan
+
+directories:
+  output: dist
+  buildResources: build
+
+# App payload: compiled main process, renderer bundle, package.json and
+# production dependencies (better-sqlite3, @node-rs/argon2, archiver, …).
+files:
+  - dist/**
+  - '!dist/*.exe'
+  - '!dist/SHA256SUMS.txt'
+  - '!dist/win-unpacked/**'
+  - '!dist/builder-*.yml'
+  - '!dist/.icon-*/**'
+  - package.json
+
+asar: true
+# Native modules must be readable outside the asar archive.
+asarUnpack:
+  - '**/node_modules/better-sqlite3/**'
+  - '**/node_modules/@node-rs/**'
+npmRebuild: true
+
+win:
+  icon: build/icon.ico
+  target:
+    - target: nsis
+      arch:
+        - x64
+
+nsis:
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: always
+  createStartMenuShortcut: true
+  shortcutName: Dentiva Pro
+  uninstallDisplayName: Dentiva Pro
+  artifactName: DentivaPro-Setup-${version}.exe
+  deleteAppDataOnUninstall: false

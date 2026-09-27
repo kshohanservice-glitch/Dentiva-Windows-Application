@@ -1,0 +1,316 @@
+/* Dentiva Pro — print stylesheets.
+   Print routes render bare documents (no app chrome) so window.print()
+   produces clean clinic stationery. Screen mode provides editable context. */
+
+@page {
+  size: A4;
+  margin: 14mm;
+}
+
+:root {
+  --print-ink: #111;
+  --print-line: #d9d9d9;
+  --print-muted: #666;
+}
+
+@media print {
+  body {
+    background: #fff !important;
+    margin: 0;
+    padding: 0;
+  }
+  .print-toolbar {
+    display: none !important;
+  }
+  .print-doc {
+    box-shadow: none !important;
+    border: none !important;
+    margin: 0 !important;
+    width: auto !important;
+    min-height: 0 !important;
+    padding: 0 !important;
+  }
+  .page-break {
+    break-after: page;
+    page-break-after: always;
+  }
+}
+
+.print-toolbar {
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 16px;
+  background: var(--surface-1, #fff);
+  border-bottom: 1px solid var(--line, #e5e7eb);
+  font-size: 13px;
+}
+
+.print-stage {
+  padding: 24px 16px 64px;
+  display: flex;
+  justify-content: center;
+  background: var(--bg-2, #eef1f5);
+  min-height: calc(100vh - 54px);
+}
+
+.print-doc {
+  width: 210mm;
+  min-height: 297mm;
+  background: #fff;
+  color: var(--print-ink);
+  padding: 14mm;
+  box-shadow: 0 2px 18px rgba(15, 23, 42, 0.14);
+  border: 1px solid var(--print-line);
+  font-family: 'Inter', 'Noto Sans Bengali', 'Segoe UI', sans-serif;
+  font-size: 12.5px;
+  line-height: 1.5;
+  box-sizing: border-box;
+}
+
+.print-doc * {
+  box-sizing: border-box;
+}
+
+.print-doc h1 {
+  font-size: 21px;
+  margin: 0;
+  letter-spacing: -0.02em;
+  color: var(--print-ink);
+}
+
+.print-doc h2 {
+  font-size: 14.5px;
+  margin: 18px 0 8px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--print-muted);
+  border-bottom: 1.5px solid var(--print-ink);
+  padding-bottom: 4px;
+}
+
+.print-doc h3 {
+  font-size: 13px;
+  margin: 12px 0 4px;
+}
+
+.print-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 18px;
+  border-bottom: 2.5px solid var(--print-ink);
+  padding-bottom: 12px;
+  margin-bottom: 14px;
+}
+
+.print-header .logo {
+  width: 54px;
+  height: 54px;
+  border-radius: 12px;
+  background: var(--print-ink);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 28px;
+  font-weight: 800;
+  flex: none;
+}
+
+.print-header .head-main {
+  display: flex;
+  gap: 14px;
+  align-items: center;
+}
+
+.print-header .clinic-meta {
+  text-align: right;
+  font-size: 11.5px;
+  color: var(--print-muted);
+  line-height: 1.55;
+}
+
+.print-doc .doc-title {
+  font-size: 16px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  text-align: center;
+  margin: 6px 0 14px;
+  color: var(--print-ink);
+}
+
+.print-doc table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 8px 0 12px;
+}
+
+.print-doc table th,
+.print-doc table td {
+  border: 1px solid var(--print-line);
+  padding: 6px 8px;
+  text-align: left;
+  vertical-align: top;
+}
+
+.print-doc table thead th {
+  background: #f4f4f5;
+  font-size: 10.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #444;
+}
+
+.print-doc table.compact td,
+.print-doc table.compact th {
+  padding: 3.5px 6px;
+  font-size: 11.5px;
+}
+
+.print-doc .right {
+  text-align: right;
+}
+.print-doc .center {
+  text-align: center;
+}
+.print-doc .muted {
+  color: var(--print-muted);
+}
+.print-doc .mono {
+  font-variant-numeric: tabular-nums;
+  font-family: ui-monospace, 'Cascadia Mono', monospace;
+}
+
+.print-kv {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 4px 24px;
+  margin-bottom: 8px;
+}
+
+.print-kv > div {
+  display: flex;
+  gap: 8px;
+  border-bottom: 1px dotted var(--print-line);
+  padding: 3px 0;
+}
+
+.print-kv .k {
+  color: var(--print-muted);
+  min-width: 92px;
+  flex: none;
+}
+
+.print-kv .v {
+  font-weight: 600;
+}
+
+.totals {
+  width: 68mm;
+  margin-left: auto;
+}
+
+.totals td {
+  border: none;
+  padding: 3px 6px;
+}
+
+.totals tr.grand td {
+  border-top: 2px solid var(--print-ink);
+  font-weight: 800;
+  font-size: 14px;
+}
+
+.rx-line {
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+  padding: 7px 0;
+  border-bottom: 1px dotted var(--print-line);
+}
+
+.rx-line .idx {
+  font-weight: 700;
+  min-width: 20px;
+}
+
+.rx-line .drug {
+  font-weight: 650;
+}
+
+.sig-block {
+  margin-top: 22px;
+  border-top: 1px solid var(--print-line);
+  padding-top: 14px;
+  display: flex;
+  justify-content: space-between;
+  gap: 30px;
+}
+
+.sig-line {
+  border-bottom: 1.4px solid var(--print-ink);
+  width: 58mm;
+  height: 34px;
+  margin-bottom: 4px;
+}
+
+.print-footer {
+  margin-top: 22px;
+  border-top: 1px solid var(--print-line);
+  padding-top: 8px;
+  font-size: 10.5px;
+  color: var(--print-muted);
+  display: flex;
+  justify-content: space-between;
+  text-align: center;
+}
+
+.print-watermark {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  z-index: 50;
+}
+
+.print-watermark span {
+  font-size: 120px;
+  font-weight: 900;
+  color: #c44;
+  opacity: 0.28;
+  transform: rotate(-32deg);
+  letter-spacing: 0.3em;
+  text-transform: uppercase;
+}
+
+.chart-print-grid {
+  display: grid;
+  grid-template-columns: repeat(8, 1fr);
+  gap: 6px;
+}
+
+.chart-print-grid .tooth {
+  border: 1px solid var(--print-line);
+  padding: 5px;
+  text-align: center;
+  font-size: 11px;
+}
+
+.chart-print-grid .tooth b {
+  display: block;
+  font-size: 13px;
+}
+
+@media screen {
+  .print-doc {
+    max-width: 100%;
+  }
+}

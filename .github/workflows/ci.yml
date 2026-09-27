@@ -1,0 +1,157 @@
+name: CI
+
+on:
+  push:
+    paths-ignore:
+      - 'dist/**'
+      - 'docs/**'
+      - '*.md'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  verify:
+    name: Typecheck, lint, unit & integration tests
+    runs-on: ubuntu-latest
+    env:
+      ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - name: Typecheck (main process)
+        run: npx tsc -p tsconfig.node.json --noEmit
+      - name: Typecheck (renderer + tests)
+        run: npx tsc -p tsconfig.renderer.json --noEmit
+      - name: Lint
+        run: npx eslint .
+      - name: Unit & integration tests (vitest)
+        run: npm test
+      - name: Build (main + renderer)
+        run: npm run build
+      - name: No TODO/FIXME/HACK markers in code
+        shell: bash
+        run: |
+          if grep -rEn 'TODO|FIXME|HACK' src tests scripts --include='*.ts' --include='*.tsx' --include='*.mjs'; then
+            echo '::error::Release-code markers found (TODO/FIXME/HACK are forbidden).'
+            exit 1
+          fi
+          echo 'No markers.'
+
+  e2e:
+    name: Electron E2E (Windows)
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - name: Rebuild native modules for the Electron ABI
+        run: npx electron-builder install-app-deps
+      - name: Playwright E2E (real app window)
+        run: npm run test:e2e
+      - name: Upload Playwright report
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 7
+
+  package:
+    name: NSIS installer + installed-artifact smoke test
+    runs-on: windows-latest
+    needs: [verify, e2e]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - name: Generate Windows icons
+        run: npm run icons
+      - name: Rebuild native modules for the Electron ABI
+        run: npx electron-builder install-app-deps
+      - name: Build NSIS installer
+        run: npm run dist
+      - name: Silent-install the actual installer and smoke-test it
+        shell: pwsh
+        run: |
+          $installer = Get-ChildItem dist\*.exe | Select-Object -First 1
+          if (-not $installer) { throw 'No installer produced in dist/' }
+          $installDir = Join-Path $env:RUNNER_TEMP 'dentiva-installed'
+          Write-Host "Installing $($installer.Name) silently to $installDir"
+          Start-Process -FilePath $installer.FullName -ArgumentList '/S', "/D=$installDir" -Wait
+          $appExe = Join-Path $installDir 'Dentiva Pro.exe'
+          if (!(Test-Path $appExe)) { throw "Installed executable missing: $appExe" }
+          node scripts/smoke-installed.mjs "$appExe"
+          if ($LASTEXITCODE -ne 0) { throw 'Installed-artifact smoke test failed' }
+          # Best-effort silent uninstall (keeps CI image clean).
+          $unins = Join-Path $installDir 'unins000.exe'
+          if (Test-Path $unins) { Start-Process -FilePath $unins -ArgumentList '/S' -Wait }
+      - name: Checksums
+        shell: pwsh
+        run: |
+          $exe = Get-ChildItem dist\*.exe | Select-Object -First 1
+          $hash = (Get-FileHash $exe.FullName -Algorithm SHA256).Hash.ToLower()
+          "$hash  $($exe.Name)" | Out-File -Encoding ascii dist/SHA256SUMS.txt
+          Get-Content dist/SHA256SUMS.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: DentivaPro-Windows-NSIS
+          path: |
+            dist/*.exe
+            dist/SHA256SUMS.txt
+          retention-days: 30
+      - name: Commit installer to branch (dist fallback)
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add dist/*.exe dist/SHA256SUMS.txt
+          if git diff --cached --quiet; then
+            echo "Artifacts unchanged."
+          else
+            git commit -m "chore(ci): Windows NSIS artifact ${GITHUB_RUN_NUMBER} [skip ci]"
+            git push origin "HEAD:${GITHUB_REF_NAME}"
+          fi
+      - name: Create or update GitHub Release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $ver = (Get-Content package.json -Raw | ConvertFrom-Json).version
+          $tag = "v$ver"
+          $exe = (Get-ChildItem dist\*.exe | Select-Object -First 1).FullName
+          $sums = (Resolve-Path dist/SHA256SUMS.txt).Path
+          gh release view $tag *> $null
+          if ($LASTEXITCODE -ne 0) {
+            gh release create $tag $exe $sums `
+              --title "Dentiva Pro $ver" `
+              --latest `
+              --notes @"
+          Offline-first Windows dental clinic management for Bangladesh.
+
+          - NSIS installer: DentivaPro-Setup-$ver.exe
+          - SHA-256 checksums in SHA256SUMS.txt
+          - Fully offline after one-time activation; no telemetry, no paid APIs
+          - Built and smoke-tested on Windows CI from source at $($env:GITHUB_SHA)
+          "@
+          } else {
+            gh release upload $tag $exe $sums --clobber
+          }
+          if ($LASTEXITCODE -ne 0) { throw 'Release step failed' }
