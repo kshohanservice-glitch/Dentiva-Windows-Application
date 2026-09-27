@@ -142,7 +142,7 @@ test('creates an invoice and receives full payment', async () => {
   await expect(detail.getByText('৳500.00').first()).toBeVisible();
 
   await detail.getByRole('button', { name: 'Receive payment' }).click();
-  const pay = page.locator('.modal[role="dialog"]', { hasText: 'Receive payment' });
+  const pay = page.locator('.modal[role="dialog"]', { hasText: 'Receive payment' }).last();
   await expect(pay).toBeVisible();
   await pay.getByLabel('Method').selectOption('cash');
   await pay.getByRole('button', { name: 'Record payment' }).click();
