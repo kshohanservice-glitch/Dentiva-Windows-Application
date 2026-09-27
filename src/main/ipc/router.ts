@@ -2,7 +2,7 @@ import { BrowserWindow, dialog, ipcMain, shell, type OpenDialogOptions, type Sav
 import fs from 'node:fs';
 import { IPC } from '../../shared/ipc';
 import type { SessionUser } from '../../shared/types';
-import { AppError, toWireError, validation } from '../errors';
+import { AppError, toWireError } from '../errors';
 import { logger } from '../logger';
 import type { Ctx } from '../core/context';
 import { audit } from '../core/context';
