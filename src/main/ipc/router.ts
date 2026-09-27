@@ -283,10 +283,13 @@ export function registerRouter(deps: RouterDeps): void {
 
   /* ----------------------------- backup/restore -------------------------- */
   handle(IPC.backupRun, { auth: true, fn: async (p, ctx) => {
+    // One-click backup: use the caller's destination, else the configured
+    // auto-backup destination, else the app's backups folder. Never blocks on
+    // a native folder dialog — destination changes happen in Backup settings.
     let destination = String(p ?? '');
     if (!destination) {
-      destination = (await pickDirectory('Choose backup destination')) ?? '';
-      if (!destination) throw validation('Backup destination is required.');
+      const configured = deps.backup.readBackupSetting().destination;
+      destination = configured && configured.trim() ? configured : deps.paths().backupsDir;
     }
     return deps.backup.runBackup(ctx!, destination, 'manual');
   } });
