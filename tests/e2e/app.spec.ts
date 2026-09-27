@@ -30,8 +30,25 @@ test.beforeAll(async () => {
     timeout: 90_000,
   });
   page = await app.firstWindow({ timeout: 60_000 });
+  // Forward renderer diagnostics to stdout so CI annotations can show them.
+  page.on('console', (m) => console.log(`[renderer ${m.type()}] ${m.text()}`));
+  page.on('pageerror', (e) => console.log(`[pageerror] ${e.message}`));
   await page.waitForLoadState('domcontentloaded');
 });
+
+/** Dump whatever the window actually shows — used when a selector never appears. */
+async function dumpWindowState(label: string): Promise<void> {
+  try {
+    console.log(`[diag:${label}] title=${await page.title()}`);
+    console.log(`[diag:${label}] url=${page.url()}`);
+    const html = await page.content();
+    console.log(`[diag:${label}] html=${html.slice(0, 2500)}`);
+    const text = await page.locator('body').innerText();
+    console.log(`[diag:${label}] bodyText=${text.slice(0, 1200)}`);
+  } catch (err) {
+    console.log(`[diag:${label}] dump failed: ${err instanceof Error ? err.message : String(err)}`);
+  }
+}
 
 test.afterAll(async () => {
   await app?.close();
@@ -39,7 +56,12 @@ test.afterAll(async () => {
 
 test('activates offline and completes first-run setup', async () => {
   const code = page.locator('input[placeholder="Enter activation code"]');
-  await expect(code).toBeVisible({ timeout: 60_000 });
+  try {
+    await expect(code).toBeVisible({ timeout: 60_000 });
+  } catch (err) {
+    await dumpWindowState('activation');
+    throw err;
+  }
 
   await code.fill(ACTIVATION_CODE);
   await page.getByRole('button', { name: 'Activate' }).click();
