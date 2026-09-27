@@ -14,7 +14,7 @@ const STATUS_TONE = {
   paid: 'success', partial: 'warning', unpaid: 'info', voided: 'danger', draft: 'neutral',
 } as const;
 
-function PaymentModal(props: { invoice: InvoiceDTO; onClose: () => void; onPaid: () => void }) {
+function PaymentModal(props: { invoice: InvoiceDTO; onClose: () => void; onPaid: (invoice: InvoiceDTO) => void }) {
   const { values, set, errors, validate } = usePaymentForm();
   const [pending, setPending] = useState(false);
   const toast = useToast();
@@ -42,7 +42,7 @@ function PaymentModal(props: { invoice: InvoiceDTO; onClose: () => void; onPaid:
         note: values.note || null,
       });
       toast.success('Payment recorded', `${bdt(res.payment.amountPaisa)} · balance ${bdt(res.invoice?.duePaisa ?? 0)}`);
-      props.onPaid();
+      props.onPaid(res.invoice ?? props.invoice);
       props.onClose();
     } catch (err) {
       toast.fromError(err, 'Payment failed');
@@ -122,13 +122,14 @@ function usePaymentForm() {
 }
 
 function InvoiceDetailModal(props: { invoice: InvoiceDTO; onClose: () => void; onChanged: () => void }) {
-  const { invoice } = props;
+  // Local copy so payments/voids immediately reflect in this open modal.
+  const [invoice, setInvoice] = useState(props.invoice);
   const { can } = useApp();
   const toast = useToast();
   const [payOpen, setPayOpen] = useState(false);
   const [voidOpen, setVoidOpen] = useState(false);
   const [voidReason, setVoidReason] = useState('');
-  const { data: pays } = useAsync(() => api['payments/list']({ invoiceId: invoice.id, pageSize: 200 }), [invoice.id]);
+  const { data: pays, reload: reloadPays } = useAsync(() => api['payments/list']({ invoiceId: invoice.id, pageSize: 200 }), [invoice.id]);
   const { data: attachments, reload: reloadAtt } = useAsync(() => api['attachments/list']({ entityType: 'invoice', entityId: invoice.id }), [invoice.id]);
 
   const doPrint = async (kind: 'invoice' | 'receipt') => {
@@ -243,7 +244,7 @@ function InvoiceDetailModal(props: { invoice: InvoiceDTO; onClose: () => void; o
         </>
       )}
 
-      {payOpen && <PaymentModal invoice={invoice} onClose={() => setPayOpen(false)} onPaid={() => { props.onChanged(); reloadAtt(); }} />}
+      {payOpen && <PaymentModal invoice={invoice} onClose={() => setPayOpen(false)} onPaid={(fresh) => { setInvoice(fresh); props.onChanged(); reloadAtt(); reloadPays(); }} />}
 
       {voidOpen && (
         <Modal
@@ -257,7 +258,8 @@ function InvoiceDetailModal(props: { invoice: InvoiceDTO; onClose: () => void; o
                 disabled={voidReason.trim().length < 5}
                 onClick={async () => {
                   try {
-                    await api['invoices/void']({ id: invoice.id, reason: voidReason.trim() });
+                    const fresh = await api['invoices/void']({ id: invoice.id, reason: voidReason.trim() });
+                    setInvoice(fresh);
                     toast.success('Invoice voided', invoice.number);
                     setVoidOpen(false);
                     props.onChanged();
