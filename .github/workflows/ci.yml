@@ -60,7 +60,23 @@ jobs:
       - name: Rebuild native modules for the Electron ABI
         run: npx electron-builder install-app-deps
       - name: Playwright E2E (real app window)
-        run: npm run test:e2e
+        shell: pwsh
+        run: |
+          npm run test:e2e 2>&1 | Tee-Object -FilePath e2e-output.log
+          if ($LASTEXITCODE -ne 0) {
+            # Surface failure details as annotations (readable via the API even
+            # when artifact/log CDNs are unreachable from the sandbox).
+            $lines = Get-Content e2e-output.log
+            $signal = $lines | Where-Object { $_ -match 'Error|error:|✘|failed|expect|at tests|Timeout' } | Select-Object -Last 12
+            if (-not $signal) { $signal = $lines | Select-Object -Last 12 }
+            $n = 0
+            foreach ($l in $signal) {
+              $n++
+              $esc = ($l -replace '[\r\n]', ' ')
+              Write-Host "::error title=E2E failure $n::$esc"
+            }
+            exit 1
+          }
       - name: Upload Playwright report
         if: failure()
         uses: actions/upload-artifact@v4
@@ -98,8 +114,19 @@ jobs:
           Start-Process -FilePath $installer.FullName -ArgumentList '/S', "/D=$installDir" -Wait
           $appExe = Join-Path $installDir 'Dentiva Pro.exe'
           if (!(Test-Path $appExe)) { throw "Installed executable missing: $appExe" }
-          node scripts/smoke-installed.mjs "$appExe"
-          if ($LASTEXITCODE -ne 0) { throw 'Installed-artifact smoke test failed' }
+          node scripts/smoke-installed.mjs "$appExe" 2>&1 | Tee-Object -FilePath smoke-output.log
+          if ($LASTEXITCODE -ne 0) {
+            $lines = Get-Content smoke-output.log
+            $signal = $lines | Where-Object { $_ -match 'Error|error:|failed|Timeout|waiting for' } | Select-Object -Last 12
+            if (-not $signal) { $signal = $lines | Select-Object -Last 12 }
+            $n = 0
+            foreach ($l in $signal) {
+              $n++
+              $esc = ($l -replace '[\r\n]', ' ')
+              Write-Host "::error title=Installed-artifact smoke failure $n::$esc"
+            }
+            throw 'Installed-artifact smoke test failed'
+          }
           # Best-effort silent uninstall (keeps CI image clean).
           $unins = Join-Path $installDir 'unins000.exe'
           if (Test-Path $unins) { Start-Process -FilePath $unins -ArgumentList '/S' -Wait }
