@@ -13,7 +13,7 @@ import { test, expect, _electron as electron, type ElectronApplication, type Pag
 import fs from 'node:fs';
 import path from 'node:path';
 
-const ACTIVATION_CODE = [3, 3, 5, 317, 106315593061].reduce((acc, n) => acc * n, 0).toString();
+const ACTIVATION_CODE = [3, 3, 5, 317, 106315593061].reduce((acc, n) => acc * n, 1).toString();
 const PASSWORD = 'Passw0rd123';
 
 let app: ElectronApplication;
