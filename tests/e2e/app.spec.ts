@@ -32,7 +32,7 @@ test.beforeAll(async () => {
   page = await app.firstWindow({ timeout: 60_000 });
   // Forward renderer diagnostics to stdout so CI annotations can show them.
   page.on('console', (m) => console.log(`[renderer ${m.type()}] ${m.text()}`));
-  page.on('pageerror', (e) => console.log(`[pageerror] ${e.message}`));
+  page.on('pageerror', (e) => console.log(`[pageerror] ${e.stack ?? e.message}`));
   await page.waitForLoadState('domcontentloaded');
 });
 
