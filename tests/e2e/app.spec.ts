@@ -65,7 +65,12 @@ test('activates offline and completes first-run setup', async () => {
 
   await code.fill(ACTIVATION_CODE);
   await page.getByRole('button', { name: 'Activate' }).click();
-  await expect(page.getByRole('heading', { name: 'Clinic information' })).toBeVisible();
+  try {
+    await expect(page.getByRole('heading', { name: 'Clinic information' })).toBeVisible();
+  } catch (err) {
+    await dumpWindowState('post-activate');
+    throw err;
+  }
 
   await page.locator('input[placeholder="e.g. Smile Dental Care"]').fill('E2E Test Dental');
   await page.locator('input[placeholder="01XXXXXXXXX"]').fill('01711111111');
