@@ -139,7 +139,7 @@ test('creates an invoice and receives full payment', async () => {
   // onSaved opens the invoice detail modal.
   const detail = page.locator('.modal[role="dialog"]', { hasText: 'Invoice INV-' });
   await expect(detail).toBeVisible({ timeout: 30_000 });
-  await expect(detail.getByText('৳500.00')).toBeVisible();
+  await expect(detail.getByText('৳500.00').first()).toBeVisible();
 
   await detail.getByRole('button', { name: 'Receive payment' }).click();
   const pay = page.locator('.modal[role="dialog"]', { hasText: 'Receive payment' });
