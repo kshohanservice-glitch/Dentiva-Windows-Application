@@ -109,7 +109,21 @@ jobs:
       - name: Rebuild native modules for the Electron ABI
         run: npx electron-builder install-app-deps
       - name: Build NSIS installer
-        run: npm run dist
+        shell: pwsh
+        run: |
+          npm run dist 2>&1 | Tee-Object -FilePath dist-output.log
+          if ($LASTEXITCODE -ne 0) {
+            $lines = Get-Content dist-output.log
+            $signal = $lines | Where-Object { $_ -match 'Error|error|ERR |failed|Cannot|• building|• packaging|https://' } | Select-Object -Last 18
+            if (-not $signal) { $signal = $lines | Select-Object -Last 18 }
+            $n = 0
+            foreach ($l in $signal) {
+              $n++
+              $esc = ($l -replace '[\r\n]', ' ')
+              Write-Host "::error title=NSIS build $n::$esc"
+            }
+            exit 1
+          }
       - name: Silent-install the actual installer and smoke-test it
         shell: pwsh
         run: |
