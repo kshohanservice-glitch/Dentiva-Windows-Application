@@ -222,7 +222,18 @@ jobs:
             echo "Artifacts unchanged."
           else
             git commit -m "chore(ci): Windows NSIS artifact ${GITHUB_RUN_NUMBER} [skip ci]"
-            git push origin "HEAD:${GITHUB_REF_NAME}"
+            set +e
+            out=$(git push origin "HEAD:${GITHUB_REF_NAME}" 2>&1)
+            code=$?
+            set -e
+            if [ "$code" -ne 0 ]; then
+              echo "::error title=artifact commit push failed::$out"
+              echo "HEAD=$(git rev-parse HEAD) origin=$(git rev-parse origin/${GITHUB_REF_NAME} 2>/dev/null)"
+              # Non-fast-forward race: rebase onto the branch and retry once.
+              git fetch origin "${GITHUB_REF_NAME}"
+              git rebase "origin/${GITHUB_REF_NAME}"
+              git push origin "HEAD:${GITHUB_REF_NAME}"
+            fi
           fi
       - name: Create or update GitHub Release
         if: github.event_name == 'push' && github.ref == 'refs/heads/arena/01a0e467-dentiva-windows-application'
