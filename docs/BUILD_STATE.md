@@ -37,14 +37,12 @@ No product code may change until the plan exists — plan exists; Phase A in pro
 
 ## Current task
 
-**Phase A module review COMPLETE (mandated scope) — Batch 3 Phase-C fixes staged locally:**
-ISS-020 (P1 — all 14 Reports-UI names threw `Unknown report`; contract moved to
-`shared/reports.ts` + 7 missing builders + contract tests), ISS-021…024 (queue↔appointment
-sync completeness, duplicate-queue arrive, reschedule self-conflict, duration double-booking),
-ISS-025 (dead code), ISS-028 (installer 122 MB → GitHub 100 MB push limit: locales+max
-compression+bSql payload excludes+afterPack strips dxcompiler.dll — win32-x64 N-API prebuild
-kept after smoke proved its absence crashes the app). Local gates: **88/88**, tsc ×2, eslint 0,
-build ✓. Committing + pushing → CI verification → then Phase B (ISS-005).
+**Phase B COMPLETE** (ISS-005 closed): module coverage, RBAC persona matrix §34, scale
+fixture, report-accuracy hand calc (→ISS-029 fix), print units, E2E expanded6→10 specs.
+Local gates: **125/125**, tsc ×2, eslint 0, build ✓. CI: runs 36407957060 + 36408784492
+green (batch3 + ISS-029); persona run 36409481819 + latest push (E2E expansion) pending.
+NEXT: watch CI green → Phase D second independent audit vs original V1.0 requirements →
+Phase E (bump 1.1.0, release gates, GitHub Release v1.1.0).
 
 ## Known issues
 

@@ -165,3 +165,109 @@ test('runs a manual backup from the dashboard', async () => {
   await page.getByRole('button', { name: 'Backup now' }).click();
   await expect(page.locator('.toast-title', { hasText: 'Backup created' })).toBeVisible({ timeout: 60_000 });
 });
+
+/* ---------------------------------------------------------------------------
+ * Phase B journey expansion (ISS-005): appointment lifecycle + queue,
+ * prescription → print window, and the Reports UI contract (ISS-020 guard).
+ * --------------------------------------------------------------------------- */
+
+test('books an appointment and walks the patient through the queue to completion', async () => {
+  const today = new Date().toISOString().slice(0, 10);
+  await page.getByRole('link', { name: 'Appointments' }).click();
+  await expect(page.getByRole('heading', { name: 'Appointments', level: 1 })).toBeVisible();
+
+  await page.getByRole('button', { name: 'New appointment' }).first().click();
+  const modal = page.locator('.modal[role="dialog"]', { hasText: 'New appointment' });
+  await expect(modal).toBeVisible();
+  await modal.getByPlaceholder('Search by name, phone or patient ID…').fill('E2E Test Patient');
+  await modal.locator('.list-row', { hasText: 'E2E Test Patient' }).first().click();
+  await modal.getByLabel('Dentist').selectOption({ label: 'Dr. E2E Dentist' });
+  await modal.getByLabel('Date').fill(today);
+  await modal.getByLabel('Time').fill('15:30');
+  await modal.getByRole('button', { name: 'Book appointment' }).click();
+  await expect(page.locator('.toast-title', { hasText: 'Appointment booked' })).toBeVisible({ timeout: 30_000 });
+
+  // Patient arrives → enters the queue.
+  await page.getByRole('button', { name: 'Arrive → queue' }).first().click();
+  await expect(page.locator('.toast-title', { hasText: 'Patient arrived' })).toBeVisible({ timeout: 30_000 });
+
+  // Queue: call → start → complete.
+  await page.getByRole('link', { name: 'Queue' }).click();
+  await expect(page.getByRole('heading', { name: 'Queue', level: 1 })).toBeVisible();
+  await page.getByRole('button', { name: 'Call next' }).first().click();
+  await expect(page.locator('.toast-title', { hasText: '— call' })).toBeVisible({ timeout: 30_000 });
+  await page.getByRole('button', { name: 'Start treatment' }).first().click();
+  await expect(page.locator('.toast-title', { hasText: '— start' })).toBeVisible({ timeout: 30_000 });
+  await page.getByRole('button', { name: 'Complete' }).first().click();
+  await expect(page.locator('.toast-title', { hasText: '— complete' })).toBeVisible({ timeout: 30_000 });
+  // The finished entry lands in the completed section for the day.
+  await expect(page.getByText('Completed & removed')).toBeVisible();
+  await expect(page.locator('.card, .Card, section', { hasText: 'Completed & removed' }).getByText('E2E Test Patient').first()).toBeVisible({ timeout: 30_000 });
+});
+
+test('blocks double-booking with a conflict alert and honours override permission', async () => {
+  const today = new Date().toISOString().slice(0, 10);
+  await page.getByRole('link', { name: 'Appointments' }).click();
+  await page.getByRole('button', { name: 'New appointment' }).first().click();
+  const modal = page.locator('.modal[role="dialog"]', { hasText: 'New appointment' });
+  await expect(modal).toBeVisible();
+  await modal.getByPlaceholder('Search by name, phone or patient ID…').fill('E2E Test Patient');
+  await modal.locator('.list-row', { hasText: 'E2E Test Patient' }).first().click();
+  await modal.getByLabel('Dentist').selectOption({ label: 'Dr. E2E Dentist' });
+  await modal.getByLabel('Date').fill(today);
+  await modal.getByLabel('Time').fill('15:45'); // overlaps the 15:30 appointment
+  await modal.getByRole('button', { name: 'Book appointment' }).click();
+  // Conflict detected (owner holds appointments.override → inline alert, not a silent double-book).
+  await expect(modal.getByText('Scheduling conflict')).toBeVisible({ timeout: 30_000 });
+  await modal.getByRole('button', { name: 'Book anyway (override)' }).click();
+  await expect(page.locator('.toast-title', { hasText: 'Appointment booked' })).toBeVisible({ timeout: 30_000 });
+});
+
+test('creates a prescription and opens the print window', async () => {
+  await page.getByRole('link', { name: 'Patients' }).click();
+  await page.getByPlaceholder('Search name, phone, patient ID, tag…').fill('E2E Test Patient');
+  await page.getByRole('cell', { name: 'E2E Test Patient' }).click();
+  await expect(page.getByRole('heading', { name: 'E2E Test Patient' })).toBeVisible({ timeout: 30_000 });
+
+  await page.getByRole('button', { name: 'New prescription' }).first().click();
+  const rxModal = page.locator('.modal[role="dialog"]', { hasText: 'Save prescription' });
+  await expect(rxModal).toBeVisible();
+  await page.getByLabel('Prescribing dentist').selectOption({ label: 'Dr. E2E Dentist' });
+  await page.getByPlaceholder('e.g. Amoxicillin').first().fill('Amoxicillin 500 mg');
+  await page.getByRole('button', { name: 'Save prescription' }).click();
+  await expect(page.getByText('Amoxicillin 500 mg').first()).toBeVisible({ timeout: 30_000 });
+
+  // Open the saved prescription and print — a separate sandboxed print window must open.
+  await page.getByText('Amoxicillin 500 mg').first().click();
+  const detail = page.locator('.modal[role="dialog"]', { hasText: 'Patient' }).last();
+  await expect(detail.getByRole('button', { name: 'Print', exact: true })).toBeVisible({ timeout: 30_000 });
+  const [printWin] = await Promise.all([
+    app.waitForEvent('window', { timeout: 60_000 }),
+    detail.getByRole('button', { name: 'Print', exact: true }).click(),
+  ]);
+  await printWin.waitForLoadState('domcontentloaded');
+  expect(printWin.url()).toContain('#print/prescription');
+  await expect(printWin.getByText('Amoxicillin 500 mg').first()).toBeVisible({ timeout: 60_000 });
+  await printWin.close();
+});
+
+test('runs reports from the UI — the full catalogue contract (ISS-020 guard)', async () => {
+  await page.getByRole('link', { name: 'Reports' }).click();
+  await expect(page.getByRole('heading', { name: 'Reports', level: 1 })).toBeVisible();
+
+  // Daily summary (default selection).
+  await page.getByRole('button', { name: 'Run report' }).click();
+  await expect(page.getByText('Collections (net)')).toBeVisible({ timeout: 30_000 });
+  await expect(page.locator('.toast-title', { hasText: 'Unknown report' })).toHaveCount(0);
+
+  // Range report with totals.
+  await page.getByText('Collection report', { exact: true }).click();
+  await page.getByRole('button', { name: 'Run report' }).click();
+  await expect(page.getByText('By method')).toBeVisible({ timeout: 30_000 });
+
+  // Profit & loss.
+  await page.getByText('Profit & loss', { exact: true }).click();
+  await page.getByRole('button', { name: 'Run report' }).click();
+  await expect(page.getByText('Net', { exact: true }).first()).toBeVisible({ timeout: 30_000 });
+  await expect(page.locator('.toast-title', { hasText: 'Unknown report' })).toHaveCount(0);
+});
