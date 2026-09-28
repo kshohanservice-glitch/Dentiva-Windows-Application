@@ -42,7 +42,22 @@ jobs:
       - name: Lint
         run: npx eslint .
       - name: Unit & integration tests (vitest)
-        run: npm test
+        shell: bash
+        run: |
+          set -o pipefail
+          npm test 2>&1 | tee vitest-output.log
+          code=${PIPESTATUS[0]}
+          if [ "$code" -ne 0 ]; then
+            echo "::error title=vitest failed (exit $code)"
+            # Emit failure context as annotations (log CDN unreachable from sandbox)
+            grep -E "FAIL |AssertionError|Serialized Error|→ " vitest-output.log | tail -50 | while IFS= read -r line; do
+              esc="${line//'%'/'%25'}"
+              esc="${esc//$'\r'/' '}"
+              esc="${esc//$'\n'/' '}"
+              echo "::error title=test failure::$esc"
+            done
+            exit "$code"
+          fi
       - name: Build (main + renderer)
         run: npm run build
       - name: No TODO/FIXME/HACK markers in code
