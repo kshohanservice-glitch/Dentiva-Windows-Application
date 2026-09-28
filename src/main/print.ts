@@ -128,17 +128,18 @@ export async function saveAsPdf(opts: PdfOptions): Promise<PdfResult> {
 }
 
 export interface PrinterInfo {
-  name: string; displayName: string; status: string; isDefault: boolean; options: Record<string, string>;
+  name: string; displayName: string; description: string; options: Record<string, string>;
 }
 
 export async function listPrinters(from: WebContents): Promise<PrinterInfo[]> {
   try {
+    // Electron ≥43: PrinterInfo exposes name/displayName/description/options —
+    // status/isDefault were removed from the API (Chromium print backend change).
     const printers = await from.getPrintersAsync();
     return printers.map((p) => ({
       name: p.name,
       displayName: p.displayName,
-      status: String(p.status),
-      isDefault: p.isDefault,
+      description: (p as { description?: string }).description ?? '',
       options: (p.options ?? {}) as Record<string, string>,
     }));
   } catch {

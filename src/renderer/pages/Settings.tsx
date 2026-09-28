@@ -360,7 +360,7 @@ function SecurityTab(props: { form: any; set: (path: string[], v: unknown) => vo
 
 function PrintTab(props: { form: any }) {
   const toast = useToast();
-  const [printers, setPrinters] = useState<{ name: string; displayName: string; isDefault: boolean }[]>([]);
+  const [printers, setPrinters] = useState<{ name: string; displayName: string; description: string }[]>([]);
   const profiles: any[] = props.form.printProfiles ?? [];
 
   useEffect(() => {
@@ -376,8 +376,7 @@ function PrintTab(props: { form: any }) {
           <div className="list">
             {printers.map((p) => (
               <div className="list-row" key={p.name}>
-                <span className="flex-1"><strong>{p.displayName}</strong><div className="xsmall muted mono">{p.name}</div></span>
-                {p.isDefault && <span className="badge badge-brand">default</span>}
+                <span className="flex-1"><strong>{p.displayName}</strong><div className="xsmall muted mono">{p.name}{p.description ? ` — ${p.description}` : ''}</div></span>
               </div>
             ))}
           </div>

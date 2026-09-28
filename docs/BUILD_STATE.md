@@ -37,42 +37,19 @@ No product code may change until the plan exists — plan exists; Phase A in pro
 
 ## Current task
 
-Phase A COMPLETE; **Phase C batch 1 CI-verified** (run 36393753841, all jobs green —
-ISS-008..014, 016..019). Batch 2 in progress: **ISS-003 (PR trigger + release guards),
-ISS-004 (THIRD_PARTY_NOTICES + ACCEPTANCE_CHECKLIST), ISS-006 (dependency audit
-finalized) — committing now.** NEXT: push batch 2 → open PR for PR-run evidence →
-dependency upgrades (ISS-001 react-router 7.18, ISS-002 Electron supported major +
-playwright, ISS-007 vitest 5) as isolated commit(s) with full CI validation →
-Phase B module tests (ISS-005) → Phase D second audit → Phase E v1.1.0.
+**Phase C batch 2 = dependency hardening: ISS-001 (router 7), ISS-002 (Electron 43.7.5 +
+Playwright 1.63 + printer-API adaptation), ISS-007 (vitest 5 + drop unused @electron/rebuild)
+— `npm audit` now 0/0 (prod+dev). Local gates all green (76/76). Batch 2 docs/CI commit
+fa46642 already CI-green (run 36395901710).** Committing deps batch now → push → watch
+full Windows CI (native rebuild is the risk point) → then Phase B module tests (ISS-005),
+Phase D second audit, Phase E v1.1.0.
 
-## Blocked
-
-- **GitHub tokens are short-lived in this sandbox** — expired twice (2026-09-27);
-  each time reconnection in Arena restored them. Current run 36356672810 is executing
-  on GitHub but cannot be polled until the token is refreshed.
-
-## Test status (local, commit `6846a03`)
-
-| Gate | Result |
-|------|--------|
-| `tsc -p tsconfig.node.json --noEmit` | exit 0 |
-| `tsc -p tsconfig.renderer.json --noEmit` | exit 0 |
-| `eslint .` | 0 errors (7 intentional `react-hooks/exhaustive-deps` warnings) |
-| `npm test` (vitest) | **76/76 passed** (adds audit-regressions suite covering ISS-008..019) |
-| `npm run build` | exit 0 (renderer bundle ~426 kB) |
-| `npm run icons` | exit 0 (build/icon.ico 16–256 + icon.png 512) |
-
-## Failing tests
-
-_None — vitest 76/76 local; Windows E2E/installer last green at run 36369672016 (V1.0);
-full CI re-run pending for V1.1 batch 1._
 
 ## Known issues
 
-- Open in register: ISS-001 (react-router advisory — upgrade staged next), ISS-002
-  (Electron EOL/high — upgrade staged next), ISS-005 (Phase B coverage), ISS-007
-  (dev vulns — vitest 5). Fixed+verified: 003..004 (pending PR-run evidence for 003),
-  006, 008..014, 016..019. P4 deferred: 015.
+- Open in register: ISS-005 (Phase B coverage). CI-verifying: 001/002 (upgrades in the
+  next push), 003 (PR-run evidence to open). Fixed+verified: 004, 006, 007, 008..014,
+  016..019. P4 deferred: 015.
 - Environment-limited (never claim passed): physical printer/DPI/monitor/admin-matrix.
 
 ## Next task

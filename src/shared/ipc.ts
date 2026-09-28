@@ -242,7 +242,7 @@ export interface PrintDocRequest {
 }
 
 export interface PrinterInfoDTO {
-  name: string; displayName: string; status: string; isDefault: boolean; options: Record<string, string>;
+  name: string; displayName: string; description: string; options: Record<string, string>;
 }
 
 export type PublicSettings = { clinic: SettingsDTO['clinic']; prescription: { labels: SettingsDTO['prescription']['labels'] } };
