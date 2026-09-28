@@ -1,0 +1,153 @@
+
+> dentiva-pro@1.0.0 dist
+> npm run build && electron-builder --win nsis --loglevel debug
+
+
+> dentiva-pro@1.0.0 build
+> npm run build:main && npm run build:renderer
+
+
+> dentiva-pro@1.0.0 build:main
+> tsc -p tsconfig.node.json && node scripts/bundle-preload.mjs
+
+
+  dist\main\preload\index.js  4.9kb
+
+Done in 6ms
+preload bundled → dist/main/preload/index.js
+
+> dentiva-pro@1.0.0 build:renderer
+> vite build
+
+[36mvite v6.4.3 [32mbuilding for production...[36m[39m
+transforming...
+[32m✓[39m 68 modules transformed.
+rendering chunks...
+computing gzip size...
+[2m../../dist/renderer/[22m[32mindex.html                                                    [39m[1m[2m  0.70 kB[22m[1m[22m[2m │ gzip:   0.40 kB[22m
+[2m../../dist/renderer/[22m[32massets/inter-vietnamese-400-normal-DMkecbls.woff2             [39m[1m[2m  4.97 kB[22m[1m[22m
+[2m../../dist/renderer/[22m[32massets/inter-vietnamese-600-normal-Cc8MFFhd.woff2             [39m[1m[2m  5.10 kB[22m[1m[22m
+[2m../../dist/renderer/[22m[32massets/inter-vietnamese-700-normal-DlLaEgI2.woff2             [39m[1m[2m  5.10 kB[22m[1m[22m
+[2m../../dist/renderer/[22m[32massets/inter-vietnamese-500-normal-DOriooB6.woff2             [39m[1m[2m  5.11 kB[22m[1m[22m
+[2m../../dist/renderer/[22m[32massets/inter-greek-ext-400-normal-DGGRlc-M.woff2              [39m[1m[2m  5.26 kB[22m[1m[22m
+[2m../../dist/renderer/[22m[32massets/inter-greek-ext-500-normal-C4iEst2y.woff2              [39m[1m[2m  5.43 kB[22m[1m[22m
+[2m../../dist/renderer/[22m[32massets/inter-greek-ext-600-normal-DRtmH8MT.woff2              [39m[1m[2m  5.43 kB[22m[1m[22m
+[2m../../dist/renderer/[22m[32massets/inter-greek-ext-700-normal-qfdV9bQt.woff2              [39m[1m[2m  5.44 kB[22m[1m[22m
+[2m../../dist/renderer/[22m[32massets/noto-sans-bengali-latin-ext-400-normal-Caj59Max.woff2  [39m[1m[2m  6.08 kB[22m[1m[22m
+[2m../../dist/renderer/[22m[32massets/noto-sans-bengali-latin-ext-600-normal-C6cBZc4J.woff2  [39m[1m[2m  6.12 kB[22m[1m[22m
+[2m../../dist/renderer/[22m[32massets/inter-vietnamese-400-normal-Bbgyi5SW.woff              [39m[1m[2m  6.50 kB[22m[1m[22m
+[2m../../dist/renderer/[22m[32massets/inter-vietnamese-500-normal-mJboJaSs.woff              [39m[1m[2m  6.60 kB[22m[1m[22m
+[2m../../dist/renderer/[22m[32massets/inter-vietnamese-700-normal-BZaoP0fm.woff              [39m[1m[2m  6.63 kB[22m[1m[22m
+[2m../../dist/renderer/[22m[32massets/inter-vietnamese-600-normal-BuLX-rYi.woff              [39m[1m[2m  6.64 kB[22m[1m[22m
+[2m../../dist/renderer/[22m[32massets/inter-greek-ext-400-normal-KugGGMne.woff               [39m[1m[2m  7.06 kB[22m[1m[22m
+[2m../../dist/renderer/[22m[32massets/inter-greek-ext-500-normal-2j5mBUwD.woff               [39m[1m[2m  7.19 kB[22m[1m[22m
+[2m../../dist/renderer/[22m[32massets/inter-greek-ext-600-normal-B8X0CLgF.woff               [39m[1m[2m  7.21 kB[22m[1m[22m
+[2m../../dist/renderer/[22m[32massets/inter-greek-ext-700-normal-BoQ6DsYi.woff               [39m[1m[2m  7.22 kB[22m[1m[22m
+[2m../../dist/renderer/[22m[32massets/inter-cyrillic-400-normal-obahsSVq.woff2               [39m[1m[2m  7.71 kB[22m[1m[22m
+[2m../../dist/renderer/[22m[32massets/inter-greek-400-normal-B4URO6DV.woff2                  [39m[1m[2m  7.78 kB[22m[1m[22m
+[2m../../dist/renderer/[22m[32massets/inter-cyrillic-500-normal-BasfLYem.woff2               [39m[1m[2m  7.90 kB[22m[1m[22m
+[2m../../dist/renderer/[22m[32massets/inter-cyrillic-700-normal-CjBOestx.woff2               [39m[1m[2m  7.90 kB[22m[1m[22m
+[2m../../dist/renderer/[22m[32massets/inter-greek-500-normal-BIZE56-Y.woff2                  [39m[1m[2m  7.92 kB[22m[1m[22m
+[2m../../dist/renderer/[22m[32massets/inter-greek-700-normal-C3JjAnD8.woff2                  [39m[1m[2m  7.92 kB[22m[1m[22m
+[2m../../dist/renderer/[22m[32massets/inter-greek-600-normal-plRanbMR.woff2                  [39m[1m[2m  7.94 kB[22m[1m[22m
+[2m../../dist/renderer/[22m[32massets/noto-sans-bengali-latin-ext-400-normal-DwoTidnb.woff   [39m[1m[2m  7.94 kB[22m[1m[22m
+[2m../../dist/renderer/[22m[32massets/inter-cyrillic-600-normal-CWCymEST.woff2               [39m[1m[2m  7.97 kB[22m[1m[22m
+[2m../../dist/renderer/[22m[32massets/noto-sans-bengali-latin-ext-600-normal-DY6HLMBa.woff   [39m[1m[2m  8.04 kB[22m[1m[22m
+[2m../../dist/renderer/[22m[32massets/inter-cyrillic-400-normal-HOLc17fK.woff                [39m[1m[2m  9.78 kB[22m[1m[22m
+[2m../../dist/renderer/[22m[32massets/inter-cyrillic-700-normal-DrXBdSj3.woff                [39m[1m[2m  9.91 kB[22m[1m[22m
+[2m../../dist/renderer/[22m[32massets/inter-greek-400-normal-q2sYcFCs.woff                   [39m[1m[2m  9.92 kB[22m[1m[22m
+[2m../../dist/renderer/[22m[32massets/inter-cyrillic-600-normal-4D_pXhcN.woff                [39m[1m[2m  9.94 kB[22m[1m[22m
+[2m../../dist/renderer/[22m[32massets/inter-cyrillic-500-normal-CxZf_p3X.woff                [39m[1m[2m  9.94 kB[22m[1m[22m
+[2m../../dist/renderer/[22m[32massets/inter-greek-500-normal-Xzm54t5V.woff                   [39m[1m[2m  9.98 kB[22m[1m[22m
+[2m../../dist/renderer/[22m[32massets/inter-greek-700-normal-BUv2fZ6O.woff                   [39m[1m[2m  9.98 kB[22m[1m[22m
+[2m../../dist/renderer/[22m[32massets/inter-greek-600-normal-BZpKdvQh.woff                   [39m[1m[2m 10.03 kB[22m[1m[22m
+[2m../../dist/renderer/[22m[32massets/inter-cyrillic-ext-400-normal-BQZuk6qB.woff2           [39m[1m[2m 10.23 kB[22m[1m[22m
+[2m../../dist/renderer/[22m[32massets/noto-sans-bengali-latin-400-normal-DiV_iq0_.woff2      [39m[1m[2m 10.35 kB[22m[1m[22m
+[2m../../dist/renderer/[22m[32massets/inter-cyrillic-ext-500-normal-B0yAr1jD.woff2           [39m[1m[2m 10.43 kB[22m[1m[22m
+[2m../../dist/renderer/[22m[32massets/noto-sans-bengali-latin-600-normal-BokLars8.woff2      [39m[1m[2m 10.47 kB[22m[1m[22m
+[2m../../dist/renderer/[22m[32massets/inter-cyrillic-ext-600-normal-Dfes3d0z.woff2           [39m[1m[2m 10.48 kB[22m[1m[22m
+[2m../../dist/renderer/[22m[32massets/inter-cyrillic-ext-700-normal-BjwYoWNd.woff2           [39m[1m[2m 10.50 kB[22m[1m[22m
+[2m../../dist/renderer/[22m[32massets/noto-sans-bengali-latin-400-normal-BNmU3xSe.woff       [39m[1m[2m 13.28 kB[22m[1m[22m
+[2m../../dist/renderer/[22m[32massets/noto-sans-bengali-latin-600-normal-KNvJZft-.woff       [39m[1m[2m 13.33 kB[22m[1m[22m
+[2m../../dist/renderer/[22m[32massets/inter-cyrillic-ext-400-normal-DQukG94-.woff            [39m[1m[2m 13.34 kB[22m[1m[22m
+[2m../../dist/renderer/[22m[32massets/inter-cyrillic-ext-700-normal-LO58E6JB.woff            [39m[1m[2m 13.41 kB[22m[1m[22m
+[2m../../dist/renderer/[22m[32massets/inter-cyrillic-ext-500-normal-BmqWE9Dz.woff            [39m[1m[2m 13.45 kB[22m[1m[22m
+[2m../../dist/renderer/[22m[32massets/inter-cyrillic-ext-600-normal-Bcila6Z-.woff            [39m[1m[2m 13.46 kB[22m[1m[22m
+[2m../../dist/renderer/[22m[32massets/inter-latin-400-normal-C38fXH4l.woff2                  [39m[1m[2m 23.66 kB[22m[1m[22m
+[2m../../dist/renderer/[22m[32massets/inter-latin-500-normal-Cerq10X2.woff2                  [39m[1m[2m 24.27 kB[22m[1m[22m
+[2m../../dist/renderer/[22m[32massets/inter-latin-700-normal-Yt3aPRUw.woff2                  [39m[1m[2m 24.36 kB[22m[1m[22m
+[2m../../dist/renderer/[22m[32massets/inter-latin-600-normal-LgqL8muc.woff2                  [39m[1m[2m 24.45 kB[22m[1m[22m
+[2m../../dist/renderer/[22m[32massets/inter-latin-400-normal-CyCys3Eg.woff                   [39m[1m[2m 30.70 kB[22m[1m[22m
+[2m../../dist/renderer/[22m[32massets/inter-latin-600-normal-CiBQ2DWP.woff                   [39m[1m[2m 31.26 kB[22m[1m[22m
+[2m../../dist/renderer/[22m[32massets/inter-latin-500-normal-BL9OpVg8.woff                   [39m[1m[2m 31.28 kB[22m[1m[22m
+[2m../../dist/renderer/[22m[32massets/inter-latin-700-normal-BLAVimhd.woff                   [39m[1m[2m 31.32 kB[22m[1m[22m
+[2m../../dist/renderer/[22m[32massets/inter-latin-ext-400-normal-C1nco2VV.woff2              [39m[1m[2m 35.00 kB[22m[1m[22m
+[2m../../dist/renderer/[22m[32massets/inter-latin-ext-500-normal-CV4jyFjo.woff2              [39m[1m[2m 36.02 kB[22m[1m[22m
+[2m../../dist/renderer/[22m[32massets/inter-latin-ext-700-normal-Ca8adRJv.woff2              [39m[1m[2m 36.24 kB[22m[1m[22m
+[2m../../dist/renderer/[22m[32massets/inter-latin-ext-600-normal-D2bJ5OIk.woff2              [39m[1m[2m 36.26 kB[22m[1m[22m
+[2m../../dist/renderer/[22m[32massets/noto-sans-bengali-bengali-400-normal-BFibWJDZ.woff2    [39m[1m[2m 44.35 kB[22m[1m[22m
+[2m../../dist/renderer/[22m[32massets/inter-latin-ext-400-normal-77YHD8bZ.woff               [39m[1m[2m 47.56 kB[22m[1m[22m
+[2m../../dist/renderer/[22m[32massets/noto-sans-bengali-bengali-600-normal-BVnGrJcL.woff2    [39m[1m[2m 47.64 kB[22m[1m[22m
+[2m../../dist/renderer/[22m[32massets/inter-latin-ext-500-normal-BxGbmqWO.woff               [39m[1m[2m 48.49 kB[22m[1m[22m
+[2m../../dist/renderer/[22m[32massets/inter-latin-ext-700-normal-TidjK2hL.woff               [39m[1m[2m 48.63 kB[22m[1m[22m
+[2m../../dist/renderer/[22m[32massets/inter-latin-ext-600-normal-CIVaiw4L.woff               [39m[1m[2m 48.67 kB[22m[1m[22m
+[2m../../dist/renderer/[22m[32massets/noto-sans-bengali-bengali-400-normal-BymQv2v6.woff     [39m[1m[2m 54.27 kB[22m[1m[22m
+[2m../../dist/renderer/[22m[32massets/noto-sans-bengali-bengali-600-normal-d2kw9WWz.woff     [39m[1m[2m 56.80 kB[22m[1m[22m
+[2m../../dist/renderer/[22m[35massets/index-CHNRH4Mf.css                                     [39m[1m[2m 51.29 kB[22m[1m[22m[2m │ gzip:   9.74 kB[22m
+[2m../../dist/renderer/[22m[36massets/index-DgPpNBuC.js                                      [39m[1m[2m426.58 kB[22m[1m[22m[2m │ gzip: 116.04 kB[22m
+[32m✓ built in 2.06s[39m
+cli.js build
+
+Build
+
+Commands:
+  cli.js build                    Build                                [default]
+  cli.js install-app-deps         Install app deps
+  cli.js node-gyp-rebuild         Rebuild own native code
+  cli.js publish                  Publish a list of artifacts
+  cli.js create-self-signed-cert  Create self-signed code signing cert for
+                                  Windows apps
+  cli.js start                    Run application in a development mode using
+                                  electron-webpack
+
+Building:
+  -m, -o, --mac, --macos       Build for macOS, accepts target list (see
+                               https://goo.gl/5uHuzj).                   [array]
+  -l, --linux                  Build for Linux, accepts target list (see
+                               https://goo.gl/4vwQad)                    [array]
+  -w, --win, --windows         Build for Windows, accepts target list (see
+                               https://goo.gl/jYsTEJ)                    [array]
+      --x64                    Build for x64                           [boolean]
+      --ia32                   Build for ia32                          [boolean]
+      --armv7l                 Build for armv7l                        [boolean]
+      --arm64                  Build for arm64                         [boolean]
+      --universal              Build for universal                     [boolean]
+      --dir                    Build unpacked dir. Useful to test.     [boolean]
+      --prepackaged, --pd      The path to prepackaged app (to pack in a
+                               distributable format)
+      --projectDir, --project  The path to project directory. Defaults to
+                               current working directory.
+  -c, --config                 The path to an electron-builder config. Defaults
+                               to `electron-builder.yml` (or `json`, or `json5`,
+                               or `js`, or `ts`), see https://goo.gl/YFRJOM
+
+Publishing:
+  -p, --publish  Publish artifacts, see https://goo.gl/tSFycD
+                [choices: "onTag", "onTagOrDraft", "always", "never", undefined]
+
+Other:
+      --help     Show help                                             [boolean]
+      --version  Show version number                                   [boolean]
+
+Examples:
+  electron-builder -mwl                     build for macOS, Windows and Linux
+  electron-builder --linux deb tar.xz       build deb and tar.xz for Linux
+  electron-builder --win --ia32             build for Windows ia32
+  electron-builder                          set package.json property `foo` to
+  -c.extraMetadata.foo=bar                  `bar`
+  electron-builder                          configure unicode options for NSIS
+  --config.nsis.unicode=false
+
+See https://electron.build for more documentation.
+
+Unknown argument: loglevel
