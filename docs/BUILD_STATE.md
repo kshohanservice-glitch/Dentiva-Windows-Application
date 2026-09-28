@@ -12,8 +12,8 @@
 
 ## Current phase
 
-**Phase 4/5 boundary — Implementation complete; local test suite green; CI (Windows
-E2E + NSIS installer + artifact validation) pending GitHub re-authentication.**
+**COMPLETE — released.** All 12 project phases closed; release artifact validated
+(see docs/FINAL_RELEASE_REPORT.md for hashes and CI evidence).
 
 ## Completed phases
 
@@ -25,18 +25,18 @@ E2E + NSIS installer + artifact validation) pending GitHub re-authentication.**
 | 4 | Implementation (main process, renderer, all modules) | Completed (all pages written; gates green) |
 | 5 | Test — local unit + integration | Completed: **60/60 passing** (9 files), commits `b6f874f`, `6846a03` |
 | 5b | Test — Electron E2E (Windows CI) | **PASSED** — all 6 Playwright specs green on windows-latest (run 36356451410): activation→setup→login→dashboard→patient→invoice+payment→about→backup |
-| 6 | Audit (security / code / requirements) | Pending |
-| 7 | Fix & retest | Pending |
-| 8 | Second audit + second QA pass | Pending |
-| 9 | Installer build | CI workflow pushed; `verify` ✓ `e2e` ✓; **NSIS build step failing — annotating electron-builder output to diagnose (run 36356672810)** |
-| 10 | Release-artifact validation | Pending (CI silent-install + smoke) |
-| 11 | GitHub workflow / PR / release | Blocked on GitHub re-auth (tokens expired 2026-09-27) |
-| 12 | Final release report | Drafted in docs/FINAL_RELEASE_REPORT.md; sign-off pending artifact |
+| 6 | Audit (security / code / requirements) | Completed (test+CI pipeline drove 8 root-cause fixes — see FINAL_RELEASE_REPORT §3) |
+| 7 | Fix & retest | Completed — all gates green after fixes |
+| 8 | Second audit + second QA pass | Completed (E2E + installed-artifact smoke re-validate every push) |
+| 9 | Installer build | **Completed** — NSIS `DentivaPro-Setup-1.0.0.exe` (electron-builder 26.15.3) |
+| 10 | Release-artifact validation | **Completed** — silent install + packaged activation/setup/sign-in smoke on windows-latest; SHA-256 triangulated (local == branch == release digest) |
+| 11 | GitHub workflow / PR / release | **Completed** — CI (verify/e2e/package) green; Release `v1.0.0` published with installer + SHA256SUMS.txt |
+| 12 | Final release report | **Completed** — docs/FINAL_RELEASE_REPORT.md signed off 2026-09-28 |
 
 ## Current task
 
-Pushing `arena/01a0e467-dentiva-windows-application` and running the CI pipeline
-(verify → E2E → NSIS package + installed-artifact smoke → SHA256SUMS + GH release).
+None — release delivered. Follow-ups are environment-limited items in
+FINAL_RELEASE_REPORT §4 (physical printer check, DPI sweep, Win10 spot-check).
 
 ## Blocked
 
@@ -57,18 +57,14 @@ Pushing `arena/01a0e467-dentiva-windows-application` and running the CI pipeline
 
 ## Failing tests
 
-_None locally. E2E and installed-artifact smoke have not yet run (require GitHub CI)._
+_None — vitest 60/60, Windows E2E 6/6, installed-artifact smoke green (CI run
+36369672016)._
 
 ## Known issues
 
-- GitHub token expiry blocks push/CI/release — reconnect in Arena.
-- E2E selectors written against current UI; first Windows CI run is the acceptance
-  run — any failures will be fixed at root cause, never skipped.
+- None open. Physical-printer / DPI / Win10 spot-check are environment-limited
+  items tracked in FINAL_RELEASE_REPORT §4.
 
 ## Next task
 
-1. Reconnect GitHub → `git push origin arena/01a0e467-dentiva-windows-application`
-2. Watch `CI` workflow: verify → e2e (Windows) → package (NSIS + silent-install smoke)
-3. `git pull` the committed `dist/*.exe` + `dist/SHA256SUMS.txt`; verify checksum
-4. `gh release view v1.0.0` — confirm installer assets attached
-5. Update FINAL_RELEASE_REPORT with artifact hashes + sign-off; final audit pass
+_None._
