@@ -37,20 +37,21 @@ No product code may change until the plan exists — plan exists; Phase A in pro
 
 ## Current task
 
-**Phase C batch 2 = dependency hardening: ISS-001 (router 7), ISS-002 (Electron 43.7.5 +
-Playwright 1.63 + printer-API adaptation), ISS-007 (vitest 5 + drop unused @electron/rebuild)
-— `npm audit` now 0/0 (prod+dev). Local gates all green (76/76). Batch 2 docs/CI commit
-fa46642 already CI-green (run 36395901710).** Committing deps batch now → push → watch
-full Windows CI (native rebuild is the risk point) → then Phase B module tests (ISS-005),
-Phase D second audit, Phase E v1.1.0.
-
+**Phase A module review COMPLETE (mandated scope) — Batch 3 Phase-C fixes staged locally:**
+ISS-020 (P1 — all 14 Reports-UI names threw `Unknown report`; contract moved to
+`shared/reports.ts` + 7 missing builders + contract tests), ISS-021…024 (queue↔appointment
+sync completeness, duplicate-queue arrive, reschedule self-conflict, duration double-booking),
+ISS-025 (dead code), ISS-028 (installer 122 MB → GitHub 100 MB push limit: locales+max
+compression+bSql payload excludes+afterPack strips dxcompiler.dll — win32-x64 N-API prebuild
+kept after smoke proved its absence crashes the app). Local gates: **88/88**, tsc ×2, eslint 0,
+build ✓. Committing + pushing → CI verification → then Phase B (ISS-005).
 
 ## Known issues
 
-- Open in register: ISS-005 (Phase B coverage). CI-verifying: 001/002 (upgrades in the
-  next push), 003 (PR-run evidence to open). Fixed+verified: 004, 006, 007, 008..014,
-  016..019. P4 deferred: 015.
-- Environment-limited (never claim passed): physical printer/DPI/monitor/admin-matrix.
+- Open in register: ISS-005 (Phase B coverage). Pending CI evidence: 001/002/003, 020…025, 028.
+  Fixed+verified locally: 004, 006, 007, 008..014, 016..025. Documented open: 026 (P3),
+  015/027 (P4). Environment-limited (never claim passed): physical printer/DPI/monitor/
+  admin-matrix.
 
 ## Next task
 
