@@ -218,7 +218,7 @@ export function removeRole(ctx: Ctx, id: number): { ok: boolean } {
 
 /* -------------------------------- Audit -------------------------------- */
 
-export function listAudit(ctx: Ctx, filter: { page?: number; pageSize?: number; action?: string; userId?: number; from?: string; to?: string; query?: string }): Paged<AuditEntry> {
+export function listAudit(ctx: Ctx, filter: { page?: number; pageSize?: number; action?: string; userId?: number; from?: string; to?: string; query?: string } = {}): Paged<AuditEntry> {
   requirePermission(ctx, 'audit.view');
   const { page, pageSize, offset } = pageParams(filter.page, filter.pageSize);
   const where: string[] = [];
