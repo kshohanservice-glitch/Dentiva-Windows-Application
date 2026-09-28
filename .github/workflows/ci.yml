@@ -211,6 +211,21 @@ jobs:
             dist/*.exe
             dist/SHA256SUMS.txt
           retention-days: 30
+      - name: Installer payload size report (top 20)
+        shell: pwsh
+        run: |
+          $root = (Get-ChildItem -Directory dist | Where-Object { Test-Path (Join-Path $_.FullName 'Dentiva Pro.exe') } | Select-Object -First 1)
+          if ($root) {
+            $files = Get-ChildItem -Recurse -File $root.FullName | Sort-Object Length -Descending | Select-Object -First 20
+            foreach ($f in $files) {
+              $rel = $f.FullName.Substring($root.FullName.Length)
+              Write-Host "::error title=payload $($f.Length) bytes::$rel"
+            }
+            $total = (Get-ChildItem -Recurse -File $root.FullName | Measure-Object Length -Sum).Sum
+            Write-Host "win-unpacked total: $total bytes"
+          }
+          Get-ChildItem dist -File | ForEach-Object { Write-Host "dist/$($_.Name): $($_.Length) bytes" }
+
       - name: Commit installer to branch (dist fallback)
         if: github.event_name == 'push'
         shell: bash
