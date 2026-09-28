@@ -50,6 +50,8 @@ electronLanguages:
 
 compression: maximum
 
+afterPack: scripts/after-pack.cjs
+
 asar: true
 # Native modules must be readable outside the asar archive.
 asarUnpack:
