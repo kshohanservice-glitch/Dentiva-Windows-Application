@@ -17,6 +17,14 @@ files:
   - '!dist/.icon-*/**'
   - package.json
 
+# Keep the installer under GitHub's 100 MB per-file push limit for the dist/
+# fallback commit, and make downloads lighter for clinics on slow links.
+# Electron ships ~60 locale packs; the UI is English-only, so only en-US ships.
+electronLanguages:
+  - en-US
+
+compression: maximum
+
 asar: true
 # Native modules must be readable outside the asar archive.
 asarUnpack:

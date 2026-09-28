@@ -227,7 +227,8 @@ jobs:
             code=$?
             set -e
             if [ "$code" -ne 0 ]; then
-              echo "::error title=artifact commit push failed::$out"
+              esc="${out//$'\n'/' | '}"
+              echo "::error title=artifact commit push failed::$esc"
               echo "HEAD=$(git rev-parse HEAD) origin=$(git rev-parse origin/${GITHUB_REF_NAME} 2>/dev/null)"
               # Non-fast-forward race: rebase onto the branch and retry once.
               git fetch origin "${GITHUB_REF_NAME}"
