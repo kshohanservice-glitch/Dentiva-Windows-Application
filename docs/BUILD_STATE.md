@@ -24,11 +24,11 @@ E2E + NSIS installer + artifact validation) pending GitHub re-authentication.**
 | 3 | Architecture / UX / DB / Security / Printing / Backup / Testing / Release planning (spec freeze) | Completed |
 | 4 | Implementation (main process, renderer, all modules) | Completed (all pages written; gates green) |
 | 5 | Test — local unit + integration | Completed: **60/60 passing** (9 files), commits `b6f874f`, `6846a03` |
-| 5b | Test — Electron E2E + installed-artifact smoke | Authored (tests/e2e/app.spec.ts, scripts/smoke-installed.mjs); **awaiting Windows CI run** |
+| 5b | Test — Electron E2E (Windows CI) | **PASSED** — all 6 Playwright specs green on windows-latest (run 36356451410): activation→setup→login→dashboard→patient→invoice+payment→about→backup |
 | 6 | Audit (security / code / requirements) | Pending |
 | 7 | Fix & retest | Pending |
 | 8 | Second audit + second QA pass | Pending |
-| 9 | Installer build | CI workflow ready (`.github/workflows/ci.yml`); **pending push** |
+| 9 | Installer build | CI workflow pushed; `verify` ✓ `e2e` ✓; **NSIS build step failing — annotating electron-builder output to diagnose (run 36356672810)** |
 | 10 | Release-artifact validation | Pending (CI silent-install + smoke) |
 | 11 | GitHub workflow / PR / release | Blocked on GitHub re-auth (tokens expired 2026-09-27) |
 | 12 | Final release report | Drafted in docs/FINAL_RELEASE_REPORT.md; sign-off pending artifact |
@@ -40,8 +40,9 @@ Pushing `arena/01a0e467-dentiva-windows-application` and running the CI pipeline
 
 ## Blocked
 
-- **GitHub authentication expired** in the sandbox (`GH_TOKEN`/`GITHUB_TOKEN` → 401
-  Bad credentials; SSH port 22 closed). Requires reconnection in Arena before push/CI.
+- **GitHub tokens are short-lived in this sandbox** — expired twice (2026-09-27);
+  each time reconnection in Arena restored them. Current run 36356672810 is executing
+  on GitHub but cannot be polled until the token is refreshed.
 
 ## Test status (local, commit `6846a03`)
 
