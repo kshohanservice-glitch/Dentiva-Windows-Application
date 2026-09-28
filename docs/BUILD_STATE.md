@@ -37,9 +37,15 @@ No product code may change until the plan exists — plan exists; Phase A in pro
 
 ## Current task
 
-Phase A static audit: line-by-line review of services/router/schema/renderer + test
-quality review; then Phase B dynamic break tests (ISS-005 coverage), Phase C fixes,
-Phase D second audit, Phase E build/install/release V1.1.
+Phase A static audit ~40% done (router, activation, session, auth, billing, backup,
+context/permissions, search, users/roles, inventory, accounting, notifications, schema
+triggers reviewed). Register now at ISS-015. **Two bugs confirmed empirically by
+`tests/integration/audit-probe.test.ts` (deliberately UNCOMMITTED — both cases RED until
+their Phase C fixes land together with the tests): ISS-008 over-refund breaks
+Total=Paid+Due (P1), ISS-009 CSV formula injection (P2).** Next: remaining Phase A reads
+(visits/chart/prescriptions/queue/appointments/settings/attachments/print/reports +
+renderer fake-UI sweep + test-quality review), then Phase B module tests (ISS-005),
+Phase C fixes (commits pair fix+test, keep CI green), Phase D re-audit, Phase E 1.1.0.
 
 ## Blocked
 
@@ -65,9 +71,10 @@ _None — vitest 60/60, Windows E2E 6/6, installed-artifact smoke green (CI run
 
 ## Known issues
 
-- V1.1 register: docs/V1.1_ISSUE_REGISTER.md (ISS-001 P1 shipped dep advisory,
-  ISS-002 P1 Electron EOL/high, ISS-003 P2 no PR trigger, ISS-004 P2 missing docs,
-  ISS-005 P2 test gaps, ISS-006 P2 dependency audit not finalized, ISS-007 P3 dev vulns).
+- V1.1 register: docs/V1.1_ISSUE_REGISTER.md — ISS-001..015 (P1s: 001 router advisory,
+  002 Electron EOL/high, **008 over-refund invariant — confirmed by probe**; P2s: 003 CI
+  PR trigger, 004 missing docs, 005 test gaps, 006 dependency audit, **009 CSV injection —
+  confirmed by probe**; P3s: 010-014; P4: 015).
 - Environment-limited (never claim passed): physical printer/DPI/monitor/admin-matrix.
 
 ## Next task
