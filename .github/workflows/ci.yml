@@ -32,7 +32,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: npm
       - run: npm ci
       - name: Typecheck (main process)
@@ -44,9 +44,10 @@ jobs:
       - name: Unit & integration tests (vitest)
         shell: bash
         run: |
-          set -o pipefail
+          set +e
           npm test 2>&1 | tee vitest-output.log
           code=${PIPESTATUS[0]}
+          set -e
           if [ "$code" -ne 0 ]; then
             echo "::error title=vitest failed (exit $code)"
             # Emit failure context as annotations (log CDN unreachable from sandbox)
@@ -76,7 +77,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: npm
       - run: npm ci
       - name: Rebuild native modules for the Electron ABI
@@ -123,7 +124,7 @@ jobs:
           fetch-depth: 0
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: npm
       - run: npm ci
       - name: Generate Windows icons
