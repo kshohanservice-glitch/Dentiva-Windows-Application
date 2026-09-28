@@ -143,7 +143,7 @@ export function updateAppointment(ctx: Ctx, id: number, input: AppointmentUpdate
     const duration = reqInt(input.reschedule.durationMin ?? existing.duration_min, 'Duration', { min: 5, max: 720 });
     const dentistId = existing.dentist_id as number | null;
     if (dentistId != null) {
-      const c = findConflict(ctx, dentistId, date, time, duration, undefined);
+      const c = findConflict(ctx, dentistId, date, time, duration, id);
       if (c && !input.allowConflict) {
         throw conflict(`New slot overlaps an existing appointment (${c.time}, ${c.patientName}).`);
       }
@@ -175,7 +175,7 @@ export function updateAppointment(ctx: Ctx, id: number, input: AppointmentUpdate
   const time = input.time ? reqTime(input.time, 'Time') : existing.time;
   const duration = input.durationMin != null ? reqInt(input.durationMin, 'Duration', { min: 5, max: 720 }) : existing.duration_min;
 
-  if ((date !== existing.date || time !== existing.time || dentistId !== existing.dentist_id) && dentistId != null) {
+  if ((date !== existing.date || time !== existing.time || dentistId !== existing.dentist_id || duration !== existing.duration_min) && dentistId != null) {
     const c = findConflict(ctx, dentistId, date, time, duration, id);
     if (c && !input.allowConflict) throw conflict(`Time slot overlaps an existing appointment (${c.time}, ${c.patientName}).`);
     if (c && input.allowConflict && !hasPermission(ctx, 'appointments.override')) throw forbidden('Overriding appointment conflicts requires additional permission.');
@@ -200,7 +200,7 @@ export function cancelAppointment(ctx: Ctx, id: number, reason?: string): Appoin
   tx(ctx.db, () => {
     ctx.db.prepare("UPDATE appointments SET status = 'cancelled', notes = COALESCE(notes, '') || ?, updated_at = ? WHERE id = ?")
       .run(reason ? ` [Cancelled: ${reason}]` : '', nowISO(), id);
-    ctx.db.prepare("UPDATE queue_entries SET status = 'cancelled' WHERE appointment_id = ? AND status IN ('waiting','called')").run(id);
+    ctx.db.prepare("UPDATE queue_entries SET status = 'cancelled' WHERE appointment_id = ? AND status IN ('waiting','called','paused','in_treatment')").run(id);
     audit(ctx, { action: 'appointment.cancel', entityType: 'appointment', entityId: id, summary: 'Appointment cancelled', reason });
   });
   return getOne(ctx, id);
@@ -215,6 +215,10 @@ export function markNoShow(ctx: Ctx, id: number): AppointmentDTO {
   }
   tx(ctx.db, () => {
     ctx.db.prepare("UPDATE appointments SET status = 'no_show', updated_at = ? WHERE id = ?").run(nowISO(), id);
+    // Keep the queue truthful: a no-show patient must leave the active queue,
+    // otherwise queue actions could later overwrite the terminal status (ISS-021).
+    ctx.db.prepare("UPDATE queue_entries SET status = 'cancelled', finished_at = COALESCE(finished_at, ?) WHERE appointment_id = ? AND status IN ('waiting','called','paused','in_treatment')")
+      .run(nowISO(), id);
     audit(ctx, { action: 'appointment.no_show', entityType: 'appointment', entityId: id, summary: 'Marked as no-show' });
   });
   return getOne(ctx, id);
@@ -233,6 +237,17 @@ export function arriveAppointment(ctx: Ctx, id: number): { appointment: Appointm
   const queue = tx(ctx.db, () => {
     ctx.db.prepare("UPDATE appointments SET status = 'in_queue', updated_at = ? WHERE id = ?").run(nowISO(), id);
     let entry = ctx.db.prepare("SELECT * FROM queue_entries WHERE appointment_id = ? AND status NOT IN ('completed','cancelled')").get(id) as any;
+    if (!entry) {
+      // The patient may already be queued today (walk-in added first) — reuse
+      // that entry instead of creating a duplicate (ISS-022).
+      entry = ctx.db
+        .prepare("SELECT * FROM queue_entries WHERE day = ? AND patient_id = ? AND status NOT IN ('completed','cancelled')")
+        .get(todayISO(), appt.patient_id) as any;
+      if (entry && !entry.appointment_id) {
+        ctx.db.prepare('UPDATE queue_entries SET appointment_id = ? WHERE id = ?').run(id, entry.id);
+        entry = ctx.db.prepare('SELECT * FROM queue_entries WHERE id = ?').get(entry.id) as any;
+      }
+    }
     if (!entry) {
       const day = todayISO();
       const maxNo = Number(ctx.db.prepare('SELECT COALESCE(MAX(queue_no), 0) m FROM queue_entries WHERE day = ?').get<{ m: number }>(day)!.m);

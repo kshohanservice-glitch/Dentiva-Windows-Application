@@ -108,7 +108,7 @@ export function performQueueAction(ctx: Ctx, id: number | null, action: QueueAct
           if (busy) throw conflict(`This dentist is already with queue #${busy.queue_no}. Complete or transfer that patient first.`);
         }
         update({ status: 'in_treatment', started_at: entry.started_at ?? nowISO() });
-        if (entry.appointment_id) ctx.db.prepare("UPDATE appointments SET status = 'in_treatment', updated_at = ? WHERE id = ?").run(nowISO(), entry.appointment_id);
+        if (entry.appointment_id) ctx.db.prepare("UPDATE appointments SET status = 'in_treatment', updated_at = ? WHERE id = ? AND status NOT IN ('completed','cancelled','no_show','rescheduled')").run(nowISO(), entry.appointment_id);
         break;
       }
       case 'pause': {
@@ -124,7 +124,7 @@ export function performQueueAction(ctx: Ctx, id: number | null, action: QueueAct
       case 'complete': {
         if (['completed', 'cancelled'].includes(entry.status)) throw conflict('Entry already finished.');
         update({ status: 'completed', finished_at: nowISO() });
-        if (entry.appointment_id) ctx.db.prepare("UPDATE appointments SET status = 'completed', updated_at = ? WHERE id = ?").run(nowISO(), entry.appointment_id);
+        if (entry.appointment_id) ctx.db.prepare("UPDATE appointments SET status = 'completed', updated_at = ? WHERE id = ? AND status NOT IN ('completed','cancelled','no_show','rescheduled')").run(nowISO(), entry.appointment_id);
         break;
       }
       case 'cancel': {

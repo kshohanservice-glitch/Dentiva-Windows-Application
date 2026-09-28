@@ -57,8 +57,6 @@ export type PrintResult = { ok: true } | { ok: false; cancelled?: boolean; error
 export async function executePrint(opts: PrintExecuteOptions): Promise<PrintResult> {
   const wc = getPrintContents();
   try {
-    const settings: Electron.PrintToPDFOptions & Record<string, unknown> = {};
-    void settings;
     const ok = await new Promise<boolean>((resolve, reject) => {
       wc.print(
         {

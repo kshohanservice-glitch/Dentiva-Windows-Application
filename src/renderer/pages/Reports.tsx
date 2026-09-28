@@ -7,37 +7,12 @@ import { Icon } from '../components/shell';
 import { bdt, isoDate } from '../format';
 import type { ReportResult } from '../../shared/types';
 
-interface ReportDef {
-  name: string;
-  label: string;
-  group: 'Finance' | 'Clinical' | 'Operations' | 'Inventory';
-  permission: string;
-  needsRange?: boolean;
-  needsDentist?: boolean;
-  needsPatient?: boolean;
-}
-
-const REPORTS: ReportDef[] = [
-  { name: 'daily_summary', label: 'Daily summary', group: 'Operations', permission: 'dashboard.view' },
-  { name: 'monthly_revenue', label: 'Monthly revenue', group: 'Finance', permission: 'finance.view', needsRange: true },
-  { name: 'outstanding_dues', label: 'Outstanding dues', group: 'Finance', permission: 'finance.view' },
-  { name: 'collection_report', label: 'Collection report', group: 'Finance', permission: 'billing.payment.view', needsRange: true },
-  { name: 'payment_methods', label: 'Payment methods', group: 'Finance', permission: 'billing.payment.view', needsRange: true },
-  { name: 'treatment_stats', label: 'Treatment statistics', group: 'Clinical', permission: 'finance.view', needsRange: true },
-  { name: 'dentist_workload', label: 'Dentist workload', group: 'Clinical', permission: 'finance.view', needsRange: true },
-  { name: 'appointment_no_shows', label: 'Appointment no-shows', group: 'Operations', permission: 'appointments.view', needsRange: true },
-  { name: 'patient_registrations', label: 'Patient registrations', group: 'Operations', permission: 'patients.view', needsRange: true },
-  { name: 'stock_on_hand', label: 'Stock on hand', group: 'Inventory', permission: 'inventory.view' },
-  { name: 'low_stock', label: 'Low stock items', group: 'Inventory', permission: 'inventory.view' },
-  { name: 'expiry_report', label: 'Expiry report', group: 'Inventory', permission: 'inventory.view' },
-  { name: 'expense_summary', label: 'Expense summary', group: 'Finance', permission: 'accounting.view', needsRange: true },
-  { name: 'profit_loss', label: 'Profit & loss', group: 'Finance', permission: 'accounting.view', needsRange: true },
-];
+import { REPORT_DEFS, type ReportDef } from '../../shared/reports';
 
 export function ReportsPage() {
   const { can } = useApp();
   const toast = useToast();
-  const [selected, setSelected] = useState<ReportDef>(REPORTS[0]);
+  const [selected, setSelected] = useState<ReportDef>(REPORT_DEFS[0]);
   const [from, setFrom] = useState(isoDate(new Date(Date.now() - 30 * 86_400_000)));
   const [to, setTo] = useState(isoDate(new Date()));
   const [result, setResult] = useState<ReportResult | null>(null);
@@ -45,7 +20,7 @@ export function ReportsPage() {
   const [error, setError] = useState<unknown>(null);
   const [exporting, setExporting] = useState(false);
 
-  const visible = useMemo(() => REPORTS.filter((r) => can(r.permission) || can('finance.view')), [can]);
+  const visible = useMemo(() => REPORT_DEFS.filter((r) => can(r.permission) || can('finance.view')), [can]);
 
   const params = (): Record<string, any> => {
     const p: Record<string, any> = {};

@@ -52,8 +52,9 @@ const paymentsReport: Builder = (ctx, params) => {
   const total = (ctx.db
     .prepare(`SELECT COALESCE(SUM(CASE WHEN type='payment' THEN amount_paisa ELSE -amount_paisa END),0) n FROM payments pay ${whereSql}`)
     .get(...args as any[]) as any).n;
+  const methodConds = [...where, "type='payment'"];
   const methods = (ctx.db
-    .prepare(`SELECT method, COALESCE(SUM(amount_paisa),0) total FROM payments pay ${whereSql} AND type='payment' GROUP BY method ORDER BY total DESC`)
+    .prepare(`SELECT method, COALESCE(SUM(amount_paisa),0) total FROM payments pay WHERE ${methodConds.join(' AND ')} GROUP BY method ORDER BY total DESC`)
     .all(...args as any[]) as any[])
     .map((m) => `${m.method}: ${formatBdt(m.total)}`).join(' · ');
 
@@ -239,10 +240,8 @@ const visitsReport: Builder = (ctx, params) => {
   };
 };
 
-const inventoryReport: Builder = (ctx) => {
-  requirePermission(ctx, 'inventory.view');
-  const today = todayISO();
-  const rows = (ctx.db
+function inventoryRows(ctx: Ctx): { code: string; name: string; category: string; unit: string; qty: number; min: number; status: string; nearestExpiry: string }[] {
+  return (ctx.db
     .prepare(
       `SELECT i.code, i.name, i.category, i.unit, i.min_level,
          COALESCE((SELECT SUM(b.qty_available) FROM inventory_batches b WHERE b.item_id = i.id),0) qty,
@@ -256,6 +255,12 @@ const inventoryReport: Builder = (ctx) => {
       status: r.qty <= 0 ? 'Out of stock' : r.qty <= r.min_level ? 'Low stock' : 'OK',
       nearestExpiry: r.expiry ?? '—',
     }));
+}
+
+const inventoryReport: Builder = (ctx) => {
+  requirePermission(ctx, 'inventory.view');
+  const today = todayISO();
+  const rows = inventoryRows(ctx);
   const low = rows.filter((r) => r.status !== 'OK').length;
   return {
     title: 'Inventory Report', scope: `as of ${today}`,
@@ -402,19 +407,288 @@ const staffReport: Builder = (ctx) => {
   };
 };
 
+
+/** UI: "Daily summary" — today (or range) at a glance. */
+const dailySummaryReport: Builder = (ctx, params) => {
+  requirePermission(ctx, 'dashboard.view');
+  const { from, to } = resolveRange(params, 'today');
+  const fromD = from ?? '0000-01-01';
+  const toD = to ?? '9999-12-31';
+  const n = (sql: string, ...a: unknown[]): number =>
+    Number((ctx.db.prepare(sql).get(...a as any[]) as any).n);
+  const collections = n(
+    `SELECT COALESCE(SUM(CASE WHEN type='payment' THEN amount_paisa ELSE -amount_paisa END),0) n
+     FROM payments WHERE date(paid_at) BETWEEN ? AND ?`, fromD, toD);
+  const invoiced = n(
+    `SELECT COALESCE(SUM(total_paisa),0) n FROM invoices
+     WHERE deleted_at IS NULL AND voided_at IS NULL AND date BETWEEN ? AND ?`, fromD, toD);
+  const visits = n(`SELECT COUNT(*) n FROM visits WHERE deleted_at IS NULL AND date(datetime) BETWEEN ? AND ?`, fromD, toD);
+  const prescriptions = n(`SELECT COUNT(*) n FROM prescriptions WHERE deleted_at IS NULL AND date BETWEEN ? AND ?`, fromD, toD);
+  const apptTotal = n(`SELECT COUNT(*) n FROM appointments WHERE deleted_at IS NULL AND date BETWEEN ? AND ?`, fromD, toD);
+  const apptDone = n(`SELECT COUNT(*) n FROM appointments WHERE deleted_at IS NULL AND status = 'completed' AND date BETWEEN ? AND ?`, fromD, toD);
+  const apptNoShow = n(`SELECT COUNT(*) n FROM appointments WHERE deleted_at IS NULL AND status = 'no_show' AND date BETWEEN ? AND ?`, fromD, toD);
+  const newPatients = n(`SELECT COUNT(*) n FROM patients WHERE deleted_at IS NULL AND registration_date BETWEEN ? AND ?`, fromD, toD);
+  return {
+    title: 'Daily Summary',
+    scope: scope(from, to),
+    columns: [{ key: 'metric', label: 'Metric' }, { key: 'value', label: 'Value', align: 'right' }],
+    rows: [
+      { metric: 'Collections (net)', value: formatBdt(collections) },
+      { metric: 'Invoiced (gross)', value: formatBdt(invoiced) },
+      { metric: 'Visits', value: String(visits) },
+      { metric: 'Prescriptions', value: String(prescriptions) },
+      { metric: 'Appointments', value: String(apptTotal) },
+      { metric: '  · completed', value: String(apptDone) },
+      { metric: '  · no-show', value: String(apptNoShow) },
+      { metric: 'New patients', value: String(newPatients) },
+    ],
+    totals: { 'Net collection': formatBdt(collections) },
+    generatedAt: new Date().toISOString(),
+  };
+};
+
+/** UI: "Monthly revenue" — invoiced vs collected, bucketed by month in range. */
+const monthlyRevenueReport: Builder = (ctx, params) => {
+  requirePermission(ctx, 'finance.view');
+  const { from, to } = resolveRange(params, '30');
+  const invConds = ['i.deleted_at IS NULL', 'i.voided_at IS NULL'];
+  const payConds: string[] = [];
+  const invArgs: unknown[] = [];
+  const payArgs: unknown[] = [];
+  if (from) { invConds.push('i.date >= ?'); invArgs.push(from); payConds.push('pay.paid_at >= ?'); payArgs.push(`${from}T00:00:00.000Z`); }
+  if (to) { invConds.push('i.date <= ?'); invArgs.push(to); payConds.push('pay.paid_at <= ?'); payArgs.push(`${to}T23:59:59.999Z`); }
+  const invByMonth = new Map<string, number>();
+  for (const r of ctx.db
+    .prepare(`SELECT substr(i.date,1,7) m, COALESCE(SUM(i.total_paisa),0) total FROM invoices i WHERE ${invConds.join(' AND ')} GROUP BY m`)
+    .all(...invArgs as any[]) as { m: string; total: number }[]) invByMonth.set(r.m, r.total);
+  const payByMonth = new Map<string, number>();
+  for (const r of ctx.db
+    .prepare(`SELECT substr(pay.paid_at,1,7) m, COALESCE(SUM(CASE WHEN pay.type='payment' THEN pay.amount_paisa ELSE -pay.amount_paisa END),0) total FROM payments pay WHERE ${payConds.join(' AND ')} GROUP BY m`)
+    .all(...payArgs as any[]) as { m: string; total: number }[]) payByMonth.set(r.m, r.total);
+  const months = [...new Set([...invByMonth.keys(), ...payByMonth.keys()])].sort().reverse().slice(0, 120);
+  const rows = months.map((m) => ({
+    month: m,
+    invoiced: formatBdt(invByMonth.get(m) ?? 0),
+    collected: formatBdt(payByMonth.get(m) ?? 0),
+  }));
+  const invSum = [...invByMonth.values()].reduce((a, b) => a + b, 0);
+  const paySum = [...payByMonth.values()].reduce((a, b) => a + b, 0);
+  return {
+    title: 'Monthly Revenue',
+    scope: scope(from, to),
+    columns: [
+      { key: 'month', label: 'Month' },
+      { key: 'invoiced', label: 'Invoiced', align: 'right' },
+      { key: 'collected', label: 'Collected (net)', align: 'right' },
+    ],
+    rows,
+    totals: { Invoiced: formatBdt(invSum), Collected: formatBdt(paySum) },
+    generatedAt: new Date().toISOString(),
+  };
+};
+
+/** UI: "Payment methods" — net collected per method in range. */
+const paymentMethodsReport: Builder = (ctx, params) => {
+  requirePermission(ctx, 'billing.payment.view');
+  const { from, to } = resolveRange(params, '30');
+  const conds: string[] = [];
+  const args: unknown[] = [];
+  if (from) { conds.push('paid_at >= ?'); args.push(`${from}T00:00:00.000Z`); }
+  if (to) { conds.push('paid_at <= ?'); args.push(`${to}T23:59:59.999Z`); }
+  const whereSql = conds.length ? `WHERE ${conds.join(' AND ')}` : '';
+  const rows = (ctx.db
+    .prepare(
+      `SELECT method,
+              COALESCE(SUM(CASE WHEN type='payment' THEN amount_paisa ELSE 0 END),0) paid,
+              COALESCE(SUM(CASE WHEN type='refund' THEN amount_paisa ELSE 0 END),0) refunded,
+              COUNT(*) entries
+       FROM payments ${whereSql} GROUP BY method ORDER BY paid DESC`,
+    )
+    .all(...args as any[]) as any[])
+    .map((r) => ({
+      method: r.method, paid: formatBdt(r.paid), refunded: formatBdt(r.refunded),
+      net: formatBdt(r.paid - r.refunded), entries: r.entries,
+    }));
+  const netTotal = Number((ctx.db
+    .prepare(`SELECT COALESCE(SUM(CASE WHEN type='payment' THEN amount_paisa ELSE -amount_paisa END),0) n FROM payments ${whereSql}`)
+    .get(...args as any[]) as any).n);
+  return {
+    title: 'Payment Methods',
+    scope: scope(from, to),
+    columns: [
+      { key: 'method', label: 'Method' }, { key: 'paid', label: 'Paid', align: 'right' },
+      { key: 'refunded', label: 'Refunded', align: 'right' }, { key: 'net', label: 'Net', align: 'right' },
+      { key: 'entries', label: 'Entries', align: 'right' },
+    ],
+    rows,
+    totals: { 'Net total': formatBdt(netTotal) },
+    generatedAt: new Date().toISOString(),
+  };
+};
+
+/** UI: "Dentist workload" — visits / prescriptions / completed appointments per dentist. */
+const dentistWorkloadReport: Builder = (ctx, params) => {
+  requirePermission(ctx, 'finance.view');
+  const { from, to } = resolveRange(params, '30');
+  const fromD = from ?? '0000-01-01';
+  const toD = to ?? '9999-12-31';
+  const dentists = ctx.db
+    .prepare('SELECT id, name FROM dentists ORDER BY name')
+    .all<{ id: number; name: string }>();
+  const agg = (sql: string): Map<number, number> => {
+    const m = new Map<number, number>();
+    for (const r of ctx.db.prepare(sql).all(fromD, toD) as { dentist_id: number | null; c: number }[]) {
+      if (r.dentist_id != null) m.set(r.dentist_id, r.c);
+    }
+    return m;
+  };
+  const visits = agg(`SELECT dentist_id, COUNT(*) c FROM visits WHERE deleted_at IS NULL AND date(datetime) BETWEEN ? AND ? GROUP BY dentist_id`);
+  const rxs = agg(`SELECT dentist_id, COUNT(*) c FROM prescriptions WHERE deleted_at IS NULL AND date BETWEEN ? AND ? GROUP BY dentist_id`);
+  const done = agg(`SELECT dentist_id, COUNT(*) c FROM appointments WHERE deleted_at IS NULL AND status = 'completed' AND date BETWEEN ? AND ? GROUP BY dentist_id`);
+  const rows = dentists.map((d) => ({
+    dentist: d.name,
+    visits: visits.get(d.id) ?? 0,
+    prescriptions: rxs.get(d.id) ?? 0,
+    appointmentsDone: done.get(d.id) ?? 0,
+  }));
+  return {
+    title: 'Dentist Workload',
+    scope: scope(from, to),
+    columns: [
+      { key: 'dentist', label: 'Dentist' },
+      { key: 'visits', label: 'Visits', align: 'right' },
+      { key: 'prescriptions', label: 'Prescriptions', align: 'right' },
+      { key: 'appointmentsDone', label: 'Completed appts', align: 'right' },
+    ],
+    rows,
+    totals: {
+      Visits: String([...visits.values()].reduce((a, b) => a + b, 0)),
+      Prescriptions: String([...rxs.values()].reduce((a, b) => a + b, 0)),
+    },
+    generatedAt: new Date().toISOString(),
+  };
+};
+
+/** UI: "Appointment no-shows" — no-show appointments in range. */
+const noShowsReport: Builder = (ctx, params) => {
+  requirePermission(ctx, 'appointments.view');
+  const { from, to } = resolveRange(params, '30');
+  const where = ['a.deleted_at IS NULL', "a.status = 'no_show'"];
+  const args: unknown[] = [];
+  if (from) { where.push('a.date >= ?'); args.push(from); }
+  if (to) { where.push('a.date <= ?'); args.push(to); }
+  const rows = (ctx.db
+    .prepare(
+      `SELECT a.date, a.time, a.type, p.name patient_name, COALESCE(d.name,'—') dentist
+       FROM appointments a JOIN patients p ON p.id = a.patient_id LEFT JOIN dentists d ON d.id = a.dentist_id
+       WHERE ${where.join(' AND ')} ORDER BY a.date DESC, a.time DESC`,
+    )
+    .all(...args as any[]) as any[])
+    .map((r) => ({ date: r.date, time: r.time, patient: r.patient_name, dentist: r.dentist, type: r.type }));
+  const totalWhere = ['a.deleted_at IS NULL'];
+  const totalArgs: unknown[] = [];
+  if (from) { totalWhere.push('a.date >= ?'); totalArgs.push(from); }
+  if (to) { totalWhere.push('a.date <= ?'); totalArgs.push(to); }
+  const total = Number((ctx.db
+    .prepare(`SELECT COUNT(*) n FROM appointments a WHERE ${totalWhere.join(' AND ')}`)
+    .get(...totalArgs as any[]) as any).n);
+  return {
+    title: 'Appointment No-shows',
+    scope: scope(from, to),
+    columns: [
+      { key: 'date', label: 'Date' }, { key: 'time', label: 'Time' },
+      { key: 'patient', label: 'Patient' }, { key: 'dentist', label: 'Dentist' }, { key: 'type', label: 'Type' },
+    ],
+    rows,
+    totals: {
+      'No-shows': String(rows.length),
+      'All appointments': String(total),
+      'No-show rate': total > 0 ? `${Math.round((rows.length / total) * 100)}%` : '—',
+    },
+    generatedAt: new Date().toISOString(),
+  };
+};
+
+/** UI: "Patient registrations" — patients registered within the range. */
+const patientRegistrationsReport: Builder = (ctx, params) => {
+  requirePermission(ctx, 'patients.view');
+  const { from, to } = resolveRange(params, '30');
+  const where = ['deleted_at IS NULL'];
+  const args: unknown[] = [];
+  if (from) { where.push('registration_date >= ?'); args.push(from); }
+  if (to) { where.push('registration_date <= ?'); args.push(to); }
+  const rows = (ctx.db
+    .prepare(
+      `SELECT code, name, phone, gender, registration_date, status
+       FROM patients WHERE ${where.join(' AND ')} ORDER BY registration_date DESC, id DESC`,
+    )
+    .all(...args as any[]) as any[])
+    .map((r) => ({
+      code: r.code, name: r.name, phone: r.phone ?? '—', gender: r.gender,
+      registered: r.registration_date, status: r.status,
+    }));
+  return {
+    title: 'Patient Registrations',
+    scope: scope(from, to),
+    columns: [
+      { key: 'code', label: 'Code' }, { key: 'name', label: 'Name' }, { key: 'phone', label: 'Phone' },
+      { key: 'gender', label: 'Gender' }, { key: 'registered', label: 'Registered' }, { key: 'status', label: 'Status' },
+    ],
+    rows,
+    totals: { Registered: String(rows.length) },
+    generatedAt: new Date().toISOString(),
+  };
+};
+
+/** UI: "Low stock items" — at-or-below min level (incl. out of stock). */
+const lowStockReport: Builder = (ctx) => {
+  requirePermission(ctx, 'inventory.view');
+  const rows = inventoryRows(ctx).filter((r) => r.status !== 'OK');
+  return {
+    title: 'Low Stock Items',
+    scope: 'at or below minimum level',
+    columns: [
+      { key: 'code', label: 'Code' }, { key: 'name', label: 'Item' }, { key: 'category', label: 'Category' },
+      { key: 'qty', label: 'Qty', align: 'right' }, { key: 'min', label: 'Min', align: 'right' },
+      { key: 'status', label: 'Status' }, { key: 'nearestExpiry', label: 'Nearest expiry' },
+    ],
+    rows,
+    totals: { Items: String(rows.length) },
+    generatedAt: new Date().toISOString(),
+  };
+};
+
 const REPORTS: Record<string, Builder> = {
-  payments: paymentsReport,
-  dues: duesReport,
-  income_expense: incomeExpenseReport,
+  // Canonical catalogue — MUST contain every name in src/shared/reports.ts
+  // (UI list). Locked by tests/integration/phase-a-findings.test.ts (ISS-020).
+  daily_summary: dailySummaryReport,
+  monthly_revenue: monthlyRevenueReport,
+  outstanding_dues: duesReport,
+  collection_report: paymentsReport,
+  payment_methods: paymentMethodsReport,
+  treatment_stats: treatmentRevenueReport,
+  dentist_workload: dentistWorkloadReport,
+  appointment_no_shows: noShowsReport,
+  patient_registrations: patientRegistrationsReport,
+  stock_on_hand: inventoryReport,
+  low_stock: lowStockReport,
+  expiry_report: expiryReport,
+  expense_summary: expenseCategoriesReport,
+  profit_loss: incomeExpenseReport,
+  // Service-level reports without a Reports-page entry (kept reachable + tested).
   patients: patientsReport,
   appointments: appointmentsReport,
   visits: visitsReport,
+  audit: auditReport,
+  staff: staffReport,
+  // Legacy pre-V1.1 keys — same builders, kept for IPC/API stability.
+  payments: paymentsReport,
+  dues: duesReport,
+  income_expense: incomeExpenseReport,
   inventory: inventoryReport,
   expiry: expiryReport,
   expense_categories: expenseCategoriesReport,
   treatment_revenue: treatmentRevenueReport,
-  audit: auditReport,
-  staff: staffReport,
 };
 
 export const REPORT_NAMES = Object.keys(REPORTS);

@@ -92,7 +92,7 @@ export function createVisit(ctx: Ctx, raw: unknown): VisitDTO {
       )
       .run(
         patientId,
-        input.dentistId ?? ctx.session.staffId ? (input.dentistId ?? null) : null,
+        input.dentistId ? input.dentistId : null,
         datetime,
         optString(input.chiefComplaint, 'Chief complaint', { max: 4000 }),
         optString(input.history, 'History', { max: 20000 }),
