@@ -52,9 +52,13 @@ const paymentsReport: Builder = (ctx, params) => {
   const total = (ctx.db
     .prepare(`SELECT COALESCE(SUM(CASE WHEN type='payment' THEN amount_paisa ELSE -amount_paisa END),0) n FROM payments pay ${whereSql}`)
     .get(...args as any[]) as any).n;
-  const methodConds = [...where, "type='payment'"];
+  // NET per method (payments − refunds): what the drawer/account actually
+  // holds — a breakdown that ignores refunds misstates cash (ISS-029).
   const methods = (ctx.db
-    .prepare(`SELECT method, COALESCE(SUM(amount_paisa),0) total FROM payments pay WHERE ${methodConds.join(' AND ')} GROUP BY method ORDER BY total DESC`)
+    .prepare(
+      `SELECT method, COALESCE(SUM(CASE WHEN pay.type='payment' THEN pay.amount_paisa ELSE -pay.amount_paisa END),0) total
+       FROM payments pay ${whereSql} GROUP BY method ORDER BY total DESC`,
+    )
     .all(...args as any[]) as any[])
     .map((m) => `${m.method}: ${formatBdt(m.total)}`).join(' · ');
 
