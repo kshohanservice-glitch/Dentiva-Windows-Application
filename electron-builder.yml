@@ -22,7 +22,14 @@ files:
   #   headers (9.9 MB) and C sources — the Electron-ABI binary is produced
   #   by install-app-deps into build/Release, which stays packaged.
   #   *.map: tsc/vite sourcemaps are dev artifacts, never shipped (V1.0 rule).
-  - '!node_modules/better-sqlite3/prebuilds/**'
+  # better-sqlite3 13 ships Node-API (napi) prebuilds — ONE binary per platform
+  # works for every N-API-capable runtime, including Electron 43, and the
+  # loader (lib/binding.js) consults prebuilds/ BEFORE build/Release. The CI
+  # ABI-rebuild output never reaches the package, so the win32-x64 prebuild IS
+  # the production binary — keep exactly that one, drop foreign platforms.
+  - '!node_modules/better-sqlite3/prebuilds/*'
+  - '!node_modules/better-sqlite3/prebuilds/win32-x64.node'
+  - node_modules/better-sqlite3/prebuilds/win32-x64.node
   - '!node_modules/better-sqlite3/deps/**'
   - '!node_modules/better-sqlite3/src/**'
   - '!**/*.map'
