@@ -139,29 +139,36 @@ jobs:
       - name: Silent-install the actual installer and smoke-test it
         shell: pwsh
         run: |
-          $installer = Get-ChildItem dist\*.exe | Select-Object -First 1
-          if (-not $installer) { throw 'No installer produced in dist/' }
-          $installDir = Join-Path $env:RUNNER_TEMP 'dentiva-installed'
-          Write-Host "Installing $($installer.Name) silently to $installDir"
-          Start-Process -FilePath $installer.FullName -ArgumentList '/S', "/D=$installDir" -Wait
-          $appExe = Join-Path $installDir 'Dentiva Pro.exe'
-          if (!(Test-Path $appExe)) { throw "Installed executable missing: $appExe" }
-          node scripts/smoke-installed.mjs "$appExe" 2>&1 | Tee-Object -FilePath smoke-output.log
-          if ($LASTEXITCODE -ne 0) {
-            $lines = Get-Content smoke-output.log
-            $signal = $lines | Where-Object { $_ -match 'Error|error:|failed|Timeout|waiting for' } | Select-Object -Last 12
-            if (-not $signal) { $signal = $lines | Select-Object -Last 12 }
-            $n = 0
-            foreach ($l in $signal) {
-              $n++
-              $esc = ($l -replace '[\r\n]', ' ')
-              Write-Host "::error title=Installed-artifact smoke failure $n::$esc"
-            }
-            throw 'Installed-artifact smoke test failed'
+          function Say([string]$m) {
+            $one = ($m -replace '[\r\n]', ' ')
+            if ($one.Length -gt 400) { $one = $one.Substring(0, 400) }
+            Write-Host "::error title=artifact smoke::$one"
           }
+          $installer = Get-ChildItem dist\*.exe -ErrorAction SilentlyContinue | Select-Object -First 1
+          if (-not $installer) { Say 'No installer produced in dist/'; exit 1 }
+          $installDir = Join-Path $env:RUNNER_TEMP 'dentiva-installed'
+          Say "installer: $($installer.FullName)"
+          $p = Start-Process -FilePath $installer.FullName -ArgumentList '/S', "/D=$installDir" -PassThru -Wait
+          Say "installer exit code: $($p.ExitCode)"
+          $appExe = Join-Path $installDir 'Dentiva Pro.exe'
+          if (!(Test-Path $appExe)) {
+            Say "installed exe missing: $appExe"
+            if (Test-Path $installDir) {
+              Get-ChildItem $installDir | ForEach-Object { Say "dir: $($_.Name)" }
+            } else { Say "install dir does not exist: $installDir" }
+            exit 1
+          }
+          node scripts/smoke-installed.mjs "$appExe" 2>&1 | Tee-Object -FilePath smoke-output.log
+          $code = $LASTEXITCODE
+          Say "smoke node exit code: $code"
+          if (Test-Path smoke-output.log) {
+            Get-Content smoke-output.log | Where-Object { $_.Trim() -ne '' } | Select-Object -Last 25 | ForEach-Object { Say $_ }
+          } else { Say 'smoke-output.log missing' }
+          if ($code -ne 0) { exit 1 }
           # Best-effort silent uninstall (keeps CI image clean).
           $unins = Join-Path $installDir 'unins000.exe'
           if (Test-Path $unins) { Start-Process -FilePath $unins -ArgumentList '/S' -Wait }
+
       - name: Checksums
         shell: pwsh
         run: |
