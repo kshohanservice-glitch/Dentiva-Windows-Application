@@ -7,6 +7,12 @@ on:
       - 'docs/**'
       - '*.md'
       - '*.log'
+  pull_request:
+    paths-ignore:
+      - 'dist/**'
+      - 'docs/**'
+      - '*.md'
+      - '*.log'
   workflow_dispatch:
 
 permissions:
@@ -126,13 +132,16 @@ jobs:
             }
             # Commit the full builder log so it can be read over plain git
             # (artifact/log CDNs are unreachable from the agent sandbox).
-            Copy-Item dist-output.log ci-debug.log -Force
-            git config user.name "github-actions[bot]"
-            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-            git add -f ci-debug.log
-            if (!(git diff --cached --quiet)) {
-              git commit -m "ci: capture electron-builder debug log"
-              git push origin "HEAD:$env:GITHUB_REF_NAME"
+            # Push side-effects only on push events — never on pull requests.
+            if ($env:GITHUB_EVENT_NAME -eq 'push') {
+              Copy-Item dist-output.log ci-debug.log -Force
+              git config user.name "github-actions[bot]"
+              git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+              git add -f ci-debug.log
+              if (!(git diff --cached --quiet)) {
+                git commit -m "ci: capture electron-builder debug log"
+                git push origin "HEAD:$env:GITHUB_REF_NAME"
+              }
             }
             exit 1
           }
@@ -187,6 +196,7 @@ jobs:
             dist/SHA256SUMS.txt
           retention-days: 30
       - name: Commit installer to branch (dist fallback)
+        if: github.event_name == 'push'
         shell: bash
         run: |
           git config user.name "github-actions[bot]"
@@ -199,6 +209,7 @@ jobs:
             git push origin "HEAD:${GITHUB_REF_NAME}"
           fi
       - name: Create or update GitHub Release
+        if: github.event_name == 'push' && github.ref == 'refs/heads/arena/01a0e467-dentiva-windows-application'
         shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}

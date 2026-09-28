@@ -37,14 +37,13 @@ No product code may change until the plan exists — plan exists; Phase A in pro
 
 ## Current task
 
-**Phase A COMPLETE** (all main-process services, router, schema, renderer grep-sweep,
-test-quality scan). **Phase C batch 1 LANDED (uncommitted → committing now): fixes
-ISS-008/009/010/011/012/013/014/016/017/018 + new ISS-019 (reqDate rollover), each with
-regression tests — local vitest 76/76, tsc, eslint, build all green.** Register updated,
-Fix Log written. NEXT: push batch 1 → CI green → Phase B module coverage tests (ISS-005),
-dependency upgrades (ISS-001 router 7.x, ISS-002 Electron supported major, ISS-007 dev
-deps), CI PR trigger (ISS-003), missing docs (ISS-004/006), Phase D second audit,
-Phase E version 1.1.0 build/release.
+Phase A COMPLETE; **Phase C batch 1 CI-verified** (run 36393753841, all jobs green —
+ISS-008..014, 016..019). Batch 2 in progress: **ISS-003 (PR trigger + release guards),
+ISS-004 (THIRD_PARTY_NOTICES + ACCEPTANCE_CHECKLIST), ISS-006 (dependency audit
+finalized) — committing now.** NEXT: push batch 2 → open PR for PR-run evidence →
+dependency upgrades (ISS-001 react-router 7.18, ISS-002 Electron supported major +
+playwright, ISS-007 vitest 5) as isolated commit(s) with full CI validation →
+Phase B module tests (ISS-005) → Phase D second audit → Phase E v1.1.0.
 
 ## Blocked
 
@@ -70,10 +69,10 @@ full CI re-run pending for V1.1 batch 1._
 
 ## Known issues
 
-- V1.1 register: docs/V1.1_ISSUE_REGISTER.md — ISS-001..015 (P1s: 001 router advisory,
-  002 Electron EOL/high, **008 over-refund invariant — confirmed by probe**; P2s: 003 CI
-  PR trigger, 004 missing docs, 005 test gaps, 006 dependency audit, **009 CSV injection —
-  confirmed by probe**; P3s: 010-014; P4: 015).
+- Open in register: ISS-001 (react-router advisory — upgrade staged next), ISS-002
+  (Electron EOL/high — upgrade staged next), ISS-005 (Phase B coverage), ISS-007
+  (dev vulns — vitest 5). Fixed+verified: 003..004 (pending PR-run evidence for 003),
+  006, 008..014, 016..019. P4 deferred: 015.
 - Environment-limited (never claim passed): physical printer/DPI/monitor/admin-matrix.
 
 ## Next task
