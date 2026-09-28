@@ -6,14 +6,16 @@
 ## Product
 
 - **Name:** Dentiva Pro
-- **Version:** 1.0.0
+- **Version:** 1.0.0 released; **target V1.1 = 1.1.0** (final hardening release)
 - **Category:** Offline Windows dental clinic management software (Bangladesh market)
 - **Branch:** `arena/01a0e467-dentiva-windows-application`
 
 ## Current phase
 
-**COMPLETE — released.** All 12 project phases closed; release artifact validated
-(see docs/FINAL_RELEASE_REPORT.md for hashes and CI evidence).
+**V1.1 independent end-to-end audit (Phase A: static audit).** V1.0.0 remains released
+and untouched (tag `v1.0.0`, release commit `97e1124`). The V1.1 audit plan is
+established (docs/V1.1_AUDIT_PLAN.md); issue register seeded ISS-001…ISS-007.
+No product code may change until the plan exists — plan exists; Phase A in progress.
 
 ## Completed phases
 
@@ -35,8 +37,9 @@
 
 ## Current task
 
-None — release delivered. Follow-ups are environment-limited items in
-FINAL_RELEASE_REPORT §4 (physical printer check, DPI sweep, Win10 spot-check).
+Phase A static audit: line-by-line review of services/router/schema/renderer + test
+quality review; then Phase B dynamic break tests (ISS-005 coverage), Phase C fixes,
+Phase D second audit, Phase E build/install/release V1.1.
 
 ## Blocked
 
@@ -62,9 +65,11 @@ _None — vitest 60/60, Windows E2E 6/6, installed-artifact smoke green (CI run
 
 ## Known issues
 
-- None open. Physical-printer / DPI / Win10 spot-check are environment-limited
-  items tracked in FINAL_RELEASE_REPORT §4.
+- V1.1 register: docs/V1.1_ISSUE_REGISTER.md (ISS-001 P1 shipped dep advisory,
+  ISS-002 P1 Electron EOL/high, ISS-003 P2 no PR trigger, ISS-004 P2 missing docs,
+  ISS-005 P2 test gaps, ISS-006 P2 dependency audit not finalized, ISS-007 P3 dev vulns).
+- Environment-limited (never claim passed): physical printer/DPI/monitor/admin-matrix.
 
 ## Next task
 
-_None._
+Continue Phase A → B → C → D → E until V1.1 gates all green (V1.1_AUDIT_PLAN §7).
