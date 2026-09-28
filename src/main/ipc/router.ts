@@ -8,7 +8,7 @@ import type { Ctx } from '../core/context';
 import { audit } from '../core/context';
 import type { SessionManager } from '../core/session';
 import type { ActivationStore } from '../core/activation';
-import { changePassword, completeSetup, countUsers, needsSetup, type SetupInputInternal } from '../services/auth';
+import { changePassword, completeSetup, needsSetup, type SetupInputInternal } from '../services/auth';
 import * as patients from '../services/patients';
 import * as visits from '../services/visits';
 import * as chart from '../services/chart';
@@ -30,6 +30,7 @@ import * as reportsSvc from '../services/reports';
 import * as referralsSvc from '../services/referrals';
 import type { BackupService } from '../services/backup';
 import { executePrint, listPrinters, openPrintWindow, saveAsPdf } from '../print';
+import { toCsv } from '../../shared/csv';
 import type { AppPaths } from '../paths';
 import { getDb } from '../app';
 
@@ -46,14 +47,6 @@ export interface RouterDeps {
 
 type Result<T> = { ok: true; data: T } | { ok: false; error: ReturnType<typeof toWireError> };
 
-function csvEscape(v: unknown): string {
-  const s = String(v ?? '');
-  return /[",\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
-}
-
-function toCsv(header: string[], rows: string[][]): string {
-  return [header.map(csvEscape).join(','), ...rows.map((r) => r.map(csvEscape).join(','))].join('\r\n');
-}
 
 const activeWindow = (): BrowserWindow | undefined =>
   BrowserWindow.getAllWindows().find((w) => !w.isDestroyed());
@@ -125,6 +118,12 @@ export function registerRouter(deps: RouterDeps): void {
     const result = deps.activation.activate(String(code ?? ''));
     if (result.activated) {
       audit({ db: getDb() }, { action: 'activation.verify', entityType: 'system', entityId: null, summary: 'Offline activation completed' });
+    } else {
+      // Record the attempt (never the entered value) for security visibility.
+      audit({ db: getDb() }, {
+        action: 'activation.verify', entityType: 'system', entityId: null,
+        summary: 'Activation attempt rejected', result: 'denied',
+      });
     }
     return result;
   } });
@@ -385,6 +384,4 @@ export function registerRouter(deps: RouterDeps): void {
     await changePassword(ctx!.db, ctx!.session, String(p?.oldPassword ?? ''), String(p?.newPassword ?? ''), deps.securityPolicy().minPasswordLength);
     return { ok: true };
   } });
-
-  void countUsers;
 }

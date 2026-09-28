@@ -130,6 +130,12 @@ export function performQueueAction(ctx: Ctx, id: number | null, action: QueueAct
       case 'cancel': {
         if (['completed', 'cancelled'].includes(entry.status)) throw conflict('Entry already finished.');
         update({ status: 'cancelled', finished_at: nowISO() });
+        // Keep the linked appointment truthful — don't strand it in in_queue/in_treatment.
+        if (entry.appointment_id) {
+          ctx.db
+            .prepare("UPDATE appointments SET status = 'cancelled', updated_at = ? WHERE id = ? AND status IN ('in_queue','in_treatment','arrived','confirmed','scheduled')")
+            .run(nowISO(), entry.appointment_id);
+        }
         break;
       }
       case 'transfer': {

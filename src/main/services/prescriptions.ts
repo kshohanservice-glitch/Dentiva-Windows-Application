@@ -3,7 +3,7 @@ import type { Paged, PrescriptionDTO, PrescriptionItemDTO } from '../../shared/t
 import { notFound, validation } from '../errors';
 import { audit, requirePermission, tx } from '../core/context';
 import { nextPrescriptionNumber } from '../core/sequences';
-import { optString, pageParams, reqInt, reqString, oneOf } from '../core/validate';
+import { optString, pageParams, reqDate, reqInt, reqString, oneOf } from '../core/validate';
 import { nowISO, todayISO } from '../../shared/currency';
 
 interface ItemRow {
@@ -116,7 +116,7 @@ export function createPrescription(ctx: Ctx, raw: unknown): PrescriptionDTO {
     note: optString(it.note, 'Note', { max: 500 }),
   }));
 
-  const date = input.date ? reqString(input.date, 'Date', { max: 10 }) : todayISO();
+  const date = input.date ? reqDate(input.date, 'Prescription date') : todayISO();
   const id = tx(ctx.db, () => {
     const number = nextPrescriptionNumber(ctx.db, date);
     const info = ctx.db

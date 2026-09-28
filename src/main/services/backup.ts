@@ -171,12 +171,16 @@ export function createBackupService(deps: BackupDeps) {
     if (kind !== 'auto') return;
     try {
       const retention = readBackupSetting().retention;
+      const db = holder.get();
       const files = fs.readdirSync(destination)
         .filter((f) => f.startsWith('DentivaPro_Backup_') && f.endsWith('.dpv'))
         .sort()
         .reverse();
       for (const f of files.slice(retention)) {
-        fs.rmSync(path.join(destination, f), { force: true });
+        const full = path.join(destination, f);
+        fs.rmSync(full, { force: true });
+        // Keep the backup list truthful: drop rows for pruned files.
+        db.prepare("DELETE FROM backups WHERE filename = ? AND kind = 'auto' AND status = 'ok'").run(f);
       }
     } catch { /* best effort */ }
   }
@@ -193,7 +197,13 @@ export function createBackupService(deps: BackupDeps) {
   function listBackups(ctx: Ctx): BackupRecordDTO[] {
     requirePermission(ctx, 'backup.create');
     const rows = holder.get().prepare('SELECT * FROM backups ORDER BY created_at DESC LIMIT 200').all() as any[];
-    return rows.map(rowToDTO);
+    // Surface files that vanished from disk (manual deletes, disk cleanup)
+    // instead of listing them as restorable.
+    return rows.map((r) => {
+      const dto = rowToDTO(r);
+      if (dto.status === 'ok' && !fs.existsSync(dto.path)) return { ...dto, status: 'missing', error: 'File no longer exists on disk.' };
+      return dto;
+    });
   }
 
   async function restoreBackup(ctx: Ctx, filePath: string, typedConfirm: string): Promise<{ ok: true; restoredAt: string }> {

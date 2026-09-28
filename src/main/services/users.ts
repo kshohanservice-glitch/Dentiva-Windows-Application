@@ -2,7 +2,7 @@ import type { Ctx } from '../core/context';
 import type { AuditEntry, Paged } from '../../shared/types';
 import type { PermissionKey } from '../../shared/permissions';
 import type { RoleDTO, UserDTO } from '../../shared/types';
-import { conflict, notFound, validation } from '../errors';
+import { conflict, forbidden, notFound, validation } from '../errors';
 import { audit, requirePermission, tx } from '../core/context';
 import { hashPassword } from '../core/passwords';
 import { loadPermissions } from './auth';
@@ -42,8 +42,24 @@ export async function saveUser(ctx: Ctx, input: UserSaveInput): Promise<UserDTO>
   const displayName = reqString(input?.displayName, 'Display name', { max: 120 });
   const roleId = reqIntSafe(input?.roleId);
   const status = oneOf(input?.status ?? 'active', ['active', 'locked', 'disabled'] as const, 'Status');
-  const role = ctx.db.prepare('SELECT id FROM roles WHERE id = ?').get(roleId);
+  const role = ctx.db.prepare('SELECT id, key FROM roles WHERE id = ?').get(roleId) as { key: string } | undefined;
   if (!role) throw validation('Select a valid role.');
+
+  // Owner-account protection: only an actor whose own role is "owner" may
+  // assign the owner role or modify a user that holds it. Prevents a
+  // same-privilege administrator from demoting/disabling the clinic owner.
+  const isOwnerActor = ctx.session.roleKey === 'owner';
+  const targetIsOwner = input.id
+    ? (() => {
+        const t = ctx.db
+          .prepare('SELECT r.key FROM users u JOIN roles r ON r.id = u.role_id WHERE u.id = ? AND u.deleted_at IS NULL')
+          .get(input.id) as { key: string } | undefined;
+        return t?.key === 'owner';
+      })()
+    : false;
+  if (!isOwnerActor && (role.key === 'owner' || targetIsOwner)) {
+    throw forbidden('Only the Owner can assign or modify Owner accounts.');
+  }
 
   if (input.id) {
     const existing = ctx.db.prepare('SELECT * FROM users WHERE id = ? AND deleted_at IS NULL').get(input.id) as any;

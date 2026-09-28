@@ -18,7 +18,7 @@ export type LoginResult = { ok: true; user: SessionUser } | { ok: false; reason:
 
 export interface BackupRecordDTO {
   id: number; filename: string; path: string; createdAt: string; sizeBytes: number;
-  schemaVersion: number; kind: 'manual' | 'auto' | 'pre_restore'; status: 'ok' | 'failed';
+  schemaVersion: number; kind: 'manual' | 'auto' | 'pre_restore'; status: 'ok' | 'failed' | 'missing';
   error: string | null; checksum: string | null;
 }
 

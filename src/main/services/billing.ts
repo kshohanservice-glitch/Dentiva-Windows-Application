@@ -221,9 +221,28 @@ export function createPayment(ctx: Ctx, raw: PaymentInput): { payment: PaymentDT
     if (!inv) throw notFound('Invoice not found.');
     if (inv.voided_at) throw conflict('Payments cannot be recorded against a voided invoice.');
     patientId = inv.patient_id;
+    if (type === 'refund') {
+      // Financial integrity: Total = Paid + Due must hold — a refund can never
+      // exceed the net amount actually received on this invoice.
+      const netPaid = paidNetFor(ctx.db, invoiceId);
+      if (amount > netPaid) {
+        throw validation(
+          `Refund exceeds the net paid amount on this invoice (paid net ${(netPaid / 100).toFixed(2)} BDT, refund ${(amount / 100).toFixed(2)} BDT).`,
+        );
+      }
+    }
   }
 
-  const paidAt = raw?.paidAt && /^\d{4}-\d{2}-\d{2}/.test(raw.paidAt) ? raw.paidAt : nowISO();
+  // Full date validation (not just a prefix) + ISO normalization.
+  let paidAt = nowISO();
+  if (raw?.paidAt) {
+    const m = /^(\d{4}-\d{2}-\d{2})(?:T(\d{2}:\d{2})(?::(\d{2}))?)?/.exec(String(raw.paidAt));
+    if (!m) throw validation('Payment date must be a valid date (YYYY-MM-DD).');
+    const d = reqDate(m[1], 'Payment date');
+    if (m[2] && !/^([01]\d|2[0-3]):[0-5]\d$/.test(m[2])) throw validation('Payment time must be a valid time (HH:MM).');
+    const time = m[2] ? `${m[2]}:${m[3] ?? '00'}` : '00:00:00';
+    paidAt = `${d}T${time}.000Z`;
+  }
 
   const { paymentId, invoice } = tx(ctx.db, () => {
     const info = ctx.db

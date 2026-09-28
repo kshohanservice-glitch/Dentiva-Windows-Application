@@ -208,8 +208,11 @@ export function cancelAppointment(ctx: Ctx, id: number, reason?: string): Appoin
 
 export function markNoShow(ctx: Ctx, id: number): AppointmentDTO {
   requirePermission(ctx, 'appointments.manage');
-  const existing = ctx.db.prepare('SELECT status FROM appointments WHERE id = ? AND deleted_at IS NULL').get(id);
+  const existing = ctx.db.prepare('SELECT status FROM appointments WHERE id = ? AND deleted_at IS NULL').get(id) as { status: string } | undefined;
   if (!existing) throw notFound('Appointment not found.');
+  if (['completed', 'cancelled', 'no_show'].includes(existing.status)) {
+    throw conflict(`Cannot mark a ${existing.status.replace('_', ' ')} appointment as no-show.`);
+  }
   tx(ctx.db, () => {
     ctx.db.prepare("UPDATE appointments SET status = 'no_show', updated_at = ? WHERE id = ?").run(nowISO(), id);
     audit(ctx, { action: 'appointment.no_show', entityType: 'appointment', entityId: id, summary: 'Marked as no-show' });

@@ -44,8 +44,14 @@ export function reqDate(value: unknown, field: string): string {
   if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value)) {
     throw validation(`${field} must be a valid date (YYYY-MM-DD).`);
   }
-  const d = new Date(`${value}T00:00:00`);
-  if (Number.isNaN(d.getTime())) throw validation(`${field} must be a valid date.`);
+  // Round-trip check: JavaScript's Date rolls impossible days over
+  // (2026-02-31 → 2026-03-03), so a NaN check is not enough. Reconstruct the
+  // date from components and require an exact match.
+  const [y, m, d] = value.split('-').map(Number);
+  const dt = new Date(Date.UTC(y, m - 1, d));
+  if (dt.getUTCFullYear() !== y || dt.getUTCMonth() !== m - 1 || dt.getUTCDate() !== d) {
+    throw validation(`${field} must be a valid calendar date.`);
+  }
   return value;
 }
 

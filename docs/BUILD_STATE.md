@@ -37,15 +37,14 @@ No product code may change until the plan exists — plan exists; Phase A in pro
 
 ## Current task
 
-Phase A static audit ~40% done (router, activation, session, auth, billing, backup,
-context/permissions, search, users/roles, inventory, accounting, notifications, schema
-triggers reviewed). Register now at ISS-015. **Two bugs confirmed empirically by
-`tests/integration/audit-probe.test.ts` (deliberately UNCOMMITTED — both cases RED until
-their Phase C fixes land together with the tests): ISS-008 over-refund breaks
-Total=Paid+Due (P1), ISS-009 CSV formula injection (P2).** Next: remaining Phase A reads
-(visits/chart/prescriptions/queue/appointments/settings/attachments/print/reports +
-renderer fake-UI sweep + test-quality review), then Phase B module tests (ISS-005),
-Phase C fixes (commits pair fix+test, keep CI green), Phase D re-audit, Phase E 1.1.0.
+**Phase A COMPLETE** (all main-process services, router, schema, renderer grep-sweep,
+test-quality scan). **Phase C batch 1 LANDED (uncommitted → committing now): fixes
+ISS-008/009/010/011/012/013/014/016/017/018 + new ISS-019 (reqDate rollover), each with
+regression tests — local vitest 76/76, tsc, eslint, build all green.** Register updated,
+Fix Log written. NEXT: push batch 1 → CI green → Phase B module coverage tests (ISS-005),
+dependency upgrades (ISS-001 router 7.x, ISS-002 Electron supported major, ISS-007 dev
+deps), CI PR trigger (ISS-003), missing docs (ISS-004/006), Phase D second audit,
+Phase E version 1.1.0 build/release.
 
 ## Blocked
 
@@ -60,14 +59,14 @@ Phase C fixes (commits pair fix+test, keep CI green), Phase D re-audit, Phase E 
 | `tsc -p tsconfig.node.json --noEmit` | exit 0 |
 | `tsc -p tsconfig.renderer.json --noEmit` | exit 0 |
 | `eslint .` | 0 errors (7 intentional `react-hooks/exhaustive-deps` warnings) |
-| `npm test` (vitest) | **60/60 passed** (unit: currency, permissions; integration: database, auth, activation, rbac, patients, billing, backup) |
+| `npm test` (vitest) | **76/76 passed** (adds audit-regressions suite covering ISS-008..019) |
 | `npm run build` | exit 0 (renderer bundle ~426 kB) |
 | `npm run icons` | exit 0 (build/icon.ico 16–256 + icon.png 512) |
 
 ## Failing tests
 
-_None — vitest 60/60, Windows E2E 6/6, installed-artifact smoke green (CI run
-36369672016)._
+_None — vitest 76/76 local; Windows E2E/installer last green at run 36369672016 (V1.0);
+full CI re-run pending for V1.1 batch 1._
 
 ## Known issues
 

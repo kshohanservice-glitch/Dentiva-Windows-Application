@@ -48,10 +48,28 @@ function assertEntity(ctx: Ctx, entityType: string, entityId: number): void {
   if (!row) throw notFound('Attachment target not found.');
 }
 
-export function listAttachments(ctx: Ctx, entityType: string, entityId: number): AttachmentDTO[] {
+function requireEntityRead(ctx: Ctx, entityType: string): void {
   requirePermission(ctx, 'patients.view');
   if (entityType === 'invoice') requirePermission(ctx, 'billing.invoice.view');
   if (entityType === 'staff') requirePermission(ctx, 'staff.view');
+}
+
+/** Attachments are writes — gated by the write permission of their owning domain. */
+function requireEntityWrite(ctx: Ctx, entityType: string): void {
+  if (entityType === 'invoice') {
+    requirePermission(ctx, 'billing.invoice.view');
+    requirePermission(ctx, 'billing.invoice.edit');
+    return;
+  }
+  if (entityType === 'staff') {
+    requirePermission(ctx, 'staff.manage');
+    return;
+  }
+  requirePermission(ctx, 'patients.edit');
+}
+
+export function listAttachments(ctx: Ctx, entityType: string, entityId: number): AttachmentDTO[] {
+  requireEntityRead(ctx, entityType);
   assertEntity(ctx, entityType, entityId);
   const rows = ctx.db
     .prepare(
@@ -64,10 +82,9 @@ export function listAttachments(ctx: Ctx, entityType: string, entityId: number):
 }
 
 export function addAttachment(ctx: Ctx, entityType: string, entityId: number, sourcePath: string): AttachmentDTO {
-  requirePermission(ctx, 'patients.view');
-  if (entityType === 'invoice') requirePermission(ctx, 'billing.invoice.view');
-  if (entityType === 'staff') requirePermission(ctx, 'staff.manage');
   if (!ENTITY_TYPES.includes(entityType as any)) throw validation('Unknown attachment target.');
+  requireEntityRead(ctx, entityType);
+  requireEntityWrite(ctx, entityType);
   assertEntity(ctx, entityType, entityId);
 
   if (!fs.existsSync(sourcePath)) throw new AppError('FILE', 'The selected file could not be found.');
@@ -119,9 +136,9 @@ export function addAttachment(ctx: Ctx, entityType: string, entityId: number, so
 }
 
 export function renameAttachment(ctx: Ctx, id: number, name: string): AttachmentDTO {
-  requirePermission(ctx, 'patients.edit');
   const row = ctx.db.prepare('SELECT * FROM attachments WHERE id = ?').get(id) as any;
   if (!row) throw notFound('Attachment not found.');
+  requireEntityWrite(ctx, row.entity_type);
   const safe = sanitizeFilename(reqString(name, 'File name', { max: 120 }));
   tx(ctx.db, () => {
     ctx.db.prepare('UPDATE attachments SET original_name = ? WHERE id = ?').run(safe, id);
@@ -131,9 +148,9 @@ export function renameAttachment(ctx: Ctx, id: number, name: string): Attachment
 }
 
 export function removeAttachment(ctx: Ctx, id: number): { ok: boolean } {
-  requirePermission(ctx, 'patients.edit');
   const row = ctx.db.prepare('SELECT * FROM attachments WHERE id = ?').get(id) as any;
   if (!row) throw notFound('Attachment not found.');
+  requireEntityWrite(ctx, row.entity_type);
   tx(ctx.db, () => {
     ctx.db.prepare('DELETE FROM attachments WHERE id = ?').run(id);
     audit(ctx, { action: 'attachment.delete', entityType: 'attachment', entityId: id, summary: `Deleted attachment "${row.original_name}"` });

@@ -3,7 +3,7 @@ import type { Paged, VisitDTO } from '../../shared/types';
 import { conflict, notFound, validation } from '../errors';
 import { audit, requirePermission, tx } from '../core/context';
 import { nowISO, todayISO } from '../../shared/currency';
-import { optDate, optString, pageParams } from '../core/validate';
+import { optDate, optString, pageParams, reqDate } from '../core/validate';
 
 interface VisitRow {
   id: number; patient_id: number; patient_name?: string; patient_code?: string;
@@ -74,9 +74,14 @@ export function createVisit(ctx: Ctx, raw: unknown): VisitDTO {
   const patient = ctx.db.prepare('SELECT id FROM patients WHERE id = ? AND deleted_at IS NULL').get(patientId);
   if (!patient) throw notFound('Patient not found.');
 
-  const datetime = input.datetime && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(input.datetime)
-    ? input.datetime
-    : new Date().toISOString();
+  let datetime = new Date().toISOString();
+  if (input.datetime) {
+    const m = /^(\d{4}-\d{2}-\d{2})T(\d{2}:\d{2})(?::\d{2})?/.exec(String(input.datetime));
+    if (!m) throw validation('Visit date/time must be a valid date and time.');
+    const date = reqDate(m[1], 'Visit date');
+    if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(m[2])) throw validation('Visit date/time must be a valid date and time.');
+    datetime = `${date}T${m[2]}:00.000Z`;
+  }
 
   const id = tx(ctx.db, () => {
     const info = ctx.db

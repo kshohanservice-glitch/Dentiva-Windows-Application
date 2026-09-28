@@ -1,6 +1,7 @@
 import type { DB } from '../db/database';
 import type { SessionUser } from '../../shared/types';
 import { authError } from '../errors';
+import { audit } from './context';
 import { loadSessionUser, login as svcLogin, type SecurityPolicy } from '../services/auth';
 import { verifyPassword } from './passwords';
 
@@ -79,6 +80,12 @@ export class SessionManager {
       this.locked = false;
       this.touch();
       return true;
+    }
+    if (this.user) {
+      audit({ db: this.deps.db(), session: this.user }, {
+        action: 'auth.unlock', entityType: 'user', entityId: this.user.userId,
+        summary: `Failed unlock attempt for "${this.user.username}"`, result: 'denied',
+      });
     }
     return false;
   }
