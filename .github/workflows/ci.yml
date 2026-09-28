@@ -112,8 +112,8 @@ jobs:
       - name: Build NSIS installer
         shell: pwsh
         run: |
-          $env:EB_LOG = 'debug'
-          npm run dist -- --loglevel debug 2>&1 | Tee-Object -FilePath dist-output.log
+          $env:DEBUG = 'electron-builder*'
+          npm run dist 2>&1 | Tee-Object -FilePath dist-output.log
           $code = $LASTEXITCODE
           if ($code -ne 0) {
             Write-Host "::error title=NSIS build exit code::$code"
