@@ -6,6 +6,7 @@ on:
       - 'dist/**'
       - 'docs/**'
       - '*.md'
+      - '*.log'
   workflow_dispatch:
 
 permissions:
@@ -111,16 +112,27 @@ jobs:
       - name: Build NSIS installer
         shell: pwsh
         run: |
-          npm run dist 2>&1 | Tee-Object -FilePath dist-output.log
-          if ($LASTEXITCODE -ne 0) {
-            # Emit the RAW tail of the builder log — no filtering, so the real
-            # failure line always shows up in annotations.
+          $env:EB_LOG = 'debug'
+          npm run dist -- --loglevel debug 2>&1 | Tee-Object -FilePath dist-output.log
+          $code = $LASTEXITCODE
+          if ($code -ne 0) {
+            Write-Host "::error title=NSIS build exit code::$code"
             $lines = Get-Content dist-output.log | Where-Object { $_.Trim() -ne '' } | Select-Object -Last 30
             $n = 0
             foreach ($l in $lines) {
               $n++
-              $esc = ($l -replace '[\r\n]', ' ')
+              $esc = ($l -replace '%', '%25' -replace '[\r\n]', ' ')
               Write-Host "::error title=NSIS build tail $n::$esc"
+            }
+            # Commit the full builder log so it can be read over plain git
+            # (artifact/log CDNs are unreachable from the agent sandbox).
+            Copy-Item dist-output.log ci-debug.log -Force
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add -f ci-debug.log
+            if (!(git diff --cached --quiet)) {
+              git commit -m "ci: capture electron-builder debug log"
+              git push origin "HEAD:$env:GITHUB_REF_NAME"
             }
             exit 1
           }
