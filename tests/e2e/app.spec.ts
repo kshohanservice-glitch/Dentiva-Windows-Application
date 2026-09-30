@@ -263,6 +263,8 @@ test('creates a prescription and opens the print window', async () => {
   expect(printWin.url()).toContain('#print/prescription');
   await expect(printWin.getByText('Amoxicillin 500 mg').first()).toBeVisible({ timeout: 60_000 });
   await printWin.close();
+  await detail.getByRole('button', { name: 'Close' }).click();
+  await expect(detail).toBeHidden();
 });
 
 test('runs reports from the UI — the full catalogue contract (ISS-020 guard)', async () => {
