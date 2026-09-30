@@ -10,6 +10,8 @@ directories:
 # production dependencies (better-sqlite3, @node-rs/argon2, archiver, …).
 files:
   - dist/**
+  - build/icon.ico
+  - build/icon.png
   - '!dist/*.exe'
   - '!dist/SHA256SUMS.txt'
   - '!dist/win-unpacked/**'
@@ -74,5 +76,8 @@ nsis:
   createStartMenuShortcut: true
   shortcutName: Dentiva Pro
   uninstallDisplayName: Dentiva Pro
+  installerIcon: build/icon.ico
+  uninstallerIcon: build/icon.ico
+  installerHeaderIcon: build/icon.ico
   artifactName: DentivaPro-Setup-${version}.exe
   deleteAppDataOnUninstall: false

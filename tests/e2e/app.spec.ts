@@ -208,6 +208,20 @@ test('books an appointment and walks the patient through the queue to completion
 test('blocks double-booking with a conflict alert and honours override permission', async () => {
   const today = new Date().toISOString().slice(0, 10);
   await page.getByRole('link', { name: 'Appointments' }).click();
+
+  // First book an active scheduled appointment at 16:00 (the earlier 15:30 slot was completed in the queue test).
+  await page.getByRole('button', { name: 'New appointment' }).first().click();
+  const firstModal = page.locator('.modal[role="dialog"]', { hasText: 'New appointment' });
+  await expect(firstModal).toBeVisible();
+  await firstModal.getByPlaceholder('Search by name, phone or patient ID…').fill('E2E Test Patient');
+  await firstModal.locator('.list-row', { hasText: 'E2E Test Patient' }).first().click();
+  await firstModal.getByLabel('Dentist').selectOption({ label: 'Dr. E2E Dentist' });
+  await firstModal.getByLabel('Date').fill(today);
+  await firstModal.getByLabel('Time').fill('16:00');
+  await firstModal.getByRole('button', { name: 'Book appointment' }).click();
+  await expect(page.locator('.toast-title', { hasText: 'Appointment booked' }).last()).toBeVisible({ timeout: 30_000 });
+
+  // Now attempt an overlapping appointment at 16:15 for the same dentist.
   await page.getByRole('button', { name: 'New appointment' }).first().click();
   const modal = page.locator('.modal[role="dialog"]', { hasText: 'New appointment' });
   await expect(modal).toBeVisible();
@@ -215,12 +229,12 @@ test('blocks double-booking with a conflict alert and honours override permissio
   await modal.locator('.list-row', { hasText: 'E2E Test Patient' }).first().click();
   await modal.getByLabel('Dentist').selectOption({ label: 'Dr. E2E Dentist' });
   await modal.getByLabel('Date').fill(today);
-  await modal.getByLabel('Time').fill('15:45'); // overlaps the 15:30 appointment
+  await modal.getByLabel('Time').fill('16:15'); // overlaps the 16:00 appointment
   await modal.getByRole('button', { name: 'Book appointment' }).click();
   // Conflict detected (owner holds appointments.override → inline alert, not a silent double-book).
   await expect(modal.getByText('Scheduling conflict')).toBeVisible({ timeout: 30_000 });
   await modal.getByRole('button', { name: 'Book anyway (override)' }).click();
-  await expect(page.locator('.toast-title', { hasText: 'Appointment booked' })).toBeVisible({ timeout: 30_000 });
+  await expect(page.locator('.toast-title', { hasText: 'Appointment booked' }).last()).toBeVisible({ timeout: 30_000 });
 });
 
 test('creates a prescription and opens the print window', async () => {
@@ -270,4 +284,18 @@ test('runs reports from the UI — the full catalogue contract (ISS-020 guard)',
   await page.getByRole('button', { name: 'Run report' }).click();
   await expect(page.getByText('Net', { exact: true }).first()).toBeVisible({ timeout: 30_000 });
   await expect(page.locator('.toast-title', { hasText: 'Unknown report' })).toHaveCount(0);
+});
+
+test('adapts cleanly across 1280×720 and 1920×1080 viewports without horizontal overflow', async () => {
+  for (const size of [{ width: 1280, height: 720 }, { width: 1920, height: 1080 }]) {
+    await page.setViewportSize(size);
+    for (const nav of ['Dashboard', 'Patients', 'Appointments', 'Queue', 'Invoices', 'Inventory', 'Settings']) {
+      await page.getByRole('link', { name: nav }).click();
+      const overflow = await page.evaluate(() => {
+        const doc = document.documentElement;
+        return doc.scrollWidth - doc.clientWidth;
+      });
+      expect(overflow).toBeLessThanOrEqual(2);
+    }
+  }
 });

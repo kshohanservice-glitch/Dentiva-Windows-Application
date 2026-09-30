@@ -57,10 +57,16 @@ export function ReportsPage() {
 
   const printReport = async (mode: 'print' | 'pdf') => {
     try {
+      const reportParams: Record<string, string> = {};
+      if (selected.needsRange) {
+        reportParams.from = from;
+        reportParams.to = to;
+      }
       const res = await api[mode === 'print' ? 'reports/print' : 'reports/save-pdf']({
         type: 'report',
         id: 0,
         reportName: selected.name,
+        params: reportParams,
       });
       if (res.ok) toast.success(mode === 'print' ? 'Print preview opened' : 'PDF window ready', 'Confirm inside the preview window.');
     } catch (err) {

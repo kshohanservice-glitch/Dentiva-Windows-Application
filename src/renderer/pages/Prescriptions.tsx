@@ -2,11 +2,11 @@ import React, { useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { api, useAsync } from '../api';
 import { useApp } from '../state/app-context';
-import { Button, Card, Modal, Pagination, Tabs, useToast } from '../components/primitives';
+import { Button, Card, Pagination, Tabs, useToast } from '../components/primitives';
 import { Input } from '../components/forms';
 import { DataTable, TableToolbar, type Column } from '../components/table';
 import { Icon } from '../components/shell';
-import { RxFormModal } from './Patients';
+import { RxDetailModal, RxFormModal } from './Patients';
 import type { PrescriptionDTO } from '../../shared/types';
 
 type RxTab = 'all' | 'today' | 'week' | 'month';
@@ -14,65 +14,6 @@ type RxTab = 'all' | 'today' | 'week' | 'month';
 const RANGE: Record<RxTab, string | undefined> = {
   all: undefined, today: 'today', week: '7', month: '30',
 };
-
-function RxDetailModal(props: { rx: PrescriptionDTO; onClose: () => void }) {
-  const { rx } = props;
-  const toast = useToast();
-  const print = async (kind: 'prescription' | 'prescription-duplicate') => {
-    try {
-      await api['reports/print']({ type: kind, id: rx.id } as any);
-    } catch (err) {
-      toast.fromError(err, 'Could not open print preview');
-    }
-  };
-  return (
-    <Modal
-      title={`Prescription ${rx.number}`}
-      onClose={props.onClose}
-      width="wide"
-      footer={
-        <>
-          <Button variant="secondary" onClick={props.onClose}>Close</Button>
-          <Button variant="secondary" onClick={() => void print('prescription-duplicate')}>Print duplicate (watermarked)</Button>
-          <Button variant="primary" icon={Icon.print} onClick={() => void print('prescription')}>Print</Button>
-        </>
-      }
-    >
-      <div className="kv-list mb-4">
-        <div className="kv"><span className="k">Patient</span><span className="v">{rx.patientName} ({rx.patientCode})</span></div>
-        <div className="kv"><span className="k">Date</span><span className="v">{new Date(rx.date).toLocaleDateString()}</span></div>
-        <div className="kv"><span className="k">Dentist</span><span className="v">{rx.dentistName}</span></div>
-        {rx.diagnosis && <div className="kv"><span className="k">Diagnosis</span><span className="v">{rx.diagnosis}</span></div>}
-        {rx.cC && <div className="kv"><span className="k">C/C</span><span className="v">{rx.cC}</span></div>}
-        {rx.oE && <div className="kv"><span className="k">O/E</span><span className="v">{rx.oE}</span></div>}
-        {rx.rE && <div className="kv"><span className="k">R/E</span><span className="v">{rx.rE}</span></div>}
-        {rx.treatment && <div className="kv"><span className="k">Treatment</span><span className="v">{rx.treatment}</span></div>}
-        {rx.advice && <div className="kv"><span className="k">Advice</span><span className="v">{rx.advice}</span></div>}
-        {rx.followUp && <div className="kv"><span className="k">Follow-up</span><span className="v">{new Date(rx.followUp).toLocaleDateString()}</span></div>}
-      </div>
-      <table className="table">
-        <thead>
-          <tr><th>#</th><th>Medicine</th><th>Dosage</th><th>Frequency</th><th>Duration</th></tr>
-        </thead>
-        <tbody>
-          {rx.items.map((it, i) => (
-            <tr key={i}>
-              <td className="num">{i + 1}</td>
-              <td>
-                <strong>{it.medicineName}</strong>
-                {it.strength && <span className="muted"> ({it.strength})</span>}
-                {it.generic && <div className="xsmall muted">{it.generic}</div>}
-              </td>
-              <td>{it.dosage ?? '—'}</td>
-              <td>{it.frequency ?? '—'}</td>
-              <td>{it.duration ?? '—'}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </Modal>
-  );
-}
 
 export function PrescriptionsPage() {
   const [params, setParams] = useSearchParams();
@@ -88,19 +29,20 @@ export function PrescriptionsPage() {
   const { data, loading, error, reload } = useAsync(() => api['prescriptions/list'](filter), [tab, page]);
 
   React.useEffect(() => {
+    let changed = false;
     if (params.get('new') === '1') {
       setCreateOpen(true);
       params.delete('new');
-      setParams(params, { replace: true });
+      changed = true;
     }
     const rxId = params.get('rx');
     if (rxId) {
       void api['prescriptions/get'](Number(rxId)).then(setDetail).catch(() => undefined);
       params.delete('rx');
-      setParams(params, { replace: true });
+      changed = true;
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+    if (changed) setParams(params, { replace: true });
+  }, [params, setParams]);
 
   const rows = (data?.items ?? []).filter((rx) =>
     !query ||

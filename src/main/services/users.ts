@@ -7,8 +7,19 @@ import { audit, requirePermission, tx } from '../core/context';
 import { hashPassword } from '../core/passwords';
 import { loadPermissions } from './auth';
 import { nowISO } from '../../shared/currency';
-import { optString, pageParams, reqPassword, reqString, reqUsername, oneOf } from '../core/validate';
+import { optString, pageParams, reqPassword, reqString, reqUsername, oneOf, escapeLike } from '../core/validate';
 import { isPermissionKey, BUILTIN_ROLES } from '../../shared/permissions';
+
+function minPasswordLengthOf(ctx: Ctx): number {
+  try {
+    const row = ctx.db.prepare("SELECT value_json FROM settings WHERE key = 'security'").get<{ value_json: string }>();
+    const parsed = row ? JSON.parse(row.value_json) : {};
+    const n = Number(parsed?.minPasswordLength);
+    return Number.isFinite(n) ? Math.min(64, Math.max(8, Math.round(n))) : 8;
+  } catch {
+    return 8;
+  }
+}
 
 /* ------------------------------- Users -------------------------------- */
 
@@ -61,16 +72,24 @@ export async function saveUser(ctx: Ctx, input: UserSaveInput): Promise<UserDTO>
     throw forbidden('Only the Owner can assign or modify Owner accounts.');
   }
 
+  const minPwLen = minPasswordLengthOf(ctx);
+
   if (input.id) {
     const existing = ctx.db.prepare('SELECT * FROM users WHERE id = ? AND deleted_at IS NULL').get(input.id) as any;
     if (!existing) throw notFound('User not found.');
     const dup = ctx.db.prepare('SELECT id FROM users WHERE username = ? AND id != ?').get(username, input.id);
     if (dup) throw conflict(`Username "${username}" is already taken.`);
+    const newHash = input.password ? await hashPassword(reqPassword(input.password, minPwLen)) : null;
 
     tx(ctx.db, () => {
       ctx.db
         .prepare('UPDATE users SET username = ?, display_name = ?, role_id = ?, status = ?, staff_id = ?, updated_at = ? WHERE id = ?')
         .run(username, displayName, roleId, status, input.staffId ?? null, nowISO(), input.id);
+      if (newHash) {
+        ctx.db
+          .prepare('UPDATE users SET password_hash = ?, failed_attempts = 0, locked_until = NULL WHERE id = ?')
+          .run(newHash, input.id);
+      }
       if (input.permissions && ctx.session.permissions.includes('roles.manage')) {
         ctx.db.prepare('DELETE FROM user_permission_overrides WHERE user_id = ?').run(input.id);
         for (const p of input.permissions) {
@@ -92,7 +111,7 @@ export async function saveUser(ctx: Ctx, input: UserSaveInput): Promise<UserDTO>
   }
 
   if (!input.password) throw validation('Password is required for a new user.');
-  const passwordHash = await hashPassword(reqPassword(input.password));
+  const passwordHash = await hashPassword(reqPassword(input.password, minPwLen));
 
   const id = tx(ctx.db, () => {
     try {
@@ -116,9 +135,22 @@ export async function saveUser(ctx: Ctx, input: UserSaveInput): Promise<UserDTO>
 
 export async function resetPassword(ctx: Ctx, userId: number, newPassword: string): Promise<{ ok: boolean }> {
   requirePermission(ctx, 'users.manage');
-  const row = ctx.db.prepare('SELECT id FROM users WHERE id = ? AND deleted_at IS NULL').get(userId);
+  const row = ctx.db
+    .prepare('SELECT u.id, r.key role_key FROM users u JOIN roles r ON r.id = u.role_id WHERE u.id = ? AND u.deleted_at IS NULL')
+    .get(userId) as { id: number; role_key: string } | undefined;
   if (!row) throw notFound('User not found.');
-  const hash = await hashPassword(reqPassword(newPassword));
+  if (row.role_key === 'owner' && ctx.session.roleKey !== 'owner') {
+    audit(ctx, {
+      action: 'user.reset_password',
+      entityType: 'user',
+      entityId: userId,
+      summary: 'Denied reset of owner password by non-owner',
+      result: 'denied',
+      reason: 'Only the Owner can reset an Owner account password.',
+    });
+    throw forbidden('Only the Owner can assign or modify Owner accounts.');
+  }
+  const hash = await hashPassword(reqPassword(newPassword, minPasswordLengthOf(ctx)));
   tx(ctx.db, () => {
     ctx.db.prepare('UPDATE users SET password_hash = ?, failed_attempts = 0, locked_until = NULL, updated_at = ? WHERE id = ?')
       .run(hash, nowISO(), userId);
@@ -223,13 +255,23 @@ export function listAudit(ctx: Ctx, filter: { page?: number; pageSize?: number; 
   const { page, pageSize, offset } = pageParams(filter.page, filter.pageSize);
   const where: string[] = [];
   const params: unknown[] = [];
-  if (filter.action) { where.push('action = ?'); params.push(filter.action); }
+  if (filter.action) {
+    if (filter.action === 'billing.') {
+      where.push("(action LIKE 'billing.%' OR action LIKE 'invoice.%')");
+    } else if (filter.action.endsWith('.')) {
+      where.push("action LIKE ? ESCAPE '\\'");
+      params.push(`${escapeLike(filter.action)}%`);
+    } else {
+      where.push('action = ?');
+      params.push(filter.action);
+    }
+  }
   if (filter.userId) { where.push('user_id = ?'); params.push(filter.userId); }
   if (filter.from) { where.push('at >= ?'); params.push(`${filter.from}T00:00:00.000Z`); }
   if (filter.to) { where.push('at <= ?'); params.push(`${filter.to}T23:59:59.999Z`); }
   if (filter.query?.trim()) {
-    const q = `%${filter.query.trim().toLowerCase()}%`;
-    where.push('(LOWER(summary) LIKE ? OR LOWER(username) LIKE ? OR LOWER(action) LIKE ?)');
+    const q = `%${escapeLike(filter.query.trim().toLowerCase())}%`;
+    where.push("(LOWER(summary) LIKE ? ESCAPE '\\' OR LOWER(username) LIKE ? ESCAPE '\\' OR LOWER(action) LIKE ? ESCAPE '\\')");
     params.push(q, q, q);
   }
   const whereSql = where.length ? `WHERE ${where.join(' AND ')}` : '';

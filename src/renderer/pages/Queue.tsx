@@ -123,7 +123,7 @@ export function QueuePage() {
   useInterval(() => reload(), 20_000);
 
   const entries = data ?? [];
-  const waiting = entries.filter((e) => e.status === 'waiting' || e.status === 'called');
+  const waiting = entries.filter((e) => e.status === 'waiting' || e.status === 'called' || e.status === 'paused');
   const inTreatment = entries.filter((e) => e.status === 'in_treatment');
   const done = entries.filter((e) => e.status === 'completed' || e.status === 'cancelled');
   const maxWait = waiting.reduce((m, e) => Math.max(m, e.waitingMin), 0);
@@ -166,7 +166,10 @@ export function QueuePage() {
             <Button size="sm" variant="primary" onClick={() => void action(e, 'start', { dentistId: e.dentistId ?? undefined })}>Start treatment</Button>
           )}
           {can('queue.manage') && e.status === 'in_treatment' && (
-            <Button size="sm" variant="secondary" onClick={() => void action(e, 'complete')}>Complete</Button>
+            <>
+              <Button size="sm" variant="ghost" onClick={() => void action(e, 'pause')}>Pause</Button>
+              <Button size="sm" variant="secondary" onClick={() => void action(e, 'complete')}>Complete</Button>
+            </>
           )}
           {can('queue.manage') && (e.status === 'waiting' || e.status === 'called') && (
             <>
@@ -175,7 +178,10 @@ export function QueuePage() {
             </>
           )}
           {can('queue.manage') && e.status === 'paused' && (
-            <Button size="sm" variant="secondary" onClick={() => void action(e, 'resume')}>Resume</Button>
+            <>
+              <Button size="sm" variant="secondary" onClick={() => void action(e, 'resume')}>Resume</Button>
+              <Button size="sm" variant="ghost" onClick={() => void action(e, 'cancel')}>Remove</Button>
+            </>
           )}
         </div>
       </div>

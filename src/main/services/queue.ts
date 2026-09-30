@@ -70,6 +70,9 @@ export function performQueueAction(ctx: Ctx, id: number | null, action: QueueAct
   if (!(ALLOWED_ACTIONS as readonly string[]).includes(action)) throw validation('Unknown queue action.');
 
   if (action === 'call_next') {
+    if (id != null) {
+      return performQueueAction(ctx, id, 'call', payload);
+    }
     const next = ctx.db
       .prepare(
         `SELECT q.* FROM queue_entries q
@@ -112,7 +115,7 @@ export function performQueueAction(ctx: Ctx, id: number | null, action: QueueAct
         break;
       }
       case 'pause': {
-        if (!['called', 'in_treatment'].includes(entry.status)) throw conflict(`Cannot pause a ${entry.status.replace('_', ' ')} entry.`);
+        if (!['waiting', 'called', 'in_treatment'].includes(entry.status)) throw conflict(`Cannot pause a ${entry.status.replace('_', ' ')} entry.`);
         update({ status: 'paused' });
         break;
       }

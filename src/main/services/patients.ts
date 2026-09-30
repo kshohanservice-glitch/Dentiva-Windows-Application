@@ -5,7 +5,7 @@ import { conflict, notFound, validation } from '../errors';
 import { audit, hasPermission, requirePermission, tx } from '../core/context';
 import { nextPatientCode } from '../core/sequences';
 import {
-  optDate, optPhone, optString, oneOf, pageParams, reqDate, reqInt, reqString,
+  escapeLike, optDate, optPhone, optString, oneOf, pageParams, reqDate, reqInt, reqString,
 } from '../core/validate';
 import { dateRangeFor, todayISO } from '../../shared/currency';
 import { BLOOD_GROUPS, GENDERS } from '../../shared/clinical';
@@ -76,8 +76,8 @@ export function listPatients(ctx: Ctx, filters: PatientFilters): Paged<PatientDT
   if (filters.status) { where.push('p.status = ?'); params.push(filters.status); }
   if (filters.dentistId) { where.push('p.preferred_dentist_id = ?'); params.push(filters.dentistId); }
   if (filters.query && filters.query.trim()) {
-    const q = `%${filters.query.trim().toLowerCase()}%`;
-    where.push('(LOWER(p.name) LIKE ? OR LOWER(COALESCE(p.bengali_name,\'\')) LIKE ? OR LOWER(p.code) LIKE ? OR COALESCE(p.phone,\'\') LIKE ? OR COALESCE(p.phone2,\'\') LIKE ?)');
+    const q = `%${escapeLike(filters.query.trim().toLowerCase())}%`;
+    where.push("(LOWER(p.name) LIKE ? ESCAPE '\\' OR LOWER(COALESCE(p.bengali_name,'')) LIKE ? ESCAPE '\\' OR LOWER(p.code) LIKE ? ESCAPE '\\' OR COALESCE(p.phone,'') LIKE ? ESCAPE '\\' OR COALESCE(p.phone2,'') LIKE ? ESCAPE '\\')");
     params.push(q, q, q, q, q);
   }
 

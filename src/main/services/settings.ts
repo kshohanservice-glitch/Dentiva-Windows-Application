@@ -1,6 +1,5 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import crypto from 'node:crypto';
 import type { Ctx } from '../core/context';
 import type { PrintProfile, SettingsDTO } from '../../shared/types';
 import { forbidden, validation } from '../errors';
@@ -277,6 +276,5 @@ export async function resetBusiness(ctx: Ctx, input: { typedConfirm: string; pas
   } catch {
     /* best effort — DB no longer references files */
   }
-  void crypto;
   return { ok: true };
 }

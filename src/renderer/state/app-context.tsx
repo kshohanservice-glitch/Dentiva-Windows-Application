@@ -44,7 +44,7 @@ export function AppProvider(props: { children: React.ReactNode }) {
   const [system, setSystem] = useState<AppState['system']>(null);
   const [activation, setActivation] = useState<ActivationStatus | null>(null);
   const navigate = useNavigate();
-  const activityTimer = useRef<number | null>(null);
+  const lastActivityPing = useRef<number>(0);
 
   const refreshSettings = useCallback(async () => {
     try {
@@ -99,17 +99,18 @@ export function AppProvider(props: { children: React.ReactNode }) {
     };
   }, [navigate]);
 
-  // Activity ping (keeps auto-lock timer alive)
+  // Activity ping (resets auto-lock timer only on genuine user interaction)
   useEffect(() => {
-    const ping = () => {
-      if (user && !locked) void api['system/activity']().catch(() => undefined);
+    const onUserActivity = () => {
+      if (!user || locked) return;
+      const now = Date.now();
+      if (now - lastActivityPing.current < 15_000) return;
+      lastActivityPing.current = now;
+      void api['system/activity']().catch(() => undefined);
     };
-    const onUserActivity = () => ping();
-    activityTimer.current = window.setInterval(ping, 30_000);
     window.addEventListener('pointerdown', onUserActivity, { passive: true });
     window.addEventListener('keydown', onUserActivity);
     return () => {
-      if (activityTimer.current) window.clearInterval(activityTimer.current);
       window.removeEventListener('pointerdown', onUserActivity);
       window.removeEventListener('keydown', onUserActivity);
     };

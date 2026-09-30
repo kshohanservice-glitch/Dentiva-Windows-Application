@@ -88,7 +88,7 @@ function UserModal(props: {
       permissions: props.initial?.permissions ?? [],
       customPerms: !!(props.initial?.permissions?.length),
     });
-  }, [props.open, props.initial?.id]);
+  }, [props.open, props.initial]);
 
   if (!props.open) return null;
   const set = <K extends keyof typeof v>(k: K, val: (typeof v)[K]): void => setV((p) => ({ ...p, [k]: val }));
@@ -202,7 +202,7 @@ function RoleModal(props: { open: boolean; initial?: RoleDTO | null; onClose: ()
       description: props.initial?.description ?? '',
       permissions: props.initial?.permissions ?? [],
     });
-  }, [props.open, props.initial?.id]);
+  }, [props.open, props.initial]);
 
   if (!props.open) return null;
   const readOnly = props.initial?.builtin;

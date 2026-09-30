@@ -55,6 +55,16 @@ export interface DuplicateCandidate { id: number; code: string; name: string; ph
 
 /* --------------------------- Visits / Chart ------------------------ */
 
+export interface VisitTreatmentDTO {
+  id: number;
+  treatmentId: number | null;
+  description: string;
+  qty: number;
+  unitPricePaisa: number;
+  totalPaisa: number;
+  tooth?: string | null;
+}
+
 export interface VisitDTO {
   id: number; patientId: number; patientName?: string; patientCode?: string;
   dentistId: number | null; dentistName: string | null; datetime: string;
@@ -62,6 +72,7 @@ export interface VisitDTO {
   advice: string | null; followUpDate: string | null; status: 'open' | 'closed';
   invoiceId: number | null; createdBy: number; createdAt: string;
   examination: string | null; history: string | null; notes: string | null;
+  treatments?: VisitTreatmentDTO[];
 }
 
 export interface ToothConditionDTO {

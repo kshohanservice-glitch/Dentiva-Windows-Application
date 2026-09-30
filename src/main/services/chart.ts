@@ -4,6 +4,9 @@ import { notFound, validation } from '../errors';
 import { audit, requirePermission, tx } from '../core/context';
 import { CONDITION_KEYS, conditionLabel } from '../../shared/clinical';
 import { nowISO } from '../../shared/currency';
+import { oneOf, optString } from '../core/validate';
+
+const SEVERITIES = ['mild', 'moderate', 'severe'] as const;
 
 interface ConditionRow {
   id: number; tooth: string; condition: string; severity: string | null;
@@ -67,6 +70,8 @@ export function setChart(ctx: Ctx, patientId: number, input: ChartInput): ChartS
       if (!validTeeth.has(ch.tooth)) throw validation(`Unknown tooth "${ch.tooth}".`);
       if (!CONDITION_KEYS.includes(ch.condition)) throw validation(`Unknown condition "${ch.condition}".`);
       if (ch.action === 'set') {
+        const severity = ch.severity ? oneOf(ch.severity, SEVERITIES, 'Severity') : null;
+        const note = optString(ch.note, 'Chart note', { max: 500 });
         ctx.db
           .prepare('UPDATE tooth_conditions SET superseded_at = ? WHERE patient_id = ? AND tooth = ? AND condition = ? AND superseded_at IS NULL')
           .run(at, patientId, ch.tooth, ch.condition);
@@ -75,7 +80,7 @@ export function setChart(ctx: Ctx, patientId: number, input: ChartInput): ChartS
             `INSERT INTO tooth_conditions (patient_id, tooth, condition, severity, visit_id, note, recorded_at, recorded_by, superseded_at)
              VALUES (?, ?, ?, ?, ?, ?, ?, ?, NULL)`,
           )
-          .run(patientId, ch.tooth, ch.condition, ch.severity ?? null, input.visitId ?? null, ch.note ?? null, at, ctx.session.userId);
+          .run(patientId, ch.tooth, ch.condition, severity, input.visitId ?? null, note, at, ctx.session.userId);
         sets++;
       } else {
         const info = ctx.db

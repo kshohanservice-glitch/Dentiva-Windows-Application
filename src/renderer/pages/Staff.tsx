@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { api, useAsync } from '../api';
 import { useApp } from '../state/app-context';
 import { Badge, Button, Card, ErrorState, Modal, Spinner, Tabs, useToast } from '../components/primitives';
@@ -32,7 +33,7 @@ function StaffModal(props: { open: boolean; initial?: StaffDTO | null; onClose: 
       bloodGroup: props.initial?.bloodGroup ?? '', idNumber: props.initial?.idNumber ?? '',
       age: props.initial?.age != null ? String(props.initial.age) : '',
     });
-  }, [props.open, props.initial?.id]);
+  }, [props.open, props.initial]);
 
   if (!props.open) return null;
   const set = <K extends keyof typeof v>(k: K, val: (typeof v)[K]): void => setV((p) => ({ ...p, [k]: val }));
@@ -141,7 +142,7 @@ function DentistModal(props: { open: boolean; initial?: DentistDTO | null; onClo
       phone: props.initial?.phone ?? '', email: props.initial?.email ?? '',
       schedule: props.initial?.schedule ?? '', active: props.initial ? props.initial.active : true,
     });
-  }, [props.open, props.initial?.id]);
+  }, [props.open, props.initial]);
 
   if (!props.open) return null;
   const set = <K extends keyof typeof v>(k: K, val: (typeof v)[K]): void => setV((p) => ({ ...p, [k]: val }));
@@ -207,11 +208,21 @@ type StaffTab = 'staff' | 'dentists';
 
 export function StaffPage() {
   const { can } = useApp();
-  const [tab, setTab] = useState<StaffTab>('staff');
+  const [params, setParams] = useSearchParams();
+  const [tab, setTab] = useState<StaffTab>(params.get('tab') === 'dentists' ? 'dentists' : 'staff');
   const [query, setQuery] = useState('');
   const [staffModal, setStaffModal] = useState<{ open: boolean; initial: StaffDTO | null }>({ open: false, initial: null });
   const [dentistModal, setDentistModal] = useState<{ open: boolean; initial: DentistDTO | null }>({ open: false, initial: null });
   const [showInactive, setShowInactive] = useState(false);
+
+  React.useEffect(() => {
+    const reqTab = params.get('tab');
+    if (reqTab === 'dentists' || reqTab === 'staff') {
+      setTab(reqTab);
+      params.delete('tab');
+      setParams(params, { replace: true });
+    }
+  }, [params, setParams]);
 
   const staffQ = useAsync(() => api['staff/list'](), []);
   const dentistQ = useAsync(() => api['dentists/list'](true), []);

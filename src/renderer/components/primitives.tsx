@@ -255,6 +255,8 @@ export function Modal(props: {
   footer?: React.ReactNode; width?: 'default' | 'wide' | 'xwide'; closeOnBackdrop?: boolean;
 }) {
   const ref = useRef<HTMLDivElement>(null);
+  const onCloseRef = useRef(props.onClose);
+  onCloseRef.current = props.onClose;
   const titleId = useId();
 
   useEffect(() => {
@@ -262,12 +264,13 @@ export function Modal(props: {
     const node = ref.current;
     const focusable = () =>
       node ? Array.from(node.querySelectorAll<HTMLElement>('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])')).filter((el) => !el.hasAttribute('disabled')) : [];
-    focusable()[0]?.focus();
+    const firstField = node?.querySelector<HTMLElement>('.modal-body input:not([disabled]), .modal-body select:not([disabled]), .modal-body textarea:not([disabled])');
+    (firstField ?? focusable()[0])?.focus();
 
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
         e.stopPropagation();
-        props.onClose();
+        onCloseRef.current();
       } else if (e.key === 'Tab') {
         const els = focusable();
         if (els.length === 0) return;
@@ -287,7 +290,7 @@ export function Modal(props: {
       document.removeEventListener('keydown', onKey, true);
       previous?.focus?.();
     };
-  }, [props.onClose]);
+  }, []);
 
   return (
     <div

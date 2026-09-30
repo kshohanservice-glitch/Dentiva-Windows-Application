@@ -11,7 +11,7 @@ vi.mock('electron', () => ({
   app: { getAppPath: () => '/app' },
 }));
 
-import { profilePageCss } from '../../src/main/print';
+import { buildPrintHash, marginsMmToPrintMargins, mmToInches, profilePageCss } from '../../src/main/print';
 import type { PrintProfile } from '../../src/shared/types';
 
 function profile(patch: Partial<PrintProfile>): PrintProfile {
@@ -52,5 +52,34 @@ describe('profilePageCss (@page geometry)', () => {
     }));
     expect(css).toContain('size: 100mm 150mm');
     expect(css).toContain('margin: 5mm 5mm 5mm 5mm');
+  });
+
+  it('converts mm to inches for Electron printToPDF (ISS-036)', () => {
+    // 25.4mm === 1 inch; A4 210x297mm === ~8.2677x11.6929 inches
+    expect(mmToInches(25.4)).toBeCloseTo(1, 5);
+    expect(mmToInches(210)).toBeCloseTo(8.2677, 3);
+    expect(mmToInches(297)).toBeCloseTo(11.6929, 3);
+  });
+
+  it('converts custom margins in mm to 96-DPI pixels for Electron print (ISS-036)', () => {
+    const m = marginsMmToPrintMargins({ top: 12.7, right: 25.4, bottom: 12.7, left: 25.4 });
+    expect(m).toEqual({
+      marginType: 'custom',
+      top: 48,
+      right: 96,
+      bottom: 48,
+      left: 96,
+    });
+  });
+
+  it('builds print window hash with report name, profile, and date range params (ISS-011)', () => {
+    const hash = buildPrintHash({
+      type: 'report',
+      id: 0,
+      reportName: 'daily_collection',
+      profileId: 'inv-a4',
+      params: { from: '2026-09-01', to: '2026-09-30' },
+    });
+    expect(hash).toBe('#print/report/0?report=daily_collection&profile=inv-a4&from=2026-09-01&to=2026-09-30');
   });
 });

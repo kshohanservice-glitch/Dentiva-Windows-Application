@@ -8,8 +8,9 @@ import { setDb } from './app';
 import { SessionManager } from './core/session';
 import { ActivationStore, weakCipher, type Cipher } from './core/activation';
 import { createBackupService, type DbHolder } from './services/backup';
-import { refreshNotifications } from './services/notifications';
+import { insertNotification, refreshNotifications } from './services/notifications';
 import { registerRouter } from './ipc/router';
+import { resolveWindowIcon } from './print';
 import { IPC } from '../shared/ipc';
 
 const APP_VERSION = ((): string => {
@@ -40,6 +41,7 @@ function createWindow(): void {
     backgroundColor: '#f6f8fa',
     title: 'Dentiva Pro',
     autoHideMenuBar: true,
+    icon: resolveWindowIcon(),
     webPreferences: {
       preload: path.join(__dirname, '..', 'preload', 'index.js'),
       contextIsolation: true,
@@ -94,17 +96,19 @@ async function boot(): Promise<void> {
   };
 
   // --- Session (auth + auto-lock) ---------------------------------------
+  const readSecurityPolicy = () => {
+    try {
+      const row = holder.get().prepare("SELECT value_json FROM settings WHERE key = 'security'").get<{ value_json: string }>();
+      const sec = row ? JSON.parse(row.value_json) : {};
+      return { maxFailedLogins: sec.maxFailedLogins ?? 5, minPasswordLength: sec.minPasswordLength ?? 8 };
+    } catch {
+      return { maxFailedLogins: 5, minPasswordLength: 8 };
+    }
+  };
+
   const session_ = new SessionManager({
     db: () => holder.get(),
-    securityPolicy: () => {
-      try {
-        const row = holder.get().prepare("SELECT value_json FROM settings WHERE key = 'security'").get<{ value_json: string }>();
-        const sec = row ? JSON.parse(row.value_json) : {};
-        return { maxFailedLogins: sec.maxFailedLogins ?? 5, minPasswordLength: sec.minPasswordLength ?? 8 };
-      } catch {
-        return { maxFailedLogins: 5, minPasswordLength: 8 };
-      }
-    },
+    securityPolicy: readSecurityPolicy,
     onLock: () => {
       // Close print windows (they may contain patient data) and notify shell
       for (const w of BrowserWindow.getAllWindows()) {
@@ -134,13 +138,7 @@ async function boot(): Promise<void> {
     appVersion: APP_VERSION,
     notify: (n) => {
       try {
-        refreshNotifications(holder.get(), {
-          lowStock: true, dues: false, backup: false, appointments: false,
-        });
-        holder.get().prepare(
-          `INSERT INTO notifications (key, kind, severity, title, body, entity_type, entity_id, created_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-        ).run(n.key, n.kind, n.severity, n.title, n.body, n.entityType ?? null, n.entityId ?? null, new Date().toISOString());
+        insertNotification(holder.get(), n);
       } catch (e) {
         logger.warn('Could not persist notification', { error: e instanceof Error ? e.message : String(e) });
       }
@@ -152,7 +150,7 @@ async function boot(): Promise<void> {
     session: session_,
     activation,
     backup,
-    securityPolicy: () => ({ maxFailedLogins: 5, minPasswordLength: 8 }),
+    securityPolicy: readSecurityPolicy,
     appVersion: APP_VERSION,
     schemaVersion: () => schemaVersionOf(holder.get()),
     refreshNotifications: () => {

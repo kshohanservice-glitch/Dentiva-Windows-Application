@@ -111,7 +111,7 @@ function AppointmentFormModal(props: {
     if (!patientId) return;
     setPending(true);
     try {
-      const created = await api['appointments/create']({
+      const payload = {
         patientId,
         dentistId: values.dentistId ? Number(values.dentistId) : null,
         date: values.date,
@@ -120,8 +120,14 @@ function AppointmentFormModal(props: {
         type: values.type,
         notes: values.notes || null,
         allowConflict: true,
-      });
-      toast.warning('Booked with conflict override', `${created.date} ${created.time} — dentist may be double-booked.`);
+      };
+      const created = props.initial
+        ? await api['appointments/update']({ id: props.initial.id, ...payload })
+        : await api['appointments/create'](payload);
+      toast.warning(
+        props.initial ? 'Appointment updated (conflict override)' : 'Appointment booked (conflict override)',
+        `${created.date} ${created.time} — dentist may be double-booked.`,
+      );
       props.onSaved(created);
       props.onClose();
     } catch (err) {
@@ -242,7 +248,7 @@ function AppointmentFormModal(props: {
   );
 }
 
-function useFormState(props: { open: boolean; initial?: AppointmentDTO | null }) {
+function useFormState(props: { open: boolean; initial?: AppointmentDTO | null; defaultDate?: string }) {
   const [values, setValues] = useState({
     dentistId: '',
     date: isoDate(new Date()),
@@ -258,14 +264,14 @@ function useFormState(props: { open: boolean; initial?: AppointmentDTO | null })
     setErrors({});
     setValues({
       dentistId: props.initial?.dentistId ? String(props.initial.dentistId) : '',
-      date: props.initial?.date ?? isoDate(new Date()),
+      date: props.initial?.date ?? props.defaultDate ?? isoDate(new Date()),
       time: props.initial?.time ?? '10:00',
       durationMin: props.initial?.durationMin ?? 30,
       type: props.initial?.type || 'Consultation',
       notes: props.initial?.notes ?? '',
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [props.open, props.initial?.id]);
+  }, [props.open, props.initial?.id, props.defaultDate]);
 
   const set = <K extends keyof typeof values>(k: K, v: (typeof values)[K]): void => {
     setValues((prev) => ({ ...prev, [k]: v }));

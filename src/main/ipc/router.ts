@@ -353,11 +353,11 @@ export function registerRouter(deps: RouterDeps): void {
     return { path: target, rows: rows.length };
   } });
   handle(IPC.reportsPrint, { auth: true, fn: (p) => {
-    openPrintWindow({ type: p?.type ?? 'report', id: Number(p?.id ?? 0), reportName: p?.reportName, profileId: p?.profileId });
+    openPrintWindow({ type: p?.type ?? 'report', id: Number(p?.id ?? 0), reportName: p?.reportName, profileId: p?.profileId, params: p?.params });
     return { ok: true };
   } });
   handle(IPC.reportsSavePdf, { auth: true, fn: (p) => {
-    openPrintWindow({ type: p?.type ?? 'report', id: Number(p?.id ?? 0), reportName: p?.reportName, profileId: p?.profileId });
+    openPrintWindow({ type: p?.type ?? 'report', id: Number(p?.id ?? 0), reportName: p?.reportName, profileId: p?.profileId, params: p?.params });
     return { ok: true };
   } });
   handle(IPC.printersList, { auth: true, async fn() {

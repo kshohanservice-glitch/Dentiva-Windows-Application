@@ -4,19 +4,51 @@ import fs from 'node:fs';
 import type { PrintProfile } from '../shared/types';
 import { AppError } from './errors';
 
-export interface PrintDocRef { type: import('../shared/ipc').PrintDocKind; id: number; reportName?: string; profileId?: string }
+export interface PrintDocRef {
+  type: import('../shared/ipc').PrintDocKind;
+  id: number;
+  reportName?: string;
+  profileId?: string;
+  params?: Record<string, string>;
+}
 
 let printWindow: BrowserWindow | null = null;
+
+export function resolveWindowIcon(): string | undefined {
+  const candidates = process.platform === 'win32'
+    ? ['icon.ico', 'icon.png']
+    : ['icon.png', 'icon.ico'];
+  for (const name of candidates) {
+    const p = path.join(app.getAppPath(), 'build', name);
+    try {
+      if (fs.existsSync(p)) return p;
+    } catch { /* ignore */ }
+  }
+  return undefined;
+}
 
 function appHtml(): string {
   return path.join(app.getAppPath(), 'dist', 'renderer', 'index.html');
 }
 
+export function buildPrintHash(doc: PrintDocRef): string {
+  const sp = new URLSearchParams();
+  if (doc.reportName) sp.set('report', doc.reportName);
+  if (doc.profileId) sp.set('profile', doc.profileId);
+  if (doc.params) {
+    for (const [k, v] of Object.entries(doc.params)) {
+      if (v !== undefined && v !== null && v !== '') sp.set(k, String(v));
+    }
+  }
+  const qs = sp.toString();
+  return `#print/${doc.type}/${doc.id}${qs ? `?${qs}` : ''}`;
+}
+
 export function openPrintWindow(doc: PrintDocRef): void {
-  const hash = `#print/${doc.type}/${doc.id}${doc.reportName ? `?report=${encodeURIComponent(doc.reportName)}` : ''}${doc.profileId ? `${doc.reportName ? '&' : '?'}profile=${encodeURIComponent(doc.profileId)}` : ''}`;
+  const hash = buildPrintHash(doc);
   if (printWindow && !printWindow.isDestroyed()) {
     printWindow.focus();
-    printWindow.loadFile(appHtml(), { hash: hash.slice(1) });
+    void printWindow.loadFile(appHtml(), { hash: hash.slice(1) });
     return;
   }
   printWindow = new BrowserWindow({
@@ -27,6 +59,7 @@ export function openPrintWindow(doc: PrintDocRef): void {
     title: 'Print — Dentiva Pro',
     autoHideMenuBar: true,
     show: false,
+    icon: resolveWindowIcon(),
     webPreferences: {
       preload: path.join(__dirname, '..', 'preload', 'index.js'),
       contextIsolation: true,
@@ -44,12 +77,37 @@ export function getPrintContents(): WebContents {
   throw new AppError('INTERNAL', 'Print window is not open.');
 }
 
+/** Convert millimetres to inches (Electron printToPDF uses inches). */
+export function mmToInches(mm: number): number {
+  return Math.max(0, Number(((Number(mm) || 0) / 25.4).toFixed(4)));
+}
+
+/** Convert millimetres to 96-DPI CSS pixels for Electron webContents.print custom margins. */
+export function marginsMmToPrintMargins(
+  marginsMm?: { top: number; right: number; bottom: number; left: number },
+): { marginType: 'custom'; top: number; right: number; bottom: number; left: number } {
+  const m = marginsMm ?? { top: 10, right: 10, bottom: 10, left: 10 };
+  const toPx = (mm: number) => Math.max(0, Math.round(((Number(mm) || 0) * 96) / 25.4));
+  return {
+    marginType: 'custom',
+    top: toPx(m.top),
+    right: toPx(m.right),
+    bottom: toPx(m.bottom),
+    left: toPx(m.left),
+  };
+}
+
 export interface PrintExecuteOptions {
   printerName?: string | null;
   silent?: boolean;
   copies?: number;
   landscape?: boolean;
   color?: boolean;
+  duplex?: 'simplex' | 'shortEdge' | 'longEdge';
+  widthMm?: number;
+  heightMm?: number;
+  marginsMm?: { top: number; right: number; bottom: number; left: number };
+  scale?: number;
 }
 
 export type PrintResult = { ok: true } | { ok: false; cancelled?: boolean; error: string };
@@ -60,18 +118,20 @@ export async function executePrint(opts: PrintExecuteOptions): Promise<PrintResu
     const ok = await new Promise<boolean>((resolve, reject) => {
       wc.print(
         {
-          silent: opts.silent ?? false,
+          silent: Boolean(opts.silent && opts.printerName),
+          printBackground: true,
           deviceName: opts.printerName ?? '',
           copies: Math.max(1, Math.min(99, Number(opts.copies) || 1)),
           landscape: !!opts.landscape,
           color: opts.color !== false,
-          margins: { top: 0.4, bottom: 0.4, left: 0.4, right: 0.4 },
+          duplexMode: opts.duplex,
+          margins: marginsMmToPrintMargins(opts.marginsMm),
           pagesPerSheet: 1,
-          scaleFactor: 100,
+          scaleFactor: opts.scale ? Math.max(25, Math.min(200, Math.round(opts.scale))) : 100,
         },
         (success, failureReason) => {
           if (success) resolve(true);
-          else if (failureReason === 'cancelled') resolve(false);
+          else if (failureReason === 'cancelled' || failureReason === 'Print job canceled') resolve(false);
           else reject(new Error(failureReason || 'Print failed'));
         },
       );
@@ -87,7 +147,9 @@ export interface PdfOptions {
   suggestedName: string;
   widthMm: number;
   heightMm: number;
+  landscape?: boolean;
   marginsMm?: { top: number; right: number; bottom: number; left: number };
+  scale?: number;
 }
 
 export type PdfResult = { ok: true; path: string } | { ok: false; cancelled?: boolean; error: string };
@@ -103,15 +165,19 @@ export async function saveAsPdf(opts: PdfOptions): Promise<PdfResult> {
   if (save.canceled || !save.filePath) return { ok: false, cancelled: true, error: 'Save cancelled.' };
 
   try {
-    // Micron units (1 mm = 1000 microns) per Electron printToPDF API.
+    // Electron printToPDF uses inches (1 inch = 25.4 mm) for pageSize and margins.
     const m = opts.marginsMm ?? { top: 10, right: 10, bottom: 10, left: 10 };
+    const widthIn = Math.max(1.5, mmToInches(opts.widthMm || 210));
+    const heightIn = Math.max(2.0, mmToInches(opts.heightMm || 297));
     const data = await win.webContents.printToPDF({
-      pageSize: { width: Math.round(opts.widthMm * 1000), height: Math.round(opts.heightMm * 1000) },
+      pageSize: { width: widthIn, height: heightIn },
+      landscape: Boolean(opts.landscape),
+      scale: opts.scale ? Math.max(0.25, Math.min(2, opts.scale / 100)) : undefined,
       margins: {
-        top: Math.round(m.top * 1000),
-        right: Math.round(m.right * 1000),
-        bottom: Math.round(m.bottom * 1000),
-        left: Math.round(m.left * 1000),
+        top: mmToInches(m.top),
+        right: mmToInches(m.right),
+        bottom: mmToInches(m.bottom),
+        left: mmToInches(m.left),
       },
       printBackground: true,
     });

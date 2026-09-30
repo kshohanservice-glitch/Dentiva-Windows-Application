@@ -14,13 +14,19 @@ import { createPatient } from '../../src/main/services/patients';
 import { createInvoice, createPayment, getInvoice, paidNetFor } from '../../src/main/services/billing';
 import { patientCsvRows } from '../../src/main/services/patients';
 import { toCsv, neutralizeFormula } from '../../src/shared/csv';
-import { saveUser } from '../../src/main/services/users';
-import { addAttachment, listAttachments } from '../../src/main/services/attachments';
+import { saveUser, resetPassword, listAudit } from '../../src/main/services/users';
+import { addAttachment, attachmentPath, listAttachments } from '../../src/main/services/attachments';
 import { createAppointment, updateAppointment, markNoShow, cancelAppointment, arriveAppointment } from '../../src/main/services/appointments';
-import { performQueueAction } from '../../src/main/services/queue';
-import { createVisit } from '../../src/main/services/visits';
+import { addQueueEntry, performQueueAction } from '../../src/main/services/queue';
+import { createVisit, getVisit } from '../../src/main/services/visits';
 import { createPrescription } from '../../src/main/services/prescriptions';
 import { createBackupService } from '../../src/main/services/backup';
+import { setChart } from '../../src/main/services/chart';
+import { listItems, saveItem } from '../../src/main/services/inventory';
+import { listPatients } from '../../src/main/services/patients';
+import { globalSearch } from '../../src/main/services/search';
+import { getDashboard } from '../../src/main/services/dashboard';
+import { saveSettings } from '../../src/main/services/settings';
 import { SessionManager } from '../../src/main/core/session';
 import { hashPassword } from '../../src/main/core/passwords';
 import type { Ctx } from '../../src/main/core/context';
@@ -280,5 +286,171 @@ describe('ISS-018 attachment write permissions', () => {
     const att = addAttachment(editor, 'patient', p.id, pngFixture());
     expect(att.originalName).toBe('fixture.png');
     expect(listAttachments(editor, 'patient', p.id).length).toBe(1);
+  });
+
+  it('accepts valid WebP and BMP attachments and enforces entity-specific read permission on attachmentPath (ISS-037)', () => {
+    const owner = ownerCtx(env);
+    const p = patient(owner, '01700000120');
+    const inv = createInvoice(owner, {
+      patientId: p.id, date: '2026-09-28',
+      items: [{ description: 'Crown', qty: 1, unitPricePaisa: 500000 }],
+    });
+
+    const webpPath = path.join(env.dir, 'xray.webp');
+    const webpBuf = Buffer.alloc(16);
+    webpBuf.write('RIFF', 0, 'latin1');
+    webpBuf.writeUInt32LE(8, 4);
+    webpBuf.write('WEBP', 8, 'latin1');
+    fs.writeFileSync(webpPath, webpBuf);
+
+    const bmpPath = path.join(env.dir, 'scan.bmp');
+    const bmpBuf = Buffer.alloc(16);
+    bmpBuf[0] = 0x42; // 'B'
+    bmpBuf[1] = 0x4d; // 'M'
+    fs.writeFileSync(bmpPath, bmpBuf);
+
+    const webpAtt = addAttachment(owner, 'patient', p.id, webpPath);
+    expect(webpAtt.mime).toBe('image/webp');
+
+    const invAtt = addAttachment(owner, 'invoice', inv.id, bmpPath);
+    expect(invAtt.mime).toBe('image/bmp');
+
+    // A user with only patients.view cannot open an invoice attachment without billing.invoice.view
+    const patientOnlyReader = { db: env.db, paths: env.paths, session: sessionWith(['patients.view']) };
+    expect(() => attachmentPath(patientOnlyReader, invAtt.id)).toThrow(/permission/i);
+    expect(attachmentPath(owner, invAtt.id).originalName).toBe('scan.bmp');
+  });
+});
+
+describe('ISS-033 owner resetPassword guard & minPasswordLength enforcement', () => {
+  it('blocks non-owner administrator from resetting the owner password and enforces minPasswordLength', async () => {
+    const owner = ownerCtx(env);
+    saveSettings(owner, { security: { autoLockMinutes: 10, minPasswordLength: 12, maxFailedLogins: 5 } });
+
+    const role = env.db.prepare("SELECT id FROM roles WHERE key = 'administrator'").get<{ id: number }>()!;
+    const now = new Date().toISOString();
+    env.db
+      .prepare("INSERT INTO users (username, display_name, password_hash, role_id, status, created_at, updated_at) VALUES ('admin2', 'Admin 2', 'x', ?, 'active', ?, ?)")
+      .run(role.id, now, now);
+    const adminId = Number(env.db.prepare("SELECT id FROM users WHERE username = 'admin2'").get<{ id: number }>()!.id);
+    const admin = {
+      db: env.db, paths: env.paths,
+      session: sessionWith([...ALL_PERMISSIONS], { roleKey: 'administrator', userId: adminId, username: 'admin2' }),
+    };
+
+    await expect(resetPassword(admin, 1, 'ValidLongPass123')).rejects.toThrow(/only the owner/i);
+    await expect(resetPassword(owner, adminId, 'short123')).rejects.toThrow(/at least 12 characters/i);
+    const ok = await resetPassword(owner, adminId, 'ValidLongPass123');
+    expect(ok.ok).toBe(true);
+  });
+});
+
+describe('ISS-035 queue pause on waiting & targeted call_next', () => {
+  it('allows pausing a waiting patient and calling a specific waiting row via call_next', () => {
+    const ctx = ownerCtx(env);
+    const p1 = patient(ctx, '01700000131');
+    const p2 = patient(ctx, '01700000132');
+    const q1 = addQueueEntry(ctx, { patientId: p1.id });
+    const q2 = addQueueEntry(ctx, { patientId: p2.id });
+
+    const paused = performQueueAction(ctx, q1.id, 'pause');
+    expect(paused.status).toBe('paused');
+
+    const called = performQueueAction(ctx, q2.id, 'call_next');
+    expect(called.id).toBe(q2.id);
+    expect(called.status).toBe('called');
+  });
+});
+
+describe('ISS-036 / ISS-009 visit treatments returned in getVisit', () => {
+  it('returns recorded visit_treatments in getVisit for visit-summary printing', () => {
+    const ctx = ownerCtx(env);
+    const p = patient(ctx, '01700000141');
+    const d = seedDentist();
+    const now = new Date().toISOString();
+    const tInfo = env.db
+      .prepare("INSERT INTO treatments (code, name, default_price_paisa, active, created_at, updated_at) VALUES ('T-SCAL', 'Scaling & Polishing', 150000, 1, ?, ?)")
+      .run(now, now);
+    const treatmentId = Number(tInfo.lastInsertRowid);
+
+    const v = createVisit(ctx, {
+      patientId: p.id,
+      dentistId: d,
+      datetime: '2026-09-28T10:30',
+      diagnosis: 'Gingivitis',
+      treatments: [{ treatmentId, qty: 1, unitPricePaisa: 150000 }],
+    });
+    const fetched = getVisit(ctx, v.id);
+    expect(fetched.treatments).toHaveLength(1);
+    expect(fetched.treatments?.[0].description).toBe('Scaling & Polishing');
+    expect(fetched.treatments?.[0].totalPaisa).toBe(150000);
+  });
+});
+
+describe('ISS-038 pediatric upper arch & chart validation', () => {
+  it('seeds quadrants 5 and 6 as upper arch and validates chart severity/note length', () => {
+    const ctx = ownerCtx(env);
+    const p = patient(ctx, '01700000151');
+    const upperPed = env.db.prepare("SELECT COUNT(*) c FROM teeth WHERE quadrant IN (5, 6) AND arch = 'upper'").get<{ c: number }>()!;
+    expect(Number(upperPed.c)).toBe(10);
+
+    expect(() =>
+      setChart(ctx, p.id, { changes: [{ tooth: '55', condition: 'caries', action: 'set', severity: 'critical' }] }),
+    ).toThrow(/Severity must be one of/i);
+
+    const chart = setChart(ctx, p.id, {
+      changes: [{ tooth: '55', condition: 'caries', action: 'set', severity: 'moderate', note: 'Occlusal pit' }],
+    });
+    expect(chart.current).toHaveLength(1);
+    expect(chart.current[0].tooth).toBe('55');
+    expect(chart.current[0].severity).toBe('moderate');
+  });
+});
+
+describe('ISS-039 LIKE wildcard escaping, inventory auto-code & audit prefix filter', () => {
+  it('escapes % and _ wildcards in search/list filters, auto-generates blank item codes, and filters audit by prefix', () => {
+    const ctx = ownerCtx(env);
+    createPatient(ctx, { name: 'Normal Patient', gender: 'male', ageYears: 40, phone: '01700000161', forceCreate: true });
+    expect(listPatients(ctx, { query: '%', range: 'all' }).total).toBe(0);
+    expect(globalSearch(ctx, '%%')).toHaveLength(0);
+
+    const item = saveItem(ctx, { name: '100% Cotton Roll', unit: 'box', minLevel: 5 });
+    expect(item.code).toMatch(/^ITM-/);
+    expect(listItems(ctx, { query: '100%' })).toHaveLength(1);
+
+    const auditPatient = listAudit(ctx, { action: 'patient.' });
+    expect(auditPatient.total).toBeGreaterThanOrEqual(1);
+    expect(auditPatient.items.every((a) => a.action.startsWith('patient.'))).toBe(true);
+  });
+});
+
+describe('ISS-040 dashboard alerts honour notification preferences', () => {
+  it('suppresses due alerts when notifications.dues is disabled', () => {
+    const ctx = ownerCtx(env);
+    const p = patient(ctx, '01700000171');
+    createInvoice(ctx, {
+      patientId: p.id, date: '2026-09-28',
+      items: [{ description: 'Root Canal', qty: 1, unitPricePaisa: 400000 }],
+    });
+    expect(getDashboard(ctx).alerts.some((a) => a.kind === 'billing')).toBe(true);
+    saveSettings(ctx, { notifications: { appointments: true, lowStock: true, dues: false, backup: true } });
+    expect(getDashboard(ctx).alerts.some((a) => a.kind === 'billing')).toBe(false);
+  });
+});
+
+describe('ISS-041 icon asset transparency & multi-size ICO integrity', () => {
+  it('has transparent outer corners on PNG icons and all 7 standard sizes in build/icon.ico', () => {
+    const root = path.resolve(__dirname, '..', '..');
+    const ico = fs.readFileSync(path.join(root, 'build', 'icon.ico'));
+    expect(ico.readUInt16LE(0)).toBe(0);
+    expect(ico.readUInt16LE(2)).toBe(1);
+    const count = ico.readUInt16LE(4);
+    expect(count).toBe(7);
+    const sizes: number[] = [];
+    for (let i = 0; i < count; i++) {
+      const w = ico.readUInt8(6 + i * 16);
+      sizes.push(w === 0 ? 256 : w);
+    }
+    expect(sizes).toEqual([16, 24, 32, 48, 64, 128, 256]);
   });
 });

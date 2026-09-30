@@ -11,7 +11,7 @@ import { DataTable, TableToolbar, type Column } from '../components/table';
 import { Icon } from '../components/shell';
 import { ToothChart } from '../components/ToothChart';
 import { bdt, isoDate, localDateTime } from '../format';
-import type { DuplicateCandidate, PatientDTO, PatientFilters, PatientDetailDTO, TreatmentDTO } from '../../shared/types';
+import type { DuplicateCandidate, PatientDTO, PatientFilters, PatientDetailDTO, PrescriptionDTO, TreatmentDTO } from '../../shared/types';
 import type { PatientInputPayload } from '../../shared/ipc';
 
 /* ================================ List ================================= */
@@ -25,7 +25,7 @@ const EMPTY_FORM: PatientFormValues = {
   status: 'active', tags: [], histories: {}, forceCreate: false,
 };
 
-function PatientFormModal(props: { open: boolean; initial?: PatientDTO | null; onClose: () => void; onSaved: (id: number) => void }) {
+function PatientFormModal(props: { open: boolean; initial?: (PatientDTO & Partial<PatientDetailDTO>) | null; onClose: () => void; onSaved: (id: number) => void }) {
   const { values, set, errors, setErrors, validate, reset } = useForm({ ...EMPTY_FORM });
   const [pending, setPending] = useState(false);
   const [dupes, setDupes] = useState<DuplicateCandidate[]>([]);
@@ -47,6 +47,14 @@ function PatientFormModal(props: { open: boolean; initial?: PatientDTO | null; o
             address: props.initial.address ?? '', city: props.initial.city ?? '',
             chiefComplaint: props.initial.chiefComplaint ?? '', referredBy: props.initial.referredBy ?? '',
             preferredDentistId: props.initial.preferredDentistId, status: props.initial.status, tags: props.initial.tags,
+            histories: {
+              allergies: props.initial.allergies ?? '',
+              medications: props.initial.medications ?? '',
+              previous: props.initial.previousProblems ?? '',
+              medical: props.initial.medicalHistory ?? '',
+              dental: props.initial.dentalHistory ?? '',
+              notes: props.initial.notes ?? '',
+            },
           }
         : {}),
     });
@@ -206,6 +214,24 @@ function PatientFormModal(props: { open: boolean; initial?: PatientDTO | null; o
             />
           )}
         </Field>
+        <Field label="Allergies">
+          {(id) => <Input id={id} value={values.histories?.allergies ?? ''} onChange={(v) => set('histories', { ...values.histories, allergies: v })} placeholder="e.g. Penicillin, Lidocaine" />}
+        </Field>
+        <Field label="Current medications">
+          {(id) => <Input id={id} value={values.histories?.medications ?? ''} onChange={(v) => set('histories', { ...values.histories, medications: v })} placeholder="e.g. Metformin 500mg" />}
+        </Field>
+        <Field label="Medical history">
+          {(id) => <Input id={id} value={values.histories?.medical ?? ''} onChange={(v) => set('histories', { ...values.histories, medical: v })} placeholder="e.g. Hypertension, Diabetes" />}
+        </Field>
+        <Field label="Dental history">
+          {(id) => <Input id={id} value={values.histories?.dental ?? ''} onChange={(v) => set('histories', { ...values.histories, dental: v })} placeholder="Prior RCT, extractions, ortho" />}
+        </Field>
+        <Field label="Previous problems">
+          {(id) => <Input id={id} value={values.histories?.previous ?? ''} onChange={(v) => set('histories', { ...values.histories, previous: v })} />}
+        </Field>
+        <Field label="Clinical notes">
+          {(id) => <Input id={id} value={values.histories?.notes ?? ''} onChange={(v) => set('histories', { ...values.histories, notes: v })} />}
+        </Field>
       </div>
 
       {dupes.length > 0 && (
@@ -240,6 +266,7 @@ export function PatientsPage() {
   const [page, setPage] = useState(1);
   const [pageSize] = useState(25);
   const [formOpen, setFormOpen] = useState(params.get('new') === '1');
+  const [visitOpen, setVisitOpen] = useState(params.get('newVisit') === '1');
   const [exporting, setExporting] = useState(false);
   const toast = useToast();
 
@@ -251,13 +278,19 @@ export function PatientsPage() {
   const { data, loading, error, reload } = useAsync(() => api['patients/list'](filters), [JSON.stringify(filters)]);
 
   useEffect(() => {
+    let changed = false;
     if (params.get('new') === '1') {
       setFormOpen(true);
       params.delete('new');
-      setParams(params, { replace: true });
+      changed = true;
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+    if (params.get('newVisit') === '1') {
+      setVisitOpen(true);
+      params.delete('newVisit');
+      changed = true;
+    }
+    if (changed) setParams(params, { replace: true });
+  }, [params, setParams]);
 
   const doExport = async () => {
     setExporting(true);
@@ -359,6 +392,13 @@ export function PatientsPage() {
         onClose={() => setFormOpen(false)}
         onSaved={(id) => { reload(); navigate(`/patients/${id}`); }}
       />
+      {visitOpen && (
+        <VisitFormModal
+          patientId={0}
+          onClose={() => setVisitOpen(false)}
+          onSaved={() => { setVisitOpen(false); reload(); }}
+        />
+      )}
     </div>
   );
 }
@@ -379,8 +419,9 @@ export function PatientProfilePage() {
   const [visitOpen, setVisitOpen] = useState(false);
   const [rxOpen, setRxOpen] = useState(false);
   const [invoiceOpen, setInvoiceOpen] = useState(false);
+  const [refreshTick, setRefreshTick] = useState(0);
 
-  const { data: patient, loading, error, reload } = useAsync(() => api['patients/get'](patientId), [patientId]);
+  const { data: patient, loading, error, reload } = useAsync(() => api['patients/get'](patientId), [patientId, refreshTick]);
 
   if (loading && !patient) return <Spinner label="Loading patient…" />;
   if (error) return <ErrorState error={error} onRetry={reload} />;
@@ -425,6 +466,7 @@ export function PatientProfilePage() {
         </div>
         <div className="col gap-2" style={{ alignItems: 'stretch' }}>
           {can('clinical.visit.create') && <Button variant="primary" onClick={() => setVisitOpen(true)}>New visit</Button>}
+          {can('clinical.prescription.create') && <Button variant="secondary" onClick={() => setRxOpen(true)}>New prescription</Button>}
           {can('appointments.manage') && <Button variant="secondary" onClick={() => navigate(`/appointments?patient=${patient.id}&new=1`)}>Book appointment</Button>}
           {can('billing.invoice.create') && <Button variant="secondary" onClick={() => setInvoiceOpen(true)}>Create invoice</Button>}
           <div className="row gap-2">
@@ -440,7 +482,7 @@ export function PatientProfilePage() {
 
       <div className="mt-4">
         {tab === 'overview' && <OverviewTab patient={patient} onGoto={setTab} />}
-        {tab === 'visits' && <VisitsTab patientId={patient.id} onCreate={() => setVisitOpen(true)} />}
+        {tab === 'visits' && <VisitsTab patientId={patient.id} refreshKey={refreshTick} onCreate={() => setVisitOpen(true)} />}
         {tab === 'chart' && (
           <Card title="Odontogram" actions={<span className="xsmall muted">Click to select · double-click a tooth to clear · history preserved per visit</span>}>
             <ToothChart patientId={patient.id} editable={can('clinical.chart.edit')} />
@@ -448,16 +490,16 @@ export function PatientProfilePage() {
         )}
         {tab === 'rx' && (
           <Card title="Prescriptions" actions={can('clinical.prescription.create') ? <Button size="sm" variant="primary" onClick={() => setRxOpen(true)}>New prescription</Button> : undefined}>
-            <PrescriptionsForPatient patientId={patient.id} onPrint={(rxId) => void api['reports/print']({ type: 'prescription', id: rxId })} />
+            <PrescriptionsForPatient patientId={patient.id} refreshKey={refreshTick} onPrint={(rxId) => void api['reports/print']({ type: 'prescription', id: rxId })} />
           </Card>
         )}
         {tab === 'invoices' && (
           <Card title="Invoices" actions={<Button size="sm" variant="primary" onClick={() => setInvoiceOpen(true)}>New invoice</Button>}>
-            <InvoicesForPatient patientId={patient.id} onOpen={(invId) => navigate(`/invoices?invoice=${invId}`)} />
+            <InvoicesForPatient patientId={patient.id} refreshKey={refreshTick} onOpen={(invId) => navigate(`/invoices?invoice=${invId}`)} />
           </Card>
         )}
         {tab === 'files' && <AttachmentsTab entityType="patient" entityId={patient.id} />}
-        {tab === 'history' && <TimelineTab patientId={patient.id} />}
+        {tab === 'history' && <TimelineTab patientId={patient.id} refreshKey={refreshTick} />}
       </div>
 
       <PatientFormModal open={editOpen} initial={patient} onClose={() => setEditOpen(false)} onSaved={() => reload()} />
@@ -482,9 +524,9 @@ export function PatientProfilePage() {
         />
       )}
 
-      {visitOpen && <VisitFormModal patientId={patient.id} onClose={() => setVisitOpen(false)} onSaved={(vid) => { setVisitOpen(false); setTab('visits'); void vid; }} />}
-      {rxOpen && <RxFormModal patientId={patient.id} onClose={() => setRxOpen(false)} onSaved={() => { setRxOpen(false); setTab('rx'); }} />}
-      {invoiceOpen && <InvoiceFormModal patientId={patient.id} onClose={() => setInvoiceOpen(false)} onSaved={(invId) => { setInvoiceOpen(false); setTab('invoices'); navigate(`/invoices?invoice=${invId}`); }} />}
+      {visitOpen && <VisitFormModal patientId={patient.id} onClose={() => setVisitOpen(false)} onSaved={() => { setVisitOpen(false); setRefreshTick((n) => n + 1); setTab('visits'); }} />}
+      {rxOpen && <RxFormModal patientId={patient.id} onClose={() => setRxOpen(false)} onSaved={() => { setRxOpen(false); setRefreshTick((n) => n + 1); setTab('rx'); }} />}
+      {invoiceOpen && <InvoiceFormModal patientId={patient.id} onClose={() => setInvoiceOpen(false)} onSaved={(invId) => { setInvoiceOpen(false); setRefreshTick((n) => n + 1); setTab('invoices'); navigate(`/invoices?invoice=${invId}`); }} />}
     </div>
   );
 }
@@ -524,8 +566,8 @@ function OverviewTab(props: { patient: PatientDetailDTO; onGoto: (t: ProfileTab)
   );
 }
 
-function VisitsTab(props: { patientId: number; onCreate: () => void }) {
-  const { data, loading, error, reload } = useAsync(() => api['visits/list']({ patientId: props.patientId, pageSize: 100 }), [props.patientId]);
+function VisitsTab(props: { patientId: number; refreshKey?: number; onCreate: () => void }) {
+  const { data, loading, error, reload } = useAsync(() => api['visits/list']({ patientId: props.patientId, pageSize: 100 }), [props.patientId, props.refreshKey]);
   const toast = useToast();
 
   const printSummary = async (visitId: number) => {
@@ -571,34 +613,100 @@ function VisitsTab(props: { patientId: number; onCreate: () => void }) {
   );
 }
 
-function PrescriptionsForPatient(props: { patientId: number; onPrint: (id: number) => void }) {
-  const { data, loading, error, reload } = useAsync(() => api['prescriptions/list']({ patientId: props.patientId, pageSize: 100 }), [props.patientId]);
+export function RxDetailModal(props: { rx: PrescriptionDTO; onClose: () => void }) {
+  const { rx } = props;
+  const toast = useToast();
+  const print = async (kind: 'prescription' | 'prescription-duplicate') => {
+    try {
+      await api['reports/print']({ type: kind, id: rx.id } as any);
+    } catch (err) {
+      toast.fromError(err, 'Could not open print preview');
+    }
+  };
+  return (
+    <Modal
+      title={`Prescription ${rx.number}`}
+      onClose={props.onClose}
+      width="wide"
+      footer={
+        <>
+          <Button variant="secondary" onClick={props.onClose}>Close</Button>
+          <Button variant="secondary" onClick={() => void print('prescription-duplicate')}>Print duplicate (watermarked)</Button>
+          <Button variant="primary" icon={Icon.print} onClick={() => void print('prescription')}>Print</Button>
+        </>
+      }
+    >
+      <div className="kv-list mb-4">
+        <div className="kv"><span className="k">Patient</span><span className="v">{rx.patientName} ({rx.patientCode})</span></div>
+        <div className="kv"><span className="k">Date</span><span className="v">{new Date(rx.date).toLocaleDateString()}</span></div>
+        <div className="kv"><span className="k">Dentist</span><span className="v">{rx.dentistName}</span></div>
+        {rx.diagnosis && <div className="kv"><span className="k">Diagnosis</span><span className="v">{rx.diagnosis}</span></div>}
+        {rx.cC && <div className="kv"><span className="k">C/C</span><span className="v">{rx.cC}</span></div>}
+        {rx.oE && <div className="kv"><span className="k">O/E</span><span className="v">{rx.oE}</span></div>}
+        {rx.rE && <div className="kv"><span className="k">R/E</span><span className="v">{rx.rE}</span></div>}
+        {rx.treatment && <div className="kv"><span className="k">Treatment</span><span className="v">{rx.treatment}</span></div>}
+        {rx.advice && <div className="kv"><span className="k">Advice</span><span className="v">{rx.advice}</span></div>}
+        {rx.followUp && <div className="kv"><span className="k">Follow-up</span><span className="v">{new Date(rx.followUp).toLocaleDateString()}</span></div>}
+      </div>
+      <table className="table">
+        <thead>
+          <tr><th>#</th><th>Medicine</th><th>Dosage</th><th>Frequency</th><th>Duration</th></tr>
+        </thead>
+        <tbody>
+          {rx.items.map((it, i) => (
+            <tr key={i}>
+              <td className="num">{i + 1}</td>
+              <td>
+                <strong>{it.medicineName}</strong>
+                {it.strength && <span className="muted"> ({it.strength})</span>}
+                {it.generic && <div className="xsmall muted">{it.generic}</div>}
+              </td>
+              <td>{it.dosage ?? '—'}</td>
+              <td>{it.frequency ?? '—'}</td>
+              <td>{it.duration ?? '—'}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </Modal>
+  );
+}
+
+function PrescriptionsForPatient(props: { patientId: number; refreshKey?: number; onPrint: (id: number) => void }) {
+  const { data, loading, error, reload } = useAsync(() => api['prescriptions/list']({ patientId: props.patientId, pageSize: 100 }), [props.patientId, props.refreshKey]);
+  const [detail, setDetail] = useState<PrescriptionDTO | null>(null);
   if (loading && !data) return <Spinner label="Loading prescriptions…" />;
   if (error) return <ErrorState error={error} onRetry={reload} />;
   const items = data?.items ?? [];
   if (items.length === 0) return <EmptyState title="No prescriptions" body="Create a prescription from the New visit flow or the button above." />;
   return (
-    <div className="list">
-      {items.map((rx) => (
-        <div className="list-row" key={rx.id}>
-          <span className="flex-1">
-            <strong className="mono">{rx.number}</strong>
-            <div className="xsmall muted">
-              {new Date(rx.date).toLocaleDateString()} · {rx.dentistName} · {rx.items.length} medicine{rx.items.length === 1 ? '' : 's'}
+    <>
+      <div className="list">
+        {items.map((rx) => (
+          <div className="list-row clickable" key={rx.id} onClick={() => setDetail(rx)}>
+            <span className="flex-1">
+              <strong className="mono">{rx.number}</strong>
+              <div className="xsmall muted">
+                {new Date(rx.date).toLocaleDateString()} · {rx.dentistName} · {rx.items.length} medicine{rx.items.length === 1 ? '' : 's'}
+              </div>
+            </span>
+            <span className="small muted truncate" style={{ maxWidth: 320 }}>
+              {rx.items.map((i) => i.medicineName).join(', ')}
+            </span>
+            <div className="row gap-2" onClick={(e) => e.stopPropagation()}>
+              <Button size="sm" variant="ghost" onClick={() => setDetail(rx)}>View</Button>
+              <Button size="sm" variant="secondary" onClick={() => props.onPrint(rx.id)}>Print</Button>
             </div>
-          </span>
-          <span className="small muted truncate" style={{ maxWidth: 320 }}>
-            {rx.items.map((i) => i.medicineName).join(', ')}
-          </span>
-          <Button size="sm" variant="secondary" onClick={() => props.onPrint(rx.id)}>Print</Button>
-        </div>
-      ))}
-    </div>
+          </div>
+        ))}
+      </div>
+      {detail && <RxDetailModal rx={detail} onClose={() => setDetail(null)} />}
+    </>
   );
 }
 
-function InvoicesForPatient(props: { patientId: number; onOpen: (id: number) => void }) {
-  const { data, loading, error, reload } = useAsync(() => api['invoices/list']({ patientId: props.patientId, pageSize: 100 }), [props.patientId]);
+function InvoicesForPatient(props: { patientId: number; refreshKey?: number; onOpen: (id: number) => void }) {
+  const { data, loading, error, reload } = useAsync(() => api['invoices/list']({ patientId: props.patientId, pageSize: 100 }), [props.patientId, props.refreshKey]);
   if (loading && !data) return <Spinner label="Loading invoices…" />;
   if (error) return <ErrorState error={error} onRetry={reload} />;
   const items = data?.items ?? [];
@@ -668,8 +776,8 @@ function AttachmentsTab(props: { entityType: string; entityId: number }) {
   );
 }
 
-function TimelineTab(props: { patientId: number }) {
-  const { data, loading, error, reload } = useAsync(() => api['patients/timeline'](props.patientId), [props.patientId]);
+function TimelineTab(props: { patientId: number; refreshKey?: number }) {
+  const { data, loading, error, reload } = useAsync(() => api['patients/timeline'](props.patientId), [props.patientId, props.refreshKey]);
   if (loading && !data) return <Spinner label="Loading history…" />;
   if (error) return <ErrorState error={error} onRetry={reload} />;
   const items = data ?? [];
@@ -704,6 +812,22 @@ export function VisitFormModal(props: { patientId: number; onClose: () => void; 
   const { data: treatments } = useAsync(() => api['treatments/list'](), []);
   const [pending, setPending] = useState(false);
   const toast = useToast();
+  const [patientQuery, setPatientQuery] = useState('');
+  const [chosenPatient, setChosenPatient] = useState<{ id: number; name: string; code: string } | null>(
+    props.patientId ? { id: props.patientId, name: '', code: '' } : null,
+  );
+  const [patientMatches, setPatientMatches] = useState<{ id: number; name: string; code: string }[]>([]);
+
+  React.useEffect(() => {
+    if (props.patientId) return;
+    if (patientQuery.trim().length < 2) { setPatientMatches([]); return; }
+    const t = setTimeout(() => {
+      api['patients/list']({ query: patientQuery, pageSize: 8, status: 'active' })
+        .then((res) => setPatientMatches(res.items.map((p) => ({ id: p.id, name: p.name, code: p.code }))))
+        .catch(() => setPatientMatches([]));
+    }, 200);
+    return () => clearTimeout(t);
+  }, [patientQuery, props.patientId]);
 
   const submit = async () => {
     const ok = validate((v) => ({
@@ -711,10 +835,14 @@ export function VisitFormModal(props: { patientId: number; onClose: () => void; 
       dentistId: !v.dentistId ? 'Select the treating dentist.' : '',
     }));
     if (!ok) return;
+    if (!props.patientId && !chosenPatient) {
+      toast.warning('Select a patient', 'Search and choose the patient first.');
+      return;
+    }
     setPending(true);
     try {
       const visit = await api['visits/create']({
-        patientId: props.patientId,
+        patientId: props.patientId || chosenPatient!.id,
         dentistId: Number(values.dentistId),
         datetime: values.datetime,
         chiefComplaint: values.chiefComplaint || null,
@@ -755,6 +883,28 @@ export function VisitFormModal(props: { patientId: number; onClose: () => void; 
         </>
       }
     >
+      {!props.patientId && (
+        <div className="field mb-4">
+          <label>Patient <span className="req">*</span></label>
+          <Input
+            value={chosenPatient ? `${chosenPatient.name} · ${chosenPatient.code}` : patientQuery}
+            onChange={(v) => { setChosenPatient(null); setPatientQuery(v); }}
+            placeholder="Search patient by name, phone or ID…"
+            autoFocus
+          />
+          {!chosenPatient && patientMatches.length > 0 && (
+            <div className="list" style={{ border: '1px solid var(--line)', borderRadius: 6, marginTop: 6, maxHeight: 150, overflowY: 'auto' }}>
+              {patientMatches.map((m) => (
+                <div key={m.id} className="list-row clickable" style={{ padding: '8px 10px' }}
+                  onClick={() => { setChosenPatient(m); setPatientQuery(m.name); }}>
+                  <strong className="flex-1">{m.name}</strong>
+                  <span className="xsmall muted mono">{m.code}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
       <div className="form-grid">
         <Field label="Date & time" required error={errors.datetime}>
           {(id) => <Input id={id} type="datetime-local" value={values.datetime} onChange={(v) => set('datetime', v)} invalid={!!errors.datetime} />}

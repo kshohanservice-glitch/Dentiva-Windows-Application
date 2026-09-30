@@ -143,23 +143,24 @@ export function getDashboard(ctx: Ctx): DashboardDTO {
     };
   }
 
+  const notifSettings = readSetting(ctx, 'notifications', { lowStock: true, dues: true, backup: true, appointments: true });
+
   const alerts: DashboardDTO['alerts'] = [];
-  if (inventory) {
+  if (inventory && notifSettings.lowStock !== false) {
     if (inventory.lowStock > 0) alerts.push({ severity: 'warning', kind: 'inventory', title: `${inventory.lowStock} item(s) low on stock`, body: 'Open Inventory to review and reorder.' });
     if (inventory.expired > 0) alerts.push({ severity: 'danger', kind: 'inventory', title: `${inventory.expired} expired batch(es)`, body: 'Remove or write off expired stock.' });
     else if (inventory.expiringSoon > 0) alerts.push({ severity: 'warning', kind: 'inventory', title: `${inventory.expiringSoon} batch(es) expiring within 30 days`, body: 'Review expiry dates.' });
   }
-  if (waitingQueue > 0) alerts.push({ severity: 'info', kind: 'queue', title: `${waitingQueue} patient(s) in queue`, body: 'Open Queue to manage flow.' });
-  if (canFinance && financial && financial.outstandingDuePaisa > 0) {
+  if (waitingQueue > 0 && notifSettings.appointments !== false) {
+    alerts.push({ severity: 'info', kind: 'queue', title: `${waitingQueue} patient(s) in queue`, body: 'Open Queue to manage flow.' });
+  }
+  if (canFinance && financial && financial.outstandingDuePaisa > 0 && notifSettings.dues !== false) {
     alerts.push({ severity: 'warning', kind: 'billing', title: 'Outstanding dues', body: 'Some invoices have unpaid balances.' });
   }
-  const failedBackups = hasPermission(ctx, 'backup.create')
+  const failedBackups = hasPermission(ctx, 'backup.create') && notifSettings.backup !== false
     ? scalar(`SELECT COUNT(*) n FROM backups WHERE status = 'failed' AND created_at >= datetime('now','-1 day')`)
     : 0;
   if (failedBackups > 0) alerts.push({ severity: 'danger', kind: 'backup', title: 'Recent backup failure', body: 'A backup failed in the last 24 hours. Check Settings → Backup.' });
-
-  const notifSettings = readSetting(ctx, 'notifications', { lowStock: true, dues: true, backup: true, appointments: true });
-  void notifSettings;
 
   return {
     todayPatients, todayAppointments, waitingQueue, completedVisits, noShows,

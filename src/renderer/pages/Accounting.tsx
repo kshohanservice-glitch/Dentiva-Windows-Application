@@ -20,7 +20,7 @@ function EntryModal(props: {
   const [errors, setErrors] = useState<{ [k: string]: string }>({});
   const [pending, setPending] = useState(false);
   const toast = useToast();
-  const { data: categories } = useAsync(() => api['accounting/categories'](), []);
+  const { data: categories } = useAsync(() => api['accounting/categories'](), [props.open]);
   const cats = (categories ?? []).filter((c) => c.kind === props.kind);
 
   React.useEffect(() => {
@@ -230,7 +230,7 @@ export function AccountingPage() {
           { key: 'income' as const, label: 'Other income', count: incQ.data?.total },
         ]}
         active={tab}
-        onChange={setTab}
+        onChange={(t) => { setTab(t); setPage(1); }}
       />
 
       <div className="mt-4">

@@ -14,7 +14,18 @@ interface VisitRow {
   invoice_id: number | null; created_by: number; created_at: string;
 }
 
-function toDTO(row: VisitRow): VisitDTO {
+function toDTO(ctx: Ctx, row: VisitRow): VisitDTO {
+  const treatments = ctx.db
+    .prepare('SELECT id, treatment_id, description, qty, unit_price_paisa, total_paisa FROM visit_treatments WHERE visit_id = ? ORDER BY id ASC')
+    .all<{ id: number; treatment_id: number | null; description: string; qty: number; unit_price_paisa: number; total_paisa: number }>(row.id)
+    .map((t) => ({
+      id: t.id,
+      treatmentId: t.treatment_id,
+      description: t.description,
+      qty: t.qty,
+      unitPricePaisa: t.unit_price_paisa,
+      totalPaisa: t.total_paisa,
+    }));
   return {
     id: row.id, patientId: row.patient_id, patientName: row.patient_name, patientCode: row.patient_code,
     dentistId: row.dentist_id, dentistName: row.dentist_name, datetime: row.datetime,
@@ -22,6 +33,7 @@ function toDTO(row: VisitRow): VisitDTO {
     advice: row.advice, followUpDate: row.follow_up_date, status: row.status as VisitDTO['status'],
     invoiceId: row.invoice_id, createdBy: row.created_by, createdAt: row.created_at,
     examination: row.examination, history: row.history, notes: row.notes,
+    treatments,
   };
 }
 
@@ -56,14 +68,14 @@ export function listVisits(ctx: Ctx, filter: { patientId?: number; range?: strin
   const rows = ctx.db
     .prepare(`${SELECT} ${whereSql} ORDER BY v.datetime DESC LIMIT ? OFFSET ?`)
     .all(...params as any[], pageSize, offset) as VisitRow[];
-  return { items: rows.map(toDTO), total, page, pageSize };
+  return { items: rows.map((r) => toDTO(ctx, r)), total, page, pageSize };
 }
 
 export function getVisit(ctx: Ctx, id: number): VisitDTO {
   requirePermission(ctx, 'clinical.view');
   const row = ctx.db.prepare(`${SELECT} WHERE v.id = ? AND v.deleted_at IS NULL`).get(id) as VisitRow | undefined;
   if (!row) throw notFound('Visit not found.');
-  return toDTO(row);
+  return toDTO(ctx, row);
 }
 
 export function createVisit(ctx: Ctx, raw: unknown): VisitDTO {

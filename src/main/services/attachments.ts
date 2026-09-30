@@ -49,9 +49,15 @@ function assertEntity(ctx: Ctx, entityType: string, entityId: number): void {
 }
 
 function requireEntityRead(ctx: Ctx, entityType: string): void {
+  if (entityType === 'invoice') {
+    requirePermission(ctx, 'billing.invoice.view');
+    return;
+  }
+  if (entityType === 'staff') {
+    requirePermission(ctx, 'staff.view');
+    return;
+  }
   requirePermission(ctx, 'patients.view');
-  if (entityType === 'invoice') requirePermission(ctx, 'billing.invoice.view');
-  if (entityType === 'staff') requirePermission(ctx, 'staff.view');
 }
 
 /** Attachments are writes — gated by the write permission of their owning domain. */
@@ -98,15 +104,17 @@ export function addAttachment(ctx: Ctx, entityType: string, entityId: number, so
   if (!ALLOWED_EXT.has(ext)) throw validation(`File type "${ext || 'unknown'}" is not allowed. Allowed: ${[...ALLOWED_EXT].join(', ')}`);
 
   // Magic-byte sniff for images/PDF (blocks disguised executables)
-  const head = Buffer.alloc(8);
+  const head = Buffer.alloc(12);
   const fd = fs.openSync(sourcePath, 'r');
-  try { fs.readSync(fd, head, 0, 8, 0); } finally { fs.closeSync(fd); }
+  try { fs.readSync(fd, head, 0, 12, 0); } finally { fs.closeSync(fd); }
   if (ext === '.pdf' && head.toString('latin1', 0, 4) !== '%PDF') throw validation('The file does not look like a valid PDF.');
   if (['.png', '.jpg', '.jpeg', '.gif', '.webp', '.bmp'].includes(ext)) {
-    const isImage =
-      head[0] === 0x89 && head[1] === 0x50 ||
-      head[0] === 0xff && head[1] === 0xd8 ||
-      head[0] === 0x47 && head[1] === 0x49;
+    const isPng = head[0] === 0x89 && head[1] === 0x50 && head[2] === 0x4e && head[3] === 0x47;
+    const isJpeg = head[0] === 0xff && head[1] === 0xd8 && head[2] === 0xff;
+    const isGif = head[0] === 0x47 && head[1] === 0x49 && head[2] === 0x46 && head[3] === 0x38;
+    const isWebp = head.toString('latin1', 0, 4) === 'RIFF' && head.toString('latin1', 8, 12) === 'WEBP';
+    const isBmp = head[0] === 0x42 && head[1] === 0x4d;
+    const isImage = isPng || isJpeg || isGif || isWebp || isBmp;
     if (!isImage) throw validation('The file does not look like a valid image.');
   }
   if (head[0] === 0x4d && head[1] === 0x5a) throw validation('Executable files cannot be attached.');
@@ -166,9 +174,9 @@ export function removeAttachment(ctx: Ctx, id: number): { ok: boolean } {
 
 /** Absolute path for opening/exporting — validated to stay inside storage root. */
 export function attachmentPath(ctx: Ctx, id: number): { abs: string; originalName: string } {
-  requirePermission(ctx, 'patients.view');
   const row = ctx.db.prepare('SELECT * FROM attachments WHERE id = ?').get(id) as any;
   if (!row) throw notFound('Attachment not found.');
+  requireEntityRead(ctx, row.entity_type);
   const abs = safeResolve(ctx.paths.attachmentsDir, row.stored_name);
   if (!fs.existsSync(abs)) throw new AppError('FILE', 'The attachment file is missing from storage.');
   return { abs, originalName: row.original_name };

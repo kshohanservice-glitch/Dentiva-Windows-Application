@@ -209,8 +209,15 @@ function NotificationBell() {
     const onDoc = (e: MouseEvent) => {
       if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
     };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setOpen(false);
+    };
     document.addEventListener('mousedown', onDoc);
-    return () => document.removeEventListener('mousedown', onDoc);
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('mousedown', onDoc);
+      document.removeEventListener('keydown', onKey);
+    };
   }, [open]);
 
   const markAll = async () => {
@@ -307,7 +314,7 @@ export function AppShell() {
 
   useEffect(() => {
     if (settings) setCollapsed(!!settings.appearance.sidebarCollapsed);
-  }, [settings?.appearance.sidebarCollapsed]);
+  }, [settings]);
 
   // Global shortcuts
   useEffect(() => {
@@ -458,8 +465,13 @@ function DropdownUserMenu(props: { onSettings: () => void; onAbout: () => void; 
   useEffect(() => {
     if (!open) return;
     const onDoc = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false); };
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setOpen(false); };
     document.addEventListener('mousedown', onDoc);
-    return () => document.removeEventListener('mousedown', onDoc);
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('mousedown', onDoc);
+      document.removeEventListener('keydown', onKey);
+    };
   }, [open]);
   return (
     <div className="popover-anchor" ref={ref}>

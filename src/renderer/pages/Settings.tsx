@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { api, useAsync } from '../api';
 import { useApp } from '../state/app-context';
-import { Badge, Button, Card, Kbd, Spinner, Tabs, useToast } from '../components/primitives';
+import { Badge, Button, Card, Kbd, Modal, Spinner, Tabs, useToast } from '../components/primitives';
 import { Field, Input, Select, Textarea } from '../components/forms';
 
 type SetTab = 'clinic' | 'security' | 'appearance' | 'notifications' | 'billing' | 'prescription' | 'print' | 'data' | 'shortcuts';
@@ -29,8 +29,7 @@ export function SettingsPage() {
       params.delete('tab');
       setParams(params, { replace: true });
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [params, setParams]);
 
   if (!settings || !form) return <Spinner label="Loading settings…" />;
 
@@ -248,7 +247,7 @@ export function SettingsPage() {
           </Card>
         )}
 
-        {tab === 'print' && <PrintTab form={form} />}
+        {tab === 'print' && <PrintTab form={form} set={set} />}
 
         {tab === 'data' && <DataTab />}
 
@@ -315,18 +314,18 @@ function SecurityTab(props: { form: any; set: (path: string[], v: unknown) => vo
           <Field label="Current password" required>
             {(id) => <Input id={id} type="password" value={oldPw} onChange={setOldPw} autoComplete="current-password" />}
           </Field>
-          <Field label="New password" required hint="≥8 characters with letters and numbers">
-            {(id) => <Input id={id} type="password" value={newPw} onChange={setNewPw} autoComplete="new-password" invalid={!!newPw && newPw.length < 8} />}
+          <Field label="New password" required hint={`≥${Math.max(8, Number(form.security.minPasswordLength) || 8)} characters with letters and numbers`}>
+            {(id) => <Input id={id} type="password" value={newPw} onChange={setNewPw} autoComplete="new-password" invalid={!!newPw && newPw.length < Math.max(8, Number(form.security.minPasswordLength) || 8)} />}
           </Field>
           <Field label="Confirm new password" required>
-            {(id) => <Input id={id} type="password" value={newPw2} onChange={setNewPw2} autoComplete="new-password" invalid={!!newPw2 && newPw !== newPw} />}
+            {(id) => <Input id={id} type="password" value={newPw2} onChange={setNewPw2} autoComplete="new-password" invalid={!!newPw2 && newPw !== newPw2} />}
           </Field>
         </div>
         <div className="mt-4">
           <Button
             variant="primary"
             loading={pwPending}
-            disabled={!oldPw || newPw.length < 8 || newPw !== newPw2}
+            disabled={!oldPw || newPw.length < Math.max(8, Number(form.security.minPasswordLength) || 8) || newPw !== newPw2}
             onClick={async () => {
               setPwPending(true);
               try {
@@ -358,7 +357,14 @@ function SecurityTab(props: { form: any; set: (path: string[], v: unknown) => vo
   );
 }
 
-function PrintTab(props: { form: any }) {
+const PAPER_DEFAULT_MM: Record<string, [number, number]> = {
+  a4: [210, 297],
+  a5: [148, 210],
+  thermal: [80, 200],
+  custom: [210, 297],
+};
+
+function PrintTab(props: { form: any; set: (path: string[], v: unknown) => void }) {
   const toast = useToast();
   const [printers, setPrinters] = useState<{ name: string; displayName: string; description: string }[]>([]);
   const profiles: any[] = props.form.printProfiles ?? [];
@@ -366,6 +372,13 @@ function PrintTab(props: { form: any }) {
   useEffect(() => {
     void api['printers/list']().then(setPrinters).catch(() => setPrinters([]));
   }, []);
+
+  const updateProfile = (id: string, patch: Record<string, unknown>) => {
+    props.set(
+      ['printProfiles'],
+      profiles.map((p) => (p.id === id ? { ...p, ...patch } : p)),
+    );
+  };
 
   return (
     <>
@@ -387,26 +400,61 @@ function PrintTab(props: { form: any }) {
         <div className="table-wrap">
           <table className="table compact">
             <thead>
-              <tr><th>Name</th><th>Document</th><th>Paper</th><th>Size</th><th>Orientation</th><th>Scale</th><th>Copies</th></tr>
+              <tr><th>Name</th><th>Document</th><th>Paper</th><th>Size</th><th>Orientation</th><th>Scale (%)</th><th>Copies</th></tr>
             </thead>
             <tbody>
-              {profiles.map((p) => (
-                <tr key={p.id}>
-                  <td><strong>{p.name}</strong></td>
-                  <td>{p.documentType}</td>
-                  <td>{p.paperSize}</td>
-                  <td className="mono">{p.widthMm}×{p.heightMm}mm</td>
-                  <td>{p.orientation}</td>
-                  <td>{p.scale}%</td>
-                  <td>{p.copies}</td>
-                </tr>
-              ))}
+              {profiles.map((p) => {
+                const [defW, defH] = PAPER_DEFAULT_MM[String(p.paperSize).toLowerCase()] ?? [210, 297];
+                const w = p.widthMm ?? defW;
+                const h = p.heightMm ?? defH;
+                const scalePct = Math.round(p.scale && p.scale <= 2 ? p.scale * 100 : (p.scale ?? 100));
+                return (
+                  <tr key={p.id}>
+                    <td><strong>{p.name}</strong></td>
+                    <td>{p.documentType ?? 'general'}</td>
+                    <td>{p.paperSize}</td>
+                    <td className="mono">{w}×{h}mm</td>
+                    <td>
+                      <select
+                        className="select"
+                        style={{ height: 30, fontSize: 12 }}
+                        value={p.orientation}
+                        onChange={(e) => updateProfile(p.id, { orientation: e.target.value })}
+                      >
+                        <option value="portrait">Portrait</option>
+                        <option value="landscape">Landscape</option>
+                      </select>
+                    </td>
+                    <td>
+                      <input
+                        className="input"
+                        style={{ width: 72, height: 30, fontSize: 12 }}
+                        type="number"
+                        min={50}
+                        max={200}
+                        value={scalePct}
+                        onChange={(e) => updateProfile(p.id, { scale: Math.min(200, Math.max(50, Number(e.target.value) || 100)) })}
+                      />
+                    </td>
+                    <td>
+                      <input
+                        className="input"
+                        style={{ width: 64, height: 30, fontSize: 12 }}
+                        type="number"
+                        min={1}
+                        max={10}
+                        value={p.copies ?? 1}
+                        onChange={(e) => updateProfile(p.id, { copies: Math.min(10, Math.max(1, Number(e.target.value) || 1)) })}
+                      />
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
         <p className="xsmall muted mt-4">
-          Profiles control paper size, margins and scaling for prescriptions, invoices and reports. Edit them from the print
-          preview window's profile selector.
+          Profiles control paper size, margins and scaling for prescriptions, invoices and reports. You can also switch profiles inside the print preview window.
         </p>
         <div className="mt-4">
           <Button
@@ -459,25 +507,11 @@ function DataTab() {
       </div>
 
       {resetOpen && (
-        <div className="modal-backdrop" onMouseDown={(e) => { if (e.target === e.currentTarget) setResetOpen(false); }}>
-          <div className="modal" role="dialog" aria-modal="true">
-            <div className="modal-header">
-              <div className="modal-title">Reset business data</div>
-              <Button variant="ghost" size="sm" onClick={() => setResetOpen(false)}>✕</Button>
-            </div>
-            <div className="modal-body col">
-              <div className="alert alert-danger">
-                <strong>This permanently erases clinic data.</strong>
-                <span>Users, roles and audit history remain. Backups you already made are untouched.</span>
-              </div>
-              <Field label="Your password" required>
-                {(id) => <Input id={id} type="password" value={password} onChange={setPassword} autoComplete="current-password" />}
-              </Field>
-              <Field label="Type RESET to confirm" required>
-                {(id) => <Input id={id} value={typed} onChange={setTyped} autoComplete="off" spellCheck={false} placeholder="RESET" />}
-              </Field>
-            </div>
-            <div className="modal-footer">
+        <Modal
+          title="Reset business data"
+          onClose={() => setResetOpen(false)}
+          footer={
+            <>
               <Button variant="secondary" onClick={() => setResetOpen(false)}>Cancel</Button>
               <Button
                 variant="danger"
@@ -499,9 +533,22 @@ function DataTab() {
               >
                 Reset everything
               </Button>
+            </>
+          }
+        >
+          <div className="col">
+            <div className="alert alert-danger">
+              <strong>This permanently erases clinic data.</strong>
+              <span>Users, roles and audit history remain. Backups you already made are untouched.</span>
             </div>
+            <Field label="Your password" required>
+              {(id) => <Input id={id} type="password" value={password} onChange={setPassword} autoComplete="current-password" />}
+            </Field>
+            <Field label="Type RESET to confirm" required>
+              {(id) => <Input id={id} value={typed} onChange={setTyped} autoComplete="off" spellCheck={false} placeholder="RESET" />}
+            </Field>
           </div>
-        </div>
+        </Modal>
       )}
     </>
   );

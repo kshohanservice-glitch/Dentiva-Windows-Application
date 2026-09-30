@@ -1,6 +1,5 @@
 import type { DB } from '../database';
-import { ALL_PERMISSIONS, BUILTIN_ROLES, PERMISSION_GROUPS } from '../../../shared/permissions';
-import { TOOTH_CONDITIONS } from '../../../shared/clinical';
+import { ALL_PERMISSIONS, BUILTIN_ROLES } from '../../../shared/permissions';
 
 function humanize(key: string): string {
   const parts = key.split('.');
@@ -605,7 +604,6 @@ function seed(db: DB): void {
     const group = key.startsWith('roles.') ? 'users' : key.split('.')[0];
     insPerm.run(key, group, humanize(key));
   }
-  void PERMISSION_GROUPS;
 
   // Built-in roles + grants
   const insRole = db.prepare('INSERT INTO roles (key, name, description, builtin, created_at) VALUES (?, ?, ?, 1, ?)');
@@ -622,7 +620,7 @@ function seed(db: DB): void {
   for (const [code, dentition] of teethList()) {
     const q = Number(code[0]);
     const pos = Number(code[1]);
-    const arch = q === 1 || q === 2 ? 'upper' : 'lower';
+    const arch = q === 1 || q === 2 || q === 5 || q === 6 ? 'upper' : 'lower';
     insTooth.run(code, code, dentition, arch, q, pos);
   }
 
@@ -661,8 +659,6 @@ function seed(db: DB): void {
     { id: 'inv-a4', name: 'Invoice A4', documentType: 'invoice', printerName: '', paperSize: 'a4', widthMm: 210, heightMm: 297, orientation: 'portrait', margins: { top: 12, right: 12, bottom: 12, left: 12 }, scale: 100, copies: 1 },
     { id: 'inv-thermal', name: 'Receipt Thermal 80mm', documentType: 'receipt', printerName: '', paperSize: 'thermal', widthMm: 80, heightMm: 200, orientation: 'portrait', margins: { top: 4, right: 4, bottom: 4, left: 4 }, scale: 100, copies: 1 },
   ]);
-
-  void TOOTH_CONDITIONS;
 }
 
 function teethList(): [string, 'adult' | 'pediatric'][] {

@@ -26,7 +26,7 @@ function ItemModal(props: { open: boolean; initial?: InventoryItemDTO | null; on
       location: props.initial?.location ?? '',
       active: props.initial ? props.initial.active : true,
     });
-  }, [props.open, props.initial?.id]);
+  }, [props.open, props.initial]);
 
   const set = <K extends keyof typeof values>(k: K, v: (typeof values)[K]): void => setValues((p) => ({ ...p, [k]: v }));
 

@@ -126,3 +126,8 @@ export function pageParams(page: unknown, pageSize: unknown): { page: number; pa
   const ps = Math.min(500, Math.max(5, Number(pageSize) || 25));
   return { page: p, pageSize: ps, offset: (p - 1) * ps };
 }
+
+/** Escape SQLite LIKE wildcards (`%`, `_`, `\`) for use with `LIKE ? ESCAPE '\'`. */
+export function escapeLike(value: string): string {
+  return value.replace(/[\\%_]/g, '\\$&');
+}

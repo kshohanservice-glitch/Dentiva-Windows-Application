@@ -40,6 +40,7 @@ export function openDatabase(dbFile: string, opts: { runMigrations?: boolean } =
   applyPragmas(db);
   if (opts.runMigrations !== false) {
     migrate(db);
+    db.prepare("UPDATE teeth SET arch = 'upper' WHERE quadrant IN (5, 6) AND arch != 'upper'").run();
   }
   const integrity = db.pragma('quick_check', { simple: true });
   if (integrity !== 'ok') {

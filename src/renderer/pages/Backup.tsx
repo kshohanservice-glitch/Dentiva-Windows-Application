@@ -12,7 +12,7 @@ function RestoreDialog(props: { record: BackupRecordDTO | null; externalPath?: s
   const toast = useToast();
   const label = props.externalPath
     ? props.externalPath.split(/[\\/]/).pop()
-    : props.record?.path.split(/[\\/]/).pop() ?? 'this backup';
+    : props.record?.path.split(/[\\/]/).pop() ?? 'the selected .dpv backup file';
 
   const doRestore = async () => {
     setPending(true);
@@ -52,7 +52,7 @@ function RestoreDialog(props: { record: BackupRecordDTO | null; externalPath?: s
 }
 
 export function BackupPage() {
-  const { can, settings } = useApp();
+  const { can, settings, refreshSettings } = useApp();
   const toast = useToast();
   const [running, setRunning] = useState(false);
   const [restoreTarget, setRestoreTarget] = useState<{ record: BackupRecordDTO | null; externalPath: string | null } | null>(null);
@@ -76,18 +76,8 @@ export function BackupPage() {
     }
   };
 
-  const chooseAndRestore = async () => {
-    try {
-      const res = await api['backup/restore']({ typedConfirm: 'RESTORE', filePath: undefined });
-      // The main process opens a file picker when filePath is omitted; a
-      // cancelled dialog returns { cancelled: true } without prompting.
-      if ('cancelled' in res) return;
-      toast.success('Restore complete');
-      listQ.reload();
-    } catch (err) {
-      // If the picker-based flow needs typed confirmation first, fall back to dialog
-      toast.fromError(err, 'Restore failed');
-    }
+  const chooseAndRestore = () => {
+    setRestoreTarget({ record: null, externalPath: null });
   };
 
   return (
@@ -141,9 +131,8 @@ export function BackupPage() {
         actions={
           <Button
             size="sm" variant="secondary"
-            onClick={() => {
-              void chooseAndRestore();
-            }}
+            disabled={!can('backup.restore')}
+            onClick={chooseAndRestore}
           >
             Restore from file…
           </Button>
@@ -222,6 +211,7 @@ export function BackupPage() {
                       retention: Math.max(1, Math.min(100, Number(autoRetention) || 10)),
                     });
                     if (res.cancelled) return;
+                    await refreshSettings();
                     toast.success('Auto-backup updated', autoFreq === 0 ? 'Automatic backups disabled' : `Runs every ${autoFreq} days`);
                     setAutoOpen(false);
                   } catch (err) {

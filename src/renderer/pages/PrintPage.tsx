@@ -3,6 +3,21 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { api } from '../api';
 import { Button, ErrorState, Spinner, useToast } from '../components/primitives';
 import { Icon } from '../components/shell';
+import type { PrintProfile } from '../../shared/types';
+
+const DEFAULT_PRINT_PROFILES: PrintProfile[] = [
+  { id: 'rx-a4', name: 'Prescription A4', documentType: 'prescription', printerName: '', paperSize: 'a4', widthMm: 210, heightMm: 297, orientation: 'portrait', margins: { top: 12, right: 12, bottom: 12, left: 12 }, scale: 100, copies: 1 },
+  { id: 'rx-a5', name: 'Prescription A5', documentType: 'prescription', printerName: '', paperSize: 'a5', widthMm: 148, heightMm: 210, orientation: 'portrait', margins: { top: 8, right: 8, bottom: 8, left: 8 }, scale: 100, copies: 1 },
+  { id: 'inv-a4', name: 'Invoice A4', documentType: 'invoice', printerName: '', paperSize: 'a4', widthMm: 210, heightMm: 297, orientation: 'portrait', margins: { top: 12, right: 12, bottom: 12, left: 12 }, scale: 100, copies: 1 },
+  { id: 'inv-thermal', name: 'Receipt Thermal 80mm', documentType: 'receipt', printerName: '', paperSize: 'thermal', widthMm: 80, heightMm: 200, orientation: 'portrait', margins: { top: 4, right: 4, bottom: 4, left: 4 }, scale: 100, copies: 1 },
+];
+
+const PAPER_DIMS_MM: Record<string, { widthMm: number; heightMm: number }> = {
+  a4: { widthMm: 210, heightMm: 297 },
+  a5: { widthMm: 148, heightMm: 210 },
+  thermal: { widthMm: 80, heightMm: 200 },
+  custom: { widthMm: 210, heightMm: 297 },
+};
 
 interface PrintParams { [k: string]: string }
 
@@ -155,6 +170,8 @@ function receiptDoc(data: any): React.ReactNode {
 
 function prescriptionDoc(data: any): React.ReactNode {
   const { rx, patient, clinic, visit, watermark } = data;
+  const ageGender = `${patient.ageYears != null ? `${patient.ageYears}y ` : ''}${patient.gender || ''}`.trim() || '—';
+  const diagnosisText = rx.diagnosis || visit?.diagnosis || null;
   return (
     <>
       {watermark && <div className="print-watermark"><span>Specimen</span></div>}
@@ -165,19 +182,28 @@ function prescriptionDoc(data: any): React.ReactNode {
       </>} />
       <div className="print-kv">
         <div><span className="k">Patient</span><span className="v">{patient.name}</span></div>
-        <div><span className="k">Age / Sex</span><span className="v">{patient.ageYears}y {patient.gender || ''}</span></div>
+        <div><span className="k">Age / Sex</span><span className="v">{ageGender}</span></div>
         <div><span className="k">Phone</span><span className="v">{patient.phone || '—'}</span></div>
         <div><span className="k">Patient ID</span><span className="v mono">{patient.patientCode}</span></div>
-        {visit && <div><span className="k">Diagnosis</span><span className="v">{visit.diagnosis || '—'}</span></div>}
+        {diagnosisText && <div><span className="k">Diagnosis</span><span className="v">{diagnosisText}</span></div>}
+        {rx.cC && <div><span className="k">C/C</span><span className="v">{rx.cC}</span></div>}
+        {rx.oE && <div><span className="k">O/E</span><span className="v">{rx.oE}</span></div>}
+        {rx.rE && <div><span className="k">R/E</span><span className="v">{rx.rE}</span></div>}
+        {rx.treatment && <div><span className="k">Treatment</span><span className="v">{rx.treatment}</span></div>}
       </div>
       <h2>Medications</h2>
       {rx.items.map((it: any, i: number) => (
         <div className="rx-line" key={i}>
           <span className="idx">{i + 1}.</span>
-          <span className="drug">{it.medicineName}</span>
+          <span className="drug">{it.form ? `${it.form} ` : ''}{it.medicineName}</span>
           {it.strength && <span className="muted">({it.strength})</span>}
+          {it.generic && <span className="muted">[{it.generic}]</span>}
           <span>— {it.dosage}{it.frequency ? ` ${it.frequency}` : ''}{it.route ? ` (${it.route})` : ''}</span>
-          <span className="muted">{it.duration ? `× ${it.duration}` : ''}</span>
+          <span className="muted">
+            {it.duration ? `× ${it.duration}` : ''}
+            {it.qty ? ` (Qty: ${it.qty})` : ''}
+            {it.instruction ? ` · ${it.instruction}` : ''}
+          </span>
         </div>
       ))}
       {rx.advice && <><h3>Advice</h3><div>{rx.advice}</div></>}
@@ -199,6 +225,7 @@ function prescriptionDoc(data: any): React.ReactNode {
 
 function visitSummaryDoc(data: any): React.ReactNode {
   const { patient, visit, procedures, rx, clinic } = data;
+  const ageGender = `${patient.ageYears != null ? `${patient.ageYears}y ` : ''}${patient.gender || ''}`.trim() || '—';
   return (
     <>
       <Header clinic={clinic} right={<><div><b>Visit summary</b></div><div>{new Date(visit.visitDate).toLocaleDateString()}</div></>} />
@@ -206,7 +233,7 @@ function visitSummaryDoc(data: any): React.ReactNode {
       <div className="print-kv">
         <div><span className="k">Patient</span><span className="v">{patient.name}</span></div>
         <div><span className="k">Patient ID</span><span className="v mono">{patient.patientCode}</span></div>
-        <div><span className="k">Age / Sex</span><span className="v">{patient.ageYears}y {patient.gender || ''}</span></div>
+        <div><span className="k">Age / Sex</span><span className="v">{ageGender}</span></div>
         <div><span className="k">Phone</span><span className="v">{patient.phone || '—'}</span></div>
         <div><span className="k">Visit date</span><span className="v">{new Date(visit.visitDate).toLocaleDateString()}</span></div>
         <div><span className="k">Dentist</span><span className="v">{visit.dentistName || '—'}</span></div>
@@ -221,7 +248,7 @@ function visitSummaryDoc(data: any): React.ReactNode {
         <>
           <h2>Procedures</h2>
           <table className="compact">
-            <thead><tr><th>Tooth</th><th>Procedure</th><th>Notes</th></tr></thead>
+            <thead><tr><th>Tooth</th><th>Procedure</th><th>Details</th></tr></thead>
             <tbody>
               {procedures.map((p: any) => (
                 <tr key={p.id}><td className="mono">{p.toothNumber ?? '—'}</td><td>{p.treatmentName}</td><td>{p.notes || ''}</td></tr>
@@ -334,10 +361,12 @@ function rxToDoc(rx: any) {
   return {
     id: rx.id, rxNumber: rx.number, rxDate: rx.date,
     dentistId: rx.dentistId, dentistName: rx.dentistName,
+    cC: rx.cC, oE: rx.oE, rE: rx.rE, treatment: rx.treatment,
     diagnosis: rx.diagnosis, advice: rx.advice, followUp: rx.followUp,
     items: (rx.items ?? []).map((it: any, i: number) => ({
       seq: i + 1, medicineName: it.medicineName, generic: it.generic, strength: it.strength,
-      dosage: it.dosage, frequency: it.frequency, duration: it.duration, route: null as string | null,
+      form: it.form, dosage: it.dosage, frequency: it.frequency, duration: it.duration,
+      qty: it.qty, instruction: it.instruction, route: null as string | null,
     })),
   };
 }
@@ -402,15 +431,43 @@ export function PrintPage() {
   const kind = parts[0] ?? '';
   const id = parts[1]?.split('?')[0] ?? '';
   const [state, setState] = useState<PrintState | null>(null);
+  const [profiles, setProfiles] = useState<PrintProfile[]>(DEFAULT_PRINT_PROFILES);
+  const [selectedProfileId, setSelectedProfileId] = useState<string>(query.profile ?? '');
   const [error, setError] = useState<unknown>(null);
   const [loading, setLoading] = useState(true);
   const toast = useToast();
+
+  const activeProfile = useMemo(
+    () => profiles.find((p) => p.id === selectedProfileId) ?? profiles[0] ?? DEFAULT_PRINT_PROFILES[0],
+    [profiles, selectedProfileId],
+  );
 
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
     setError(null);
-    const clinicOf = async (): Promise<any> => (await api['settings/get']()).clinic;
+    const settingsOf = async () => {
+      const s = await api['settings/get']();
+      const loadedProfiles = 'printProfiles' in s && Array.isArray(s.printProfiles) && s.printProfiles.length > 0
+        ? s.printProfiles
+        : DEFAULT_PRINT_PROFILES;
+      if (!cancelled) {
+        setProfiles(loadedProfiles);
+        setSelectedProfileId((cur) => {
+          if (query.profile && loadedProfiles.some((p: PrintProfile) => p.id === query.profile)) return query.profile;
+          if (cur && loadedProfiles.some((p: PrintProfile) => p.id === cur)) return cur;
+          const byDoc = loadedProfiles.find((p: PrintProfile) =>
+            (kind.startsWith('prescription') && p.documentType === 'prescription') ||
+            (kind === 'invoice' && p.documentType === 'invoice') ||
+            (kind === 'receipt' && p.documentType === 'receipt') ||
+            (kind === 'report' && p.documentType === 'report'),
+          );
+          return byDoc?.id ?? loadedProfiles[0].id;
+        });
+      }
+      return s;
+    };
+    const clinicOf = async (): Promise<any> => (await settingsOf()).clinic;
     const load = async (): Promise<PrintState> => {
       switch (kind) {
         case 'invoice':
@@ -461,13 +518,19 @@ export function PrintPage() {
             clinicOf(),
             api['prescriptions/list']({ patientId: visit0.patientId, pageSize: 200 }),
           ]);
+          const procedures = (visit0.treatments ?? []).map((t: any, i: number) => ({
+            id: t.id ?? i,
+            toothNumber: t.tooth ?? null,
+            treatmentName: t.description,
+            notes: `${t.qty} × ${fmtBdt(t.unitPricePaisa)} = ${fmtBdt(t.totalPaisa ?? t.qty * t.unitPricePaisa)}`,
+          }));
           const data = {
             patient: {
               name: patient.name, ageYears: patient.ageYears ?? ageFromDob(patient.dob),
               gender: patient.gender, phone: patient.phone, patientCode: patient.code,
             },
             visit: visitToDoc(visit0),
-            procedures: [],
+            procedures,
             rx: rxs.items.filter((r) => r.visitId === visit0.id),
             clinic,
           };
@@ -485,24 +548,28 @@ export function PrintPage() {
           return { kind, title: `Appointment card — ${patient.name}`, doc: appointmentCardDoc(data), data };
         }
         case 'stock-labels': {
+          const expiringMode = query.expiring === '1' || query.report === 'expiring';
           const [items, batches, clinic] = await Promise.all([
             api['inventory/items']({ includeInactive: false }),
-            api['inventory/batches'](query.expiring === '1' ? { expiringWithinDays: 90 } : {}),
+            api['inventory/batches'](expiringMode ? { expiringWithinDays: 90 } : {}),
             clinicOf(),
           ]);
-          void items;
+          const itemMap = new Map(items.map((it) => [it.id, it]));
           const rows = batches.map((b) => ({
             id: b.id, name: b.itemName, batchNumber: b.batchNo, expiryDate: b.expiryDate,
-            quantity: b.qtyAvailable, unit: '',
+            quantity: b.qtyAvailable, unit: itemMap.get(b.itemId)?.unit ?? '',
           }));
           const data = { items: rows, clinic, expiryThresholdDays: 90 };
-          return { kind, title: 'Stock labels', doc: stockLabelDoc(data), data };
+          return { kind, title: expiringMode ? 'Expiring stock labels' : 'Stock labels', doc: stockLabelDoc(data), data };
         }
         case 'report': {
           const reportName = query.report;
           if (!reportName) throw new Error('Missing report name.');
+          const reportParams: Record<string, string> = {};
+          if (query.from) reportParams.from = query.from;
+          if (query.to) reportParams.to = query.to;
           const [result, clinic] = await Promise.all([
-            api['reports/run']({ name: reportName }),
+            api['reports/run']({ name: reportName, params: reportParams }),
             clinicOf(),
           ]);
           const data = { report: result, clinic };
@@ -520,12 +587,23 @@ export function PrintPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [kind, id]);
 
+  const dims = useMemo(() => {
+    const base = PAPER_DIMS_MM[activeProfile.paperSize] ?? PAPER_DIMS_MM.a4;
+    return {
+      widthMm: activeProfile.widthMm || base.widthMm,
+      heightMm: activeProfile.heightMm || base.heightMm,
+    };
+  }, [activeProfile]);
+
   const print = async () => {
-    // Uses the dedicated print window opened by the main process: the helper
-    // targets its webContents. In the print window itself we trigger the
-    // Electron print dialog via the bridge (falls back to window.print()).
     try {
-      const res = await api['print/execute']({});
+      const res = await api['print/execute']({
+        printerName: activeProfile.printerName || undefined,
+        copies: activeProfile.copies,
+        landscape: activeProfile.orientation === 'landscape',
+        marginsMm: activeProfile.margins,
+        scale: activeProfile.scale,
+      });
       if (res.ok || res.cancelled) return;
     } catch {
       /* fall through to the browser-style dialog */
@@ -537,8 +615,11 @@ export function PrintPage() {
     try {
       const res = await api['print/pdf']({
         suggestedName: (state?.title ?? 'dentiva-document').replace(/[^A-Za-z0-9-_ ]+/g, '').trim() || 'dentiva-document',
-        widthMm: 210,
-        heightMm: 297,
+        widthMm: dims.widthMm,
+        heightMm: dims.heightMm,
+        landscape: activeProfile.orientation === 'landscape',
+        marginsMm: activeProfile.margins,
+        scale: activeProfile.scale,
       });
       if (res.ok) toast.success('PDF saved', res.path);
       else if (!res.cancelled) toast.error('PDF export failed', res.error);
@@ -547,14 +628,30 @@ export function PrintPage() {
     }
   };
 
+  const docClass =
+    activeProfile.paperSize === 'thermal'
+      ? 'print-doc thermal80'
+      : 'print-doc';
+
   return (
-    <div>
+    <div className="print-root">
       <div className="print-toolbar">
         <div className="row gap-2">
           <Button variant="secondary" size="sm" icon={Icon.chevronL} onClick={() => navigate(-1)}>Back</Button>
           <strong>{state?.title ?? 'Print document'}</strong>
         </div>
         <div className="row gap-2">
+          <select
+            className="select"
+            style={{ width: 220, height: 32, fontSize: 12.5 }}
+            value={activeProfile.id}
+            onChange={(e) => setSelectedProfileId(e.target.value)}
+            aria-label="Print profile"
+          >
+            {profiles.map((p) => (
+              <option key={p.id} value={p.id}>{p.name}</option>
+            ))}
+          </select>
           <Button variant="secondary" size="sm" onClick={() => window.close()}>Close</Button>
           <Button variant="secondary" size="sm" onClick={() => void savePdf()} disabled={loading || !!error}>Save PDF</Button>
           <Button variant="primary" size="sm" icon={Icon.print} onClick={() => void print()} disabled={loading || !!error}>
@@ -569,7 +666,7 @@ export function PrintPage() {
             <ErrorState error={error} onRetry={() => { setState(null); setError(null); window.location.reload(); }} />
           </div>
         )}
-        {!loading && error == null && <div className="print-doc">{state?.doc}</div>}
+        {!loading && error == null && <div className={docClass}>{state?.doc}</div>}
       </div>
     </div>
   );

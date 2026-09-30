@@ -161,8 +161,26 @@ export interface DentivaApi {
   'reports/print'(doc: PrintDocRequest): Promise<{ ok: boolean }>;
   'reports/save-pdf'(doc: PrintDocRequest): Promise<{ ok: boolean }>;
   'printers/list'(): Promise<PrinterInfoDTO[]>;
-  'print/execute'(opts: { printerName?: string | null; silent?: boolean; copies?: number; landscape?: boolean; color?: boolean }): Promise<{ ok: boolean; cancelled?: boolean; error?: string }>;
-  'print/pdf'(opts: { suggestedName: string; widthMm: number; heightMm: number; marginsMm?: { top: number; right: number; bottom: number; left: number } }): Promise<{ ok: boolean; path?: string; cancelled?: boolean; error?: string }>;
+  'print/execute'(opts: {
+    printerName?: string | null;
+    silent?: boolean;
+    copies?: number;
+    landscape?: boolean;
+    color?: boolean;
+    duplex?: 'simplex' | 'shortEdge' | 'longEdge';
+    widthMm?: number;
+    heightMm?: number;
+    marginsMm?: { top: number; right: number; bottom: number; left: number };
+    scale?: number;
+  }): Promise<{ ok: boolean; cancelled?: boolean; error?: string }>;
+  'print/pdf'(opts: {
+    suggestedName: string;
+    widthMm: number;
+    heightMm: number;
+    landscape?: boolean;
+    marginsMm?: { top: number; right: number; bottom: number; left: number };
+    scale?: number;
+  }): Promise<{ ok: boolean; path?: string; cancelled?: boolean; error?: string }>;
 
   /* referrals */
   'referrals/list'(patientId: number): Promise<ReferralRecord[]>;
@@ -239,6 +257,7 @@ export interface PrintDocRequest {
   id: number;
   reportName?: string;
   profileId?: string;
+  params?: Record<string, string>;
 }
 
 export interface PrinterInfoDTO {

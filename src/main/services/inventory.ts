@@ -3,7 +3,7 @@ import type { InventoryBatchDTO, InventoryItemDTO, InventoryTxnType, StockInput 
 import { conflict, notFound, validation } from '../errors';
 import { audit, requirePermission, tx } from '../core/context';
 import { nowISO, todayISO } from '../../shared/currency';
-import { optDate, optString, reqInt, reqString } from '../core/validate';
+import { escapeLike, optDate, optString, reqInt, reqString } from '../core/validate';
 
 function daysUntil(date: string): number {
   const d = new Date(`${date}T00:00:00`).getTime();
@@ -42,14 +42,20 @@ const SELECT_ITEM = `
     (SELECT MIN(b.expiry_date) FROM inventory_batches b WHERE b.item_id = i.id AND b.qty_available > 0 AND b.expiry_date IS NOT NULL) nearest_expiry
   FROM inventory_items i`;
 
+function getItemById(ctx: Ctx, id: number): InventoryItemDTO {
+  const row = ctx.db.prepare(`${SELECT_ITEM} WHERE i.id = ? AND i.deleted_at IS NULL`).get(id) as ItemRow | undefined;
+  if (!row) throw notFound('Inventory item not found.');
+  return itemDTO(row);
+}
+
 export function listItems(ctx: Ctx, filter: { query?: string; lowOnly?: boolean; includeInactive?: boolean } = {}): InventoryItemDTO[] {
   requirePermission(ctx, 'inventory.view');
   const where: string[] = ['i.deleted_at IS NULL'];
   const params: unknown[] = [];
   if (!filter.includeInactive) where.push('i.active = 1');
   if (filter.query?.trim()) {
-    const q = `%${filter.query.trim().toLowerCase()}%`;
-    where.push('(LOWER(i.name) LIKE ? OR LOWER(i.code) LIKE ? OR LOWER(COALESCE(i.category,\'\')) LIKE ?)');
+    const q = `%${escapeLike(filter.query.trim().toLowerCase())}%`;
+    where.push("(LOWER(i.name) LIKE ? ESCAPE '\\' OR LOWER(i.code) LIKE ? ESCAPE '\\' OR LOWER(COALESCE(i.category,'')) LIKE ? ESCAPE '\\')");
     params.push(q, q, q);
   }
   let rows = ctx.db.prepare(`${SELECT_ITEM} WHERE ${where.join(' AND ')} ORDER BY i.name`).all(...params as any[]) as ItemRow[];
@@ -79,7 +85,7 @@ export function listBatches(ctx: Ctx, filter: { itemId?: number; expiringWithinD
 
 export function saveItem(ctx: Ctx, raw: Partial<InventoryItemDTO>): InventoryItemDTO {
   requirePermission(ctx, 'inventory.manage');
-  const code = reqString(raw?.code, 'Item code', { max: 40 }).toUpperCase();
+  const code = optString(raw?.code, 'Item code', { max: 40 })?.toUpperCase() ?? `ITM-${Date.now().toString(36).toUpperCase().slice(-5)}`;
   const name = reqString(raw?.name, 'Item name', { max: 200 });
   const minLevel = reqInt(raw?.minLevel ?? 0, 'Minimum stock level', { min: 0, max: 1_000_000 });
   const now = nowISO();
@@ -87,7 +93,7 @@ export function saveItem(ctx: Ctx, raw: Partial<InventoryItemDTO>): InventoryIte
   if (raw.id) {
     const existing = ctx.db.prepare('SELECT * FROM inventory_items WHERE id = ? AND deleted_at IS NULL').get(raw.id) as any;
     if (!existing) throw notFound('Inventory item not found.');
-    const dup = ctx.db.prepare('SELECT id FROM inventory_items WHERE code = ? AND id != ?').get(code, raw.id);
+    const dup = ctx.db.prepare('SELECT id FROM inventory_items WHERE UPPER(code) = ? AND id != ?').get(code, raw.id);
     if (dup) throw conflict(`Item code "${code}" is already in use.`);
     ctx.db
       .prepare('UPDATE inventory_items SET code = ?, name = ?, category = ?, unit = ?, min_level = ?, location = ?, active = ?, updated_at = ? WHERE id = ?')
@@ -95,10 +101,10 @@ export function saveItem(ctx: Ctx, raw: Partial<InventoryItemDTO>): InventoryIte
         minLevel, optString(raw.location, 'Storage location', { max: 120 }),
         raw.active === false ? 0 : 1, now, raw.id);
     audit(ctx, { action: 'inventory.item_update', entityType: 'inventory_item', entityId: raw.id, summary: `Updated item ${name}` });
-    return listItems(ctx, { includeInactive: true, query: code }).find((i) => i.id === raw.id)!;
+    return getItemById(ctx, raw.id);
   }
 
-  const dup = ctx.db.prepare('SELECT id FROM inventory_items WHERE code = ?').get(code);
+  const dup = ctx.db.prepare('SELECT id FROM inventory_items WHERE UPPER(code) = ?').get(code);
   if (dup) throw conflict(`Item code "${code}" is already in use.`);
   const info = ctx.db
     .prepare('INSERT INTO inventory_items (code, name, category, unit, min_level, location, active, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, 1, ?, ?)')
@@ -106,7 +112,7 @@ export function saveItem(ctx: Ctx, raw: Partial<InventoryItemDTO>): InventoryIte
       minLevel, optString(raw.location, 'Storage location', { max: 120 }), now, now);
   const id = Number(info.lastInsertRowid);
   audit(ctx, { action: 'inventory.item_create', entityType: 'inventory_item', entityId: id, summary: `Created item ${name} (${code})` });
-  return listItems(ctx, { includeInactive: true, query: code }).find((i) => i.id === id)!;
+  return getItemById(ctx, id);
 }
 
 export function stockOperation(ctx: Ctx, raw: StockInput): { item: InventoryItemDTO; batches: InventoryBatchDTO[] } {
@@ -172,7 +178,7 @@ export function stockOperation(ctx: Ctx, raw: StockInput): { item: InventoryItem
     });
   });
 
-  const updated = listItems(ctx, { includeInactive: true, query: item.name }).find((i) => i.id === itemId)!;
+  const updated = getItemById(ctx, itemId);
   return { item: updated, batches: listBatches(ctx, { itemId }) };
 }
 
