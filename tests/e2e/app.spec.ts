@@ -291,8 +291,8 @@ test('runs reports from the UI — the full catalogue contract (ISS-020 guard)',
 test('adapts cleanly across 1280×720 and 1920×1080 viewports without horizontal overflow', async () => {
   for (const size of [{ width: 1280, height: 720 }, { width: 1920, height: 1080 }]) {
     await page.setViewportSize(size);
-    for (const nav of ['Dashboard', 'Patients', 'Appointments', 'Queue', 'Invoices', 'Inventory', 'Settings']) {
-      await page.getByRole('link', { name: nav }).click();
+    for (const nav of ['Dashboard', 'Patients', 'Appointments', 'Queue', 'Invoice', 'Inventory', 'Settings']) {
+      await page.getByRole('link', { name: nav, exact: true }).click();
       const overflow = await page.evaluate(() => {
         const doc = document.documentElement;
         return doc.scrollWidth - doc.clientWidth;
