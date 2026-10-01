@@ -7,7 +7,7 @@ import { nextPatientCode } from '../core/sequences';
 import {
   escapeLike, optDate, optPhone, optString, oneOf, pageParams, reqDate, reqInt, reqString,
 } from '../core/validate';
-import { dateRangeFor, todayISO } from '../../shared/currency';
+import { dateRangeFor, nowISO, todayISO } from '../../shared/currency';
 import { BLOOD_GROUPS, GENDERS } from '../../shared/clinical';
 
 interface PatientRow {
