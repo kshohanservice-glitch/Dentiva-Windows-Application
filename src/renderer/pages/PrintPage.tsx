@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { useLocation } from 'react-router-dom';
 import { api } from '../api';
 import { Button, ErrorState, Spinner, useToast } from '../components/primitives';
 import { Icon } from '../components/shell';
