@@ -185,7 +185,9 @@ function DentistModal(props: { open: boolean; initial?: DentistDTO | null; onClo
     >
       <div className="form-grid">
         <Field label="Full name" required className="span-2">{(id) => <Input id={id} value={v.name} onChange={(x) => set('name', x)} placeholder="Dr. …" autoFocus />}</Field>
-        <Field label="Qualifications">{(id) => <Input id={id} value={v.qualifications} onChange={(x) => set('qualifications', x)} placeholder="BDS, FCPS…" />}</Field>
+        <Field label="Qualifications" hint="One qualification per line; comma-separated values are also supported.">
+          {(id) => <Textarea id={id} rows={3} value={v.qualifications} onChange={(x) => set('qualifications', x)} placeholder={"BDS\nFCPS\nMS (Oral & Maxillofacial Surgery)"} />}
+        </Field>
         <Field label="Designation(s)">{(id) => <Input id={id} value={v.designations} onChange={(x) => set('designations', x)} placeholder="Consultant" />}</Field>
         <Field label="Registration no.">{(id) => <Input id={id} value={v.regNo} onChange={(x) => set('regNo', x)} />}</Field>
         <Field label="Phone">{(id) => <Input id={id} value={v.phone} onChange={(x) => set('phone', x)} />}</Field>
