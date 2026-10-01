@@ -169,8 +169,9 @@ jobs:
             if ($one.Length -gt 400) { $one = $one.Substring(0, 400) }
             Write-Host "::error title=artifact smoke::$one"
           }
-          $installer = Get-ChildItem dist\*.exe -ErrorAction SilentlyContinue | Select-Object -First 1
-          if (-not $installer) { Say 'No installer produced in dist/'; exit 1 }
+          $ver = (Get-Content package.json -Raw | ConvertFrom-Json).version
+          $installer = Get-Item (Join-Path (Get-Location) "dist\DentivaPro-Setup-$ver.exe") -ErrorAction SilentlyContinue
+          if (-not $installer) { Say "Version-matched installer missing: DentivaPro-Setup-$ver.exe"; exit 1 }
           $installDir = Join-Path $env:RUNNER_TEMP 'dentiva-installed'
           Write-Host "installer: $($installer.FullName)"
           $p = Start-Process -FilePath $installer.FullName -ArgumentList '/S', "/D=$installDir" -PassThru -Wait
