@@ -36,7 +36,7 @@ interface PrintState {
 
 function credentialLines(value: string | null | undefined): string[] {
   return String(value ?? '')
-     .split(/[\r\n,;]+/)
+    .split(/[\r\n,;]+/)
     .map((v) => v.trim())
     .filter(Boolean);
 }
