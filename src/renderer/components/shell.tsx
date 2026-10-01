@@ -397,8 +397,8 @@ export function AppShell() {
         </div>
 
         <div className="header-nav-controls" aria-label="Page navigation">
-          <IconButton icon={Icon.back} title="Back" aria-label="Back" onClick={() => navigate(window.history.length > 1 ? -1 : '/')} />
-          <IconButton icon={Icon.forward} title="Forward" aria-label="Forward" onClick={() => navigate(1)} />
+          <IconButton icon={Icon.back} title="Back" onClick={() => navigate(window.history.length > 1 ? -1 : '/')} />
+          <IconButton icon={Icon.forward} title="Forward" onClick={() => navigate(1)} />
         </div>
 
         <div className="header-center">
