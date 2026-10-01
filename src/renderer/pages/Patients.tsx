@@ -591,6 +591,7 @@ function OverviewTab(props: { patient: PatientDetailDTO; onGoto: (t: ProfileTab)
 }
 
 function VisitsTab(props: { patientId: number; refreshKey?: number; onCreate: () => void }) {
+  const { can } = useApp();
   const { data, loading, error, reload } = useAsync(() => api['visits/list']({ patientId: props.patientId, pageSize: 100 }), [props.patientId, props.refreshKey]);
   const toast = useToast();
 
@@ -623,6 +624,17 @@ function VisitsTab(props: { patientId: number; refreshKey?: number; onCreate: ()
                 <div className="small muted">{v.dentistName ?? 'Any dentist'} · {v.chiefComplaint || 'no complaint recorded'}</div>
               </div>
               <div className="row gap-2">
+                {v.status === 'open' && can('clinical.visit.edit') && (
+                  <Button size="sm" variant="secondary" onClick={async () => {
+                    try {
+                      await api['visits/update']({ id: v.id, status: 'closed' } as any);
+                      toast.success('Visit completed');
+                      reload();
+                    } catch (err) {
+                      toast.fromError(err, 'Could not complete visit');
+                    }
+                  }}>Complete visit</Button>
+                )}
                 <Button size="sm" variant="ghost" onClick={() => void printSummary(v.id)}>Print summary</Button>
               </div>
             </div>
