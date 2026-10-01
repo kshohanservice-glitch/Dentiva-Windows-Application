@@ -438,7 +438,6 @@ function reportDoc(data: any): React.ReactNode {
 /* ----------------------------- Print page ----------------------------- */
 
 export function PrintPage() {
-  const navigate = useNavigate();
   const query = useQuery();
   // Path: #print/<kind>/<id>[?query]  (main process builds this hash)
   const parts = window.location.hash.replace(/^#\/?print\//, '').split('/');
