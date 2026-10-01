@@ -416,6 +416,7 @@ export function PatientProfilePage() {
   const [tab, setTab] = useState<ProfileTab>('overview');
   const [editOpen, setEditOpen] = useState(false);
   const [archiveOpen, setArchiveOpen] = useState(false);
+  const [deleteOpen, setDeleteOpen] = useState(false);
   const [visitOpen, setVisitOpen] = useState(false);
   const [rxOpen, setRxOpen] = useState(false);
   const [invoiceOpen, setInvoiceOpen] = useState(false);
@@ -472,7 +473,10 @@ export function PatientProfilePage() {
           <div className="row gap-2">
             {can('patients.edit') && <Button variant="ghost" size="sm" onClick={() => setEditOpen(true)}>Edit</Button>}
             {can('patients.delete') && patient.status !== 'archived' && (
-              <Button variant="ghost" size="sm" onClick={() => setArchiveOpen(true)}>Archive</Button>
+              <>
+                <Button variant="ghost" size="sm" onClick={() => setArchiveOpen(true)}>Archive</Button>
+                <Button variant="ghost" size="sm" onClick={() => setDeleteOpen(true)}>Delete</Button>
+              </>
             )}
           </div>
         </div>
@@ -521,6 +525,26 @@ export function PatientProfilePage() {
             }
           }}
           onCancel={() => setArchiveOpen(false)}
+        />
+      )}
+
+      {deleteOpen && (
+        <ConfirmDialog
+          title="Delete patient record?"
+          body={`${patient.name} (${patient.code}) will be removed from patient lists. Clinical, billing and audit records are preserved in the local database for integrity.`}
+          confirmLabel="Delete patient"
+          danger
+          onConfirm={async () => {
+            try {
+              await api['patients/delete'](patient.id);
+              toast.success('Patient deleted');
+              setDeleteOpen(false);
+              navigate('/patients');
+            } catch (err) {
+              toast.fromError(err, 'Delete failed');
+            }
+          }}
+          onCancel={() => setDeleteOpen(false)}
         />
       )}
 
