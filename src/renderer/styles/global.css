@@ -12,6 +12,30 @@ body,
   margin: 0;
 }
 
+/* Product language polish: UI labels use title-style capitalization while patient/clinical data stays verbatim. */
+.shell,
+.auth-screen,
+.setup-screen,
+.lock-overlay {
+  text-transform: capitalize;
+}
+.shell .mono,
+.shell .num,
+.shell input,
+.shell textarea,
+.shell select,
+.shell option,
+.shell .table td,
+.shell .list-row,
+.shell .patient-meta,
+.shell .timeline,
+.shell .searchbox,
+.shell .toast-msg,
+.shell .error-state p,
+.shell .empty-state p {
+  text-transform: none;
+}
+
 body {
   font-family: var(--font-ui);
   font-size: var(--fs-md);
