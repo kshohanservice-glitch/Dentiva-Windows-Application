@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { api, useAsync } from '../api';
 import { useApp } from '../state/app-context';
-import { Badge, Button, Card, Modal, Pagination, useToast } from '../components/primitives';
+import { Badge, Button, Card, Modal, Pagination, ConfirmDialog, useToast } from '../components/primitives';
 import { Field, Input, Select, Textarea } from '../components/forms';
 import { DataTable, TableToolbar, type Column } from '../components/table';
 import { Icon } from '../components/shell';
@@ -238,6 +238,11 @@ function InvoiceDetailModal(props: { invoice: InvoiceDTO; onClose: () => void; o
               <div className="list-row" key={a.id}>
                 <span className="flex-1 small">{a.originalName}</span>
                 <Button size="sm" variant="ghost" onClick={() => void api['attachments/open'](a.id).catch(() => undefined)}>Open</Button>
+                {can('billing.invoice.edit') && <Button size="sm" variant="ghost" onClick={() => void api['attachments/export'](a.id).catch(() => undefined)}>Save copy</Button>}
+                {can('billing.invoice.edit') && <Button size="sm" variant="ghost" onClick={() => {
+                  if (!window.confirm(`Remove “${a.originalName}” from this invoice?`)) return;
+                  void api['attachments/remove'](a.id).then(() => { toast.success('Attachment removed'); reloadAtt(); }).catch((e) => toast.fromError(e, 'Remove failed'));
+                }}>Remove</Button>}
               </div>
             ))}
           </div>
