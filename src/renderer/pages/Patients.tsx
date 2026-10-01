@@ -416,6 +416,7 @@ export function PatientProfilePage() {
   const [tab, setTab] = useState<ProfileTab>('overview');
   const [editOpen, setEditOpen] = useState(false);
   const [archiveOpen, setArchiveOpen] = useState(false);
+  const [deleteOpen, setDeleteOpen] = useState(false);
   const [visitOpen, setVisitOpen] = useState(false);
   const [rxOpen, setRxOpen] = useState(false);
   const [invoiceOpen, setInvoiceOpen] = useState(false);
@@ -474,6 +475,9 @@ export function PatientProfilePage() {
             {can('patients.delete') && patient.status !== 'archived' && (
               <Button variant="ghost" size="sm" onClick={() => setArchiveOpen(true)}>Archive</Button>
             )}
+            {can('patients.delete') && (
+              <Button variant="ghost" size="sm" onClick={() => setDeleteOpen(true)}>Delete</Button>
+            )}
           </div>
         </div>
       </div>
@@ -521,6 +525,26 @@ export function PatientProfilePage() {
             }
           }}
           onCancel={() => setArchiveOpen(false)}
+        />
+      )}
+
+      {deleteOpen && (
+        <ConfirmDialog
+          title="Delete patient record?"
+          body={`${patient.name} (${patient.code}) will be removed from active patient records. Clinical, invoice, payment and audit history will be preserved.`}
+          confirmLabel="Delete patient"
+          danger
+          onConfirm={async () => {
+            try {
+              await api['patients/delete'](patient.id);
+              toast.success('Patient deleted');
+              setDeleteOpen(false);
+              navigate('/patients');
+            } catch (err) {
+              toast.fromError(err, 'Delete failed');
+            }
+          }}
+          onCancel={() => setDeleteOpen(false)}
         />
       )}
 
@@ -599,6 +623,13 @@ function VisitsTab(props: { patientId: number; refreshKey?: number; onCreate: ()
                 <div className="small muted">{v.dentistName ?? 'Any dentist'} · {v.chiefComplaint || 'no complaint recorded'}</div>
               </div>
               <div className="row gap-2">
+                {v.status === 'open' && can('clinical.visit.edit') && (
+                  <Button size="sm" variant="ghost" onClick={() => {
+                    void api['visits/update']({ id: v.id, status: 'closed' } as any)
+                      .then(() => { toast.success('Visit completed'); reload(); })
+                      .catch((err) => toast.fromError(err, 'Could not complete visit'));
+                  }}>Complete visit</Button>
+                )}
                 <Button size="sm" variant="ghost" onClick={() => void printSummary(v.id)}>Print summary</Button>
               </div>
             </div>
