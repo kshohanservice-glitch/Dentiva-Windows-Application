@@ -110,6 +110,16 @@ button, input, select, textarea {
   max-width: 220px;
 }
 
+.header-nav-controls {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  flex: none;
+  padding-right: var(--sp-2);
+  border-right: 1px solid var(--line);
+}
+.header-nav-controls .btn { width: 32px; height: 32px; padding: 0; }
+
 .header-center {
   flex: 1;
   display: flex;
