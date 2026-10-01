@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api, useAsync } from '../api';
 import { useApp } from '../state/app-context';
@@ -12,6 +13,17 @@ export function DashboardPage() {
   const navigate = useNavigate();
   const toast = useToast();
   const { data, loading, error, reload } = useAsync(() => api['dashboard/get'](), []);
+  const canFinance = can('dashboard.finance') && can('finance.view');
+
+  useEffect(() => {
+    const refresh = () => { void reload(); };
+    window.addEventListener('focus', refresh);
+    document.addEventListener('visibilitychange', refresh);
+    return () => {
+      window.removeEventListener('focus', refresh);
+      document.removeEventListener('visibilitychange', refresh);
+    };
+  }, [reload]);
 
   const backupGo = async () => {
     try {
@@ -62,9 +74,9 @@ export function DashboardPage() {
         <StatCard label="Completed visits" value={String(data.completedVisits)} tone="success" foot="closed today" onClick={() => navigate('/reports')} />
       </div>
 
-      {data.financial && can('accounting.view') && (
+      {data.financial && canFinance && (
         <div className="grid stats-grid">
-          <StatCard label="Revenue today" value={bdt(data.financial.todayRevenuePaisa)} tone="success" foot="collected" onClick={() => navigate('/payments')} />
+          <StatCard label="Paid Today" value={bdt(data.financial.todayRevenuePaisa)} tone="success" foot="Net payments received" onClick={() => navigate('/payments')} />
           <StatCard label="Outstanding dues" value={bdt(data.financial.outstandingDuePaisa)} tone="danger" foot="across invoices" onClick={() => navigate('/invoices')} />
           <StatCard label="Low-stock items" value={String(data.inventory?.lowStock ?? 0)} tone={data.inventory && data.inventory.lowStock > 0 ? 'warning' : undefined} foot="at or below minimum" onClick={() => navigate('/inventory')} />
           <StatCard label="Expiring ≤30 days" value={String(data.inventory?.expiringSoon ?? 0)} tone={data.inventory && data.inventory.expiringSoon > 0 ? 'warning' : undefined} foot="batches" onClick={() => navigate('/inventory')} />
@@ -132,6 +144,26 @@ export function DashboardPage() {
               )}
             </Card>
           )}
+
+          <Card title="Recent Payments" actions={<Button size="sm" variant="ghost" onClick={() => navigate('/payments')}>View all</Button>}>
+            {data.financial.recentPayments.length === 0 ? (
+              <EmptyState title="No payments yet" body="Payments received today will appear here." />
+            ) : (
+              <div className="list">
+                {data.financial.recentPayments.map((payment) => (
+                  <div key={payment.id} className="list-row clickable" onClick={() => navigate('/payments')}>
+                    <span className="flex-1">
+                      <strong>{payment.patientName}</strong>
+                      <div className="xsmall muted">{payment.invoiceNumber ?? 'Walk-in payment'} · {payment.method}</div>
+                    </span>
+                    <span className={payment.type === 'refund' ? 'danger strong num' : 'success-text strong num'}>
+                      {payment.type === 'refund' ? '−' : '+'}{bdt(payment.amountPaisa)}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </Card>
 
           <Card title="Dentist workload (today)">
             {data.financial && data.financial.dentistWorkload.length > 0 ? (
