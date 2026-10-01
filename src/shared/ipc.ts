@@ -49,6 +49,7 @@ export interface DentivaApi {
   'patients/create'(input: PatientInputPayload): Promise<PatientDTO>;
   'patients/update'(payload: { id: number } & PatientInputPayload): Promise<PatientDTO>;
   'patients/archive'(id: number): Promise<{ ok: boolean }>;
+  'patients/delete'(id: number): Promise<{ ok: boolean }>;
   'patients/duplicates'(input: Partial<PatientInputPayload>): Promise<DuplicateCandidate[]>;
   'patients/timeline'(patientId: number): Promise<PatientTimelineEvent[]>;
   'patients/export'(filters: PatientFilters): Promise<{ path: string; count: number } | { cancelled: true }>;
@@ -297,6 +298,7 @@ export const IPC = {
   patientsCreate: 'patients/create',
   patientsUpdate: 'patients/update',
   patientsArchive: 'patients/archive',
+  patientsDelete: 'patients/delete',
   patientsDuplicates: 'patients/duplicates',
   patientsTimeline: 'patients/timeline',
   patientsExport: 'patients/export',
