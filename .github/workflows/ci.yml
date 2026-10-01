@@ -255,3 +255,13 @@ jobs:
             gh release upload $tag $exe $sums --clobber
           }
           if ($LASTEXITCODE -ne 0) { throw 'Release step failed' }
+
+          # Production policy: keep exactly one published release/tag — this build.
+          # GitHub CLI supports deleting a release and its associated tag together.
+          $oldTags = gh release list --limit 100 --json tagName,isDraft,isPrerelease --jq '.[] | select(.tagName != $env:tag) | select(.isDraft == false) | select(.isPrerelease == false) | .tagName'
+          if ($LASTEXITCODE -ne 0) { throw 'Could not enumerate previous releases' }
+          foreach ($oldTag in ($oldTags -split "`n" | Where-Object { $_.Trim() -ne '' })) {
+            Write-Host "Removing superseded release: $oldTag"
+            gh release delete $oldTag --yes --cleanup-tag
+            if ($LASTEXITCODE -ne 0) { throw "Failed to remove superseded release $oldTag" }
+          }
