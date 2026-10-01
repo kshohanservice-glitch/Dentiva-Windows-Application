@@ -708,7 +708,7 @@ export function PrintPage() {
             <ErrorState error={error} onRetry={() => { setState(null); setError(null); window.location.reload(); }} />
           </div>
         )}
-        {!loading && error == null && <div className={docClass}>{state?.doc}</div>}
+        {!loading && error == null && <div className={docClass}>{state?.kind === 'invoice' && activeProfile.paperSize === 'thermal' ? thermalInvoiceDoc(state.data) : state?.doc}</div>}
       </div>
     </div>
   );
