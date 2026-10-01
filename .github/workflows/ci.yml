@@ -234,7 +234,9 @@ jobs:
         run: |
           $ver = (Get-Content package.json -Raw | ConvertFrom-Json).version
           $tag = "v$ver"
-          $exe = (Get-ChildItem dist\*.exe | Select-Object -First 1).FullName
+          $expectedExe = Join-Path (Get-Location) "dist\DentivaPro-Setup-$ver.exe"
+          if (!(Test-Path $expectedExe)) { throw "Expected versioned installer not found: $expectedExe" }
+          $exe = (Resolve-Path $expectedExe).Path
           $sums = (Resolve-Path dist/SHA256SUMS.txt).Path
           gh release view $tag *> $null
           if ($LASTEXITCODE -ne 0) {
