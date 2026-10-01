@@ -164,6 +164,7 @@ export function registerRouter(deps: RouterDeps): void {
   handle(IPC.patientsCreate, { auth: true, fn: (p, ctx) => patients.createPatient(ctx!, p) });
   handle(IPC.patientsUpdate, { auth: true, fn: (p, ctx) => patients.updatePatient(ctx!, Number(p?.id), p) });
   handle(IPC.patientsArchive, { auth: true, fn: (p, ctx) => patients.archivePatient(ctx!, Number(p)) });
+  handle(IPC.patientsDelete, { auth: true, fn: (p, ctx) => patients.deletePatient(ctx!, Number(p)) });
   handle(IPC.patientsDuplicates, { auth: true, fn: (p, ctx) => patients.checkDuplicates(ctx!, p) });
   handle(IPC.patientsTimeline, { auth: true, fn: (p, ctx) => patients.patientTimeline(ctx!, Number(p)) });
   handle(IPC.patientsExport, { auth: true, fn: async (p, ctx) => {
