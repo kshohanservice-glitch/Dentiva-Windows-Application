@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { api, useAsync } from '../api';
 import { useApp } from '../state/app-context';
-import { Badge, Button, Card, Modal, Pagination, ConfirmDialog, useToast } from '../components/primitives';
+import { Badge, Button, Card, Modal, Pagination, useToast } from '../components/primitives';
 import { Field, Input, Select, Textarea } from '../components/forms';
 import { DataTable, TableToolbar, type Column } from '../components/table';
 import { Icon } from '../components/shell';
