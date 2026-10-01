@@ -430,3 +430,14 @@
   gap: 4px;
   text-align: center;
 }
+
+.print-doc.thermal80 .thermal-meta { text-align: center; margin: 4px 0 10px; line-height: 1.35; overflow-wrap: anywhere; }
+.print-doc.thermal80 .thermal-lines { border-top: 1px dashed var(--print-ink); }
+.print-doc.thermal80 .thermal-line { padding: 6px 0; border-bottom: 1px dashed var(--print-line); }
+.print-doc.thermal80 .thermal-line-main { display: flex; justify-content: space-between; gap: 6px; align-items: flex-start; }
+.print-doc.thermal80 .thermal-line-main > span:first-child { min-width: 0; overflow-wrap: anywhere; }
+.print-doc.thermal80 .thermal-line-sub { font-size: 9px; color: var(--print-muted); margin-top: 2px; }
+.print-doc.thermal80 .thermal-total { margin-top: 8px; border-top: 1.5px solid var(--print-ink); padding-top: 6px; }
+.print-doc.thermal80 .thermal-total > div, .print-doc.thermal80 .thermal-payments > div { display: flex; justify-content: space-between; gap: 6px; padding: 2px 0; }
+.print-doc.thermal80 .thermal-total .grand { border-top: 2px solid var(--print-ink); margin-top: 4px; padding-top: 5px; font-size: 12px; font-weight: 800; }
+.print-doc.thermal80 .thermal-payments { margin-top: 8px; padding-top: 6px; border-top: 1px dashed var(--print-line); font-size: 9px; }
