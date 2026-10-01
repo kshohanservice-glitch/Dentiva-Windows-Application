@@ -297,6 +297,7 @@ export const IPC = {
   patientsCreate: 'patients/create',
   patientsUpdate: 'patients/update',
   patientsArchive: 'patients/archive',
+  patientsDelete: 'patients/delete',
   patientsDuplicates: 'patients/duplicates',
   patientsTimeline: 'patients/timeline',
   patientsExport: 'patients/export',
