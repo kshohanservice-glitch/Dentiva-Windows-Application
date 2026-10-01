@@ -63,7 +63,7 @@ export function getDashboard(ctx: Ctx): DashboardDTO {
   if (canFinance) {
     const todayRevenue = scalar(
       `SELECT COALESCE(SUM(CASE WHEN type='payment' THEN amount_paisa ELSE -amount_paisa END), 0) n
-       FROM payments WHERE date(paid_at) = ?`,
+       FROM payments WHERE date(paid_at, 'localtime') = ?`,
       today,
     );
     const outstandingDue = scalar(
