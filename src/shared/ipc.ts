@@ -173,6 +173,7 @@ export interface DentivaApi {
     marginsMm?: { top: number; right: number; bottom: number; left: number };
     scale?: number;
   }): Promise<{ ok: boolean; cancelled?: boolean; error?: string }>;
+  'print/close'(): Promise<{ ok: true }>;
   'print/pdf'(opts: {
     suggestedName: string;
     widthMm: number;
@@ -392,6 +393,7 @@ export const IPC = {
   reportsPrint: 'reports/print',
   printExecute: 'print/execute',
   printPdf: 'print/pdf',
+   printClose: 'print/close',
   reportsSavePdf: 'reports/save-pdf',
   printersList: 'printers/list',
 

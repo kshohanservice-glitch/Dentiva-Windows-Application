@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { useLocation } from 'react-router-dom';
 import { api } from '../api';
 import { Button, ErrorState, Spinner, useToast } from '../components/primitives';
 import { Icon } from '../components/shell';
@@ -438,7 +438,6 @@ function reportDoc(data: any): React.ReactNode {
 /* ----------------------------- Print page ----------------------------- */
 
 export function PrintPage() {
-  const navigate = useNavigate();
   const query = useQuery();
   // Path: #print/<kind>/<id>[?query]  (main process builds this hash)
   const parts = window.location.hash.replace(/^#\/?print\//, '').split('/');
@@ -651,7 +650,7 @@ export function PrintPage() {
     <div className="print-root">
       <div className="print-toolbar">
         <div className="row gap-2">
-          <Button variant="secondary" size="sm" icon={Icon.chevronL} onClick={() => navigate(-1)}>Back</Button>
+          <Button variant="secondary" size="sm" icon={Icon.chevronL} onClick={() => void api['print/close']().catch(() => window.close())}>Back</Button>
           <strong>{state?.title ?? 'Print document'}</strong>
         </div>
         <div className="row gap-2">

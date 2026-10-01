@@ -72,6 +72,12 @@ export function openPrintWindow(doc: PrintDocRef): void {
   void printWindow.loadFile(appHtml(), { hash: hash.slice(1) });
 }
 
+export function closePrintWindow(): void {
+  if (printWindow && !printWindow.isDestroyed()) {
+    printWindow.close();
+  }
+}
+
 export function getPrintContents(): WebContents {
   if (printWindow && !printWindow.isDestroyed()) return printWindow.webContents;
   throw new AppError('INTERNAL', 'Print window is not open.');

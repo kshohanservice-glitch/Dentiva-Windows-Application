@@ -121,6 +121,25 @@ test('registers a patient with Bengali-capable data entry', async () => {
   await expect(page.getByRole('cell', { name: 'E2E Test Patient' })).toBeVisible();
 });
 
+test('selects and updates the dental chart reliably', async () => {
+  await page.getByRole('link', { name: 'Patients' }).click();
+  await page.getByPlaceholder('Search name, phone, patient ID, tag…').fill('E2E Test Patient');
+  await page.getByRole('cell', { name: 'E2E Test Patient' }).click();
+  await expect(page.getByRole('heading', { name: 'E2E Test Patient' })).toBeVisible({ timeout: 30_000 });
+  await page.getByRole('tab', { name: 'Dental chart', exact: true }).click();
+
+  const chart = page.locator('.tooth-chart');
+  await expect(chart).toBeVisible({ timeout: 30_000 });
+  const tooth = chart.locator('.tooth-body', { hasText: '11' }).first();
+  await tooth.click();
+  await expect(tooth).toHaveAttribute('aria-pressed', 'true');
+  await expect(chart.getByText('11', { exact: false }).first()).toBeVisible();
+
+  await chart.getByRole('button', { name: /Apply “Caries”/ }).click();
+  await expect(page.locator('.toast-title', { hasText: 'Chart updated' })).toBeVisible({ timeout: 30_000 });
+  await expect(tooth).toHaveClass(/marked/);
+});
+
 test('creates an invoice and receives full payment', async () => {
   await page.getByRole('link', { name: 'Invoice', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Invoices', level: 1 })).toBeVisible();
@@ -265,6 +284,40 @@ test('creates a prescription and opens the print window', async () => {
   await printWin.close();
   await detail.getByRole('button', { name: 'Close' }).click();
   await expect(detail).toBeHidden();
+});
+
+test('renders an 80mm receipt without overflow and closes with Back', async () => {
+  await page.getByRole('link', { name: 'Invoice', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'Invoices', level: 1 })).toBeVisible();
+  const row = page.getByRole('cell', { name: 'INV-', exact: false }).first();
+  await row.click();
+  const detail = page.locator('.modal[role="dialog"]', { hasText: 'Invoice INV-' }).last();
+  await expect(detail).toBeVisible({ timeout: 30_000 });
+
+  const [printWin] = await Promise.all([
+    app.waitForEvent('window', { timeout: 60_000 }),
+    detail.getByRole('button', { name: 'Print receipt', exact: true }).click(),
+  ]);
+  await printWin.waitForLoadState('domcontentloaded');
+  await expect(printWin.getByRole('combobox', { name: 'Print profile' })).toHaveValue('inv-thermal');
+  await expect(printWin.getByText('PAYMENT RECEIPT')).toBeVisible({ timeout: 60_000 });
+
+  const overflow = await printWin.evaluate(() => {
+    const root = document.documentElement;
+    const paper = document.querySelector('.print-doc') as HTMLElement | null;
+    return {
+      document: root.scrollWidth - root.clientWidth,
+      paper: paper ? paper.scrollWidth - paper.clientWidth : 999,
+    };
+  });
+  expect(overflow.document).toBeLessThanOrEqual(1);
+  expect(overflow.paper).toBeLessThanOrEqual(1);
+
+  await Promise.all([
+    printWin.waitForEvent('close'),
+    printWin.getByRole('button', { name: 'Back', exact: true }).click(),
+  ]);
+  await detail.getByRole('button', { name: 'Close' }).click();
 });
 
 test('runs reports from the UI — the full catalogue contract (ISS-020 guard)', async () => {

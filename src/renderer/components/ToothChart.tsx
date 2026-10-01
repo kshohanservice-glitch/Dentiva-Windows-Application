@@ -79,7 +79,6 @@ export function ToothChart(props: {
   }, [chart]);
 
   const toggleTooth = (tooth: string, surface?: string): void => {
-    if (!editable) return;
     setSelection((sel) => {
       const exists = sel.find((s) => s.tooth === tooth && s.surface === surface);
       if (exists) return sel.filter((s) => s !== exists);
@@ -206,8 +205,9 @@ export function ToothChart(props: {
                           : `Tooth ${tooth} — click to select`
                       }
                       role="button"
+                      aria-pressed={sel}
                       tabIndex={0}
-                      onKeyDown={(e) => { if (e.key === 'Enter') toggleTooth(tooth); }}
+                      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleTooth(tooth); } }}
                     >
                       <span className="tooth-num">{tooth}</span>
                       {marks.length > 0 && <span className="tooth-flag">●</span>}
@@ -223,7 +223,7 @@ export function ToothChart(props: {
                             className={`surface ${sSel ? 'selected' : ''}`}
                             style={surfaceMark ? { background: color.bg, color: color.fg } : undefined}
                             title={`${sf.label} of ${tooth}${surfaceMark ? ` — ${surfaceMark.label}` : ''}`}
-                            disabled={!editable}
+                            aria-pressed={sSel}
                             onClick={() => toggleTooth(tooth, sf.key)}
                           >
                             {sf.key}
