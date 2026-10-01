@@ -145,6 +145,7 @@ export function DashboardPage() {
             </Card>
           )}
 
+          {data.financial && (
           <Card title="Recent Payments" actions={<Button size="sm" variant="ghost" onClick={() => navigate('/payments')}>View all</Button>}>
             {data.financial.recentPayments.length === 0 ? (
               <EmptyState title="No payments yet" body="Payments received today will appear here." />
@@ -164,6 +165,7 @@ export function DashboardPage() {
               </div>
             )}
           </Card>
+          )}
 
           <Card title="Dentist workload (today)">
             {data.financial && data.financial.dentistWorkload.length > 0 ? (
