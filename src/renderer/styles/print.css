@@ -153,6 +153,9 @@
   font-size: 28px;
   font-weight: 800;
   flex: none;
+  object-fit: contain;
+  padding: 4px;
+  background: #fff;
 }
 
 .print-header .head-main {
