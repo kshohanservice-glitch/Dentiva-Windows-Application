@@ -29,7 +29,7 @@ import * as searchSvc from '../services/search';
 import * as reportsSvc from '../services/reports';
 import * as referralsSvc from '../services/referrals';
 import type { BackupService } from '../services/backup';
-import { executePrint, listPrinters, openPrintWindow, saveAsPdf } from '../print';
+import { closePrintWindow, executePrint, listPrinters, openPrintWindow, saveAsPdf } from '../print';
 import { toCsv } from '../../shared/csv';
 import type { AppPaths } from '../paths';
 import { getDb } from '../app';
@@ -367,6 +367,7 @@ export function registerRouter(deps: RouterDeps): void {
   } });
 
   /* -------------------------------- print --------------------------------- */
+  handle(IPC.printClose, { auth: true, fn: () => { closePrintWindow(); return { ok: true }; } });
   handle(IPC.printExecute, { auth: true, fn: async (p) => executePrint(p ?? {}) });
   handle(IPC.printPdf, { auth: true, fn: async (p) => saveAsPdf(p ?? {}) });
 
