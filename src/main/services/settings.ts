@@ -27,8 +27,25 @@ function writeSetting(ctx: Ctx, key: string, value: unknown): void {
     .run(key, JSON.stringify(value), nowISO(), ctx.session.userId);
 }
 
+function clinicLogoDataUrl(ctx: Ctx, logoPath?: string | null): string | null {
+  if (!logoPath) return null;
+  try {
+    const full = safeResolve(ctx.paths.dataDir, logoPath);
+    if (!fs.existsSync(full)) return null;
+    const ext = path.extname(full).toLowerCase();
+    const mime = ext === '.svg' ? 'image/svg+xml'
+      : ext === '.jpg' || ext === '.jpeg' ? 'image/jpeg'
+      : ext === '.webp' ? 'image/webp'
+      : 'image/png';
+    return `data:${mime};base64,${fs.readFileSync(full).toString('base64')}`;
+  } catch {
+    return null;
+  }
+}
+
 export function getSettings(ctx: Ctx): SettingsDTO {
   const clinic = readSetting(ctx, 'clinic', {} as SettingsDTO['clinic']);
+  const logoDataUrl = clinicLogoDataUrl(ctx, clinic.logoPath);
   const prescription = readSetting(ctx, 'prescription', {} as SettingsDTO['prescription']);
   const invoice = readSetting(ctx, 'invoice', {} as SettingsDTO['invoice']);
   const security = readSetting<SettingsDTO['security']>(ctx, 'security', { autoLockMinutes: 10, minPasswordLength: 8, maxFailedLogins: 5 });
@@ -38,7 +55,7 @@ export function getSettings(ctx: Ctx): SettingsDTO {
   const paymentMethods = readSetting(ctx, 'paymentMethods', ['cash', 'bank', 'card', 'bkash', 'nagad', 'rocket', 'upay', 'other']);
   const printProfiles = readSetting<PrintProfile[]>(ctx, 'printProfiles', []);
   return {
-    clinic: { ...clinic, currency: 'BDT' as const },
+    clinic: { ...clinic, currency: 'BDT' as const, logoDataUrl },
     prescription,
     invoice,
     security,
