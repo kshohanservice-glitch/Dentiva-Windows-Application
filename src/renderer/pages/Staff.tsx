@@ -249,7 +249,7 @@ export function StaffPage() {
   ];
 
   const dentistColumns: Column<DentistDTO>[] = [
-    { key: 'name', label: 'Dentist', sortValue: (d) => d.name, render: (d) => (<div><strong>{d.name}</strong><div className="xsmall muted">{d.qualifications ?? ''}{d.regNo ? ` · Reg ${d.regNo}` : ''}</div></div>) },
+    { key: 'name', label: 'Dentist', sortValue: (d) => d.name, render: (d) => (<div><strong>{d.name}</strong><div className="xsmall muted">{d.qualifications ? d.qualifications.split(/[\r\n,;]+/).map((q) => q.trim()).filter(Boolean).join(' · ') : ''}{d.regNo ? ` · Reg ${d.regNo}` : ''}</div></div>) },
     { key: 'desig', label: 'Designations', render: (d) => d.designations ?? '—' },
     { key: 'contact', label: 'Contact', render: (d) => (<div className="xsmall"><div className="mono">{d.phone ?? ''}</div><div className="muted">{d.email ?? ''}</div></div>) },
     { key: 'schedule', label: 'Schedule', render: (d) => d.schedule ?? '—' },
