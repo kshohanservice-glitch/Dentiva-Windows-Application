@@ -148,6 +148,35 @@ function invoiceDoc(data: any): React.ReactNode {
   );
 }
 
+function thermalInvoiceDoc(data: any): React.ReactNode {
+  const { invoice, payments, clinic } = data;
+  const lines: any[] = invoice.lines ?? [];
+  const discount = invoice.discountPaisa ?? 0;
+  const subtotal = lines.reduce((s: number, l: any) => s + l.totalPaisa, 0);
+  return (
+    <>
+      <Header clinic={clinic} right={<><div><b>Invoice</b></div><div className="mono">{invoice.invoiceNumber}</div></>} />
+      <div className="doc-title">Invoice</div>
+      <div className="thermal-meta"><div><b>{invoice.patientName}</b></div><div>{invoice.patientPhone || ''}</div><div>{new Date(invoice.invoiceDate).toLocaleDateString()} · {invoice.status}</div></div>
+      <div className="thermal-lines">
+        {lines.map((l: any, i: number) => <div className="thermal-line" key={l.id}>
+          <div className="thermal-line-main"><span>{i + 1}. {l.description}{l.toothNumber ? ` (T${l.toothNumber})` : ''}</span><span className="mono">{fmtBdt(l.totalPaisa)}</span></div>
+          <div className="thermal-line-sub">{l.quantity} × {fmtBdt(l.unitPricePaisa)}</div>
+        </div>)}
+      </div>
+      <div className="thermal-total">
+        <div><span>Subtotal</span><b className="mono">{fmtBdt(subtotal)}</b></div>
+        {discount > 0 && <div><span>Discount</span><span className="mono">−{fmtBdt(discount)}</span></div>}
+        <div><span>Total</span><b className="mono">{fmtBdt(invoice.totalPaisa)}</b></div>
+        <div><span>Paid</span><span className="mono">{fmtBdt(invoice.paidPaisa ?? 0)}</span></div>
+        <div className="grand"><span>Balance due</span><b className="mono">{fmtBdt(invoice.duePaisa ?? 0)}</b></div>
+      </div>
+      {payments?.length > 0 && <div className="thermal-payments"><b>Payments</b>{payments.slice(-5).map((p: any) => <div key={p.id}><span>{new Date(p.paidAt).toLocaleDateString()} · {p.method}</span><span className="mono">{fmtBdt(p.amountPaisa)}</span></div>)}</div>}
+      <Footer text={invoice.footerNote || 'Thank you for your visit.'} />
+    </>
+  );
+}
+
 function receiptDoc(data: any): React.ReactNode {
   const { invoice, payments, clinic } = data;
   const lastPayment = payments?.[payments.length - 1];
@@ -679,7 +708,7 @@ export function PrintPage() {
             <ErrorState error={error} onRetry={() => { setState(null); setError(null); window.location.reload(); }} />
           </div>
         )}
-        {!loading && error == null && <div className={docClass}>{state?.doc}</div>}
+        {!loading && error == null && <div className={docClass}>{state?.kind === 'invoice' && activeProfile.paperSize === 'thermal' ? thermalInvoiceDoc(state.data) : state?.doc}</div>}
       </div>
     </div>
   );

@@ -238,6 +238,11 @@ function InvoiceDetailModal(props: { invoice: InvoiceDTO; onClose: () => void; o
               <div className="list-row" key={a.id}>
                 <span className="flex-1 small">{a.originalName}</span>
                 <Button size="sm" variant="ghost" onClick={() => void api['attachments/open'](a.id).catch(() => undefined)}>Open</Button>
+                {can('billing.invoice.edit') && <Button size="sm" variant="ghost" onClick={() => void api['attachments/export'](a.id).catch(() => undefined)}>Save copy</Button>}
+                {can('billing.invoice.edit') && <Button size="sm" variant="ghost" onClick={() => {
+                  if (!window.confirm(`Remove “${a.originalName}” from this invoice?`)) return;
+                  void api['attachments/remove'](a.id).then(() => { toast.success('Attachment removed'); reloadAtt(); }).catch((e) => toast.fromError(e, 'Remove failed'));
+                }}>Remove</Button>}
               </div>
             ))}
           </div>

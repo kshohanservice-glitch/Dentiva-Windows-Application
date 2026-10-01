@@ -416,6 +416,7 @@ export function PatientProfilePage() {
   const [tab, setTab] = useState<ProfileTab>('overview');
   const [editOpen, setEditOpen] = useState(false);
   const [archiveOpen, setArchiveOpen] = useState(false);
+  const [deleteOpen, setDeleteOpen] = useState(false);
   const [visitOpen, setVisitOpen] = useState(false);
   const [rxOpen, setRxOpen] = useState(false);
   const [invoiceOpen, setInvoiceOpen] = useState(false);
@@ -472,7 +473,10 @@ export function PatientProfilePage() {
           <div className="row gap-2">
             {can('patients.edit') && <Button variant="ghost" size="sm" onClick={() => setEditOpen(true)}>Edit</Button>}
             {can('patients.delete') && patient.status !== 'archived' && (
-              <Button variant="ghost" size="sm" onClick={() => setArchiveOpen(true)}>Archive</Button>
+              <>
+                <Button variant="ghost" size="sm" onClick={() => setArchiveOpen(true)}>Archive</Button>
+                <Button variant="ghost" size="sm" onClick={() => setDeleteOpen(true)}>Delete</Button>
+              </>
             )}
           </div>
         </div>
@@ -524,6 +528,26 @@ export function PatientProfilePage() {
         />
       )}
 
+      {deleteOpen && (
+        <ConfirmDialog
+          title="Delete patient record?"
+          body={`${patient.name} (${patient.code}) will be removed from patient lists. Clinical, billing and audit records are preserved in the local database for integrity.`}
+          confirmLabel="Delete patient"
+          danger
+          onConfirm={async () => {
+            try {
+              await api['patients/delete'](patient.id);
+              toast.success('Patient deleted');
+              setDeleteOpen(false);
+              navigate('/patients');
+            } catch (err) {
+              toast.fromError(err, 'Delete failed');
+            }
+          }}
+          onCancel={() => setDeleteOpen(false)}
+        />
+      )}
+
       {visitOpen && <VisitFormModal patientId={patient.id} onClose={() => setVisitOpen(false)} onSaved={() => { setVisitOpen(false); setRefreshTick((n) => n + 1); setTab('visits'); }} />}
       {rxOpen && <RxFormModal patientId={patient.id} onClose={() => setRxOpen(false)} onSaved={() => { setRxOpen(false); setRefreshTick((n) => n + 1); setTab('rx'); }} />}
       {invoiceOpen && <InvoiceFormModal patientId={patient.id} onClose={() => setInvoiceOpen(false)} onSaved={(invId) => { setInvoiceOpen(false); setRefreshTick((n) => n + 1); setTab('invoices'); navigate(`/invoices?invoice=${invId}`); }} />}
@@ -567,6 +591,7 @@ function OverviewTab(props: { patient: PatientDetailDTO; onGoto: (t: ProfileTab)
 }
 
 function VisitsTab(props: { patientId: number; refreshKey?: number; onCreate: () => void }) {
+  const { can } = useApp();
   const { data, loading, error, reload } = useAsync(() => api['visits/list']({ patientId: props.patientId, pageSize: 100 }), [props.patientId, props.refreshKey]);
   const toast = useToast();
 
@@ -599,6 +624,17 @@ function VisitsTab(props: { patientId: number; refreshKey?: number; onCreate: ()
                 <div className="small muted">{v.dentistName ?? 'Any dentist'} · {v.chiefComplaint || 'no complaint recorded'}</div>
               </div>
               <div className="row gap-2">
+                {v.status === 'open' && can('clinical.visit.edit') && (
+                  <Button size="sm" variant="secondary" onClick={async () => {
+                    try {
+                      await api['visits/update']({ id: v.id, status: 'closed' } as any);
+                      toast.success('Visit completed');
+                      reload();
+                    } catch (err) {
+                      toast.fromError(err, 'Could not complete visit');
+                    }
+                  }}>Complete visit</Button>
+                )}
                 <Button size="sm" variant="ghost" onClick={() => void printSummary(v.id)}>Print summary</Button>
               </div>
             </div>
