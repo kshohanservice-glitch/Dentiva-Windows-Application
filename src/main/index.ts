@@ -35,8 +35,8 @@ function createWindow(): void {
   mainWindow = new BrowserWindow({
     width: 1440,
     height: 900,
-    minWidth: 1180,
-    minHeight: 680,
+    minWidth: 960,
+    minHeight: 640,
     show: false,
     backgroundColor: '#f6f8fa',
     title: 'Dentiva Pro',
