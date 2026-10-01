@@ -228,7 +228,7 @@ export function createPatient(ctx: Ctx, raw: unknown): PatientDTO {
     // History notes
     if (input.histories) {
       for (const kind of HISTORY_KINDS) {
-        const content = optString(input.histories[kind], 'Notes', { max: 20000 });
+        const content = optString(input.histories[kind], 'Notes');
         if (content) {
           ctx.db.prepare('INSERT INTO patient_histories (patient_id, kind, content, updated_at, updated_by) VALUES (?, ?, ?, ?, ?)')
             .run(patientId, kind, content, now, ctx.session.userId);
