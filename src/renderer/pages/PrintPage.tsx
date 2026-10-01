@@ -34,11 +34,22 @@ interface PrintState {
   data: any;
 }
 
+function credentialLines(value: string | null | undefined): string[] {
+  return String(value ?? '')
+    .split(/[\\r\\n,;]+/)
+    .map((v) => v.trim())
+    .filter(Boolean);
+}
+
 function Header({ clinic, right }: { clinic: any; right?: React.ReactNode }) {
   return (
     <div className="print-header">
       <div className="head-main">
-        <div className="logo">D</div>
+        {clinic?.logoDataUrl ? (
+          <img className="logo" src={clinic.logoDataUrl} alt="" />
+        ) : (
+          <div className="logo">D</div>
+        )}
         <div>
           <h1>{clinic?.clinicName || 'Dental Clinic'}</h1>
           <div className="muted" style={{ fontSize: 11.5 }}>
@@ -215,7 +226,10 @@ function prescriptionDoc(data: any): React.ReactNode {
         <div>
           <div className="sig-line" />
           <div><b>{data.dentist?.name ?? rx.dentistName}</b></div>
-          <div className="muted small">{data.dentist?.qualifications ?? ''}{data.dentist?.regNo ? ` · Reg. ${data.dentist.regNo}` : ''}</div>
+          <div className="muted small">
+            {credentialLines(data.dentist?.qualifications).map((q, i) => <div key={i}>{q}</div>)}
+            {data.dentist?.regNo && <div>Reg. {data.dentist.regNo}</div>}
+          </div>
         </div>
       </div>
       <Footer text={clinic?.clinicName ?? ''} />
