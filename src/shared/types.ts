@@ -286,7 +286,7 @@ export interface DashboardDTO {
 /* ------------------------------- Settings --------------------------- */
 
 export interface ClinicSettings {
-  clinicName: string; clinicNameBn?: string | null; logoPath?: string | null;
+  clinicName: string; clinicNameBn?: string | null; logoPath?: string | null; logoDataUrl?: string | null;
   address: string | null; phone: string | null; email: string | null; website: string | null;
   operatingHours: string | null; visitingDays: string | null;
   currency: string; timezone?: string;
