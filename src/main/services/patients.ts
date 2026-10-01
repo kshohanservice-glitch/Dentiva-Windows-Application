@@ -228,7 +228,7 @@ export function createPatient(ctx: Ctx, raw: unknown): PatientDTO {
     // History notes
     if (input.histories) {
       for (const kind of HISTORY_KINDS) {
-        const content = optString(input.histories[kind], 'Notes', { max: 20000 });
+        const content = optString(input.histories[kind], 'Notes');
         if (content) {
           ctx.db.prepare('INSERT INTO patient_histories (patient_id, kind, content, updated_at, updated_by) VALUES (?, ?, ?, ?, ?)')
             .run(patientId, kind, content, now, ctx.session.userId);
@@ -304,7 +304,7 @@ export function updatePatient(ctx: Ctx, id: number, raw: unknown): PatientDTO {
     if (input.histories) {
       for (const kind of HISTORY_KINDS) {
         if (!(kind in input.histories)) continue;
-        const content = optString(input.histories[kind], 'Notes', { max: 20000 });
+        const content = optString(input.histories[kind], 'Notes');
         if (content) {
           ctx.db.prepare(
             `INSERT INTO patient_histories (patient_id, kind, content, updated_at, updated_by) VALUES (?, ?, ?, ?, ?)
@@ -336,6 +336,22 @@ export function updatePatient(ctx: Ctx, id: number, raw: unknown): PatientDTO {
 }
 
 /** Archive (soft) — clinical history is preserved; not a hard delete. */
+export function deletePatient(ctx: Ctx, id: number): { ok: boolean } {
+  requirePermission(ctx, 'patients.delete');
+  const row = ctx.db.prepare('SELECT name, code FROM patients WHERE id = ? AND deleted_at IS NULL').get(id) as { name: string; code: string } | undefined;
+  if (!row) throw notFound('Patient not found.');
+  tx(ctx.db, () => {
+    const now = new Date().toISOString();
+    ctx.db.prepare('UPDATE patients SET deleted_at = ?, status = ?, updated_at = ? WHERE id = ?')
+      .run(now, 'archived', now, id);
+    audit(ctx, {
+      action: 'patient.delete', entityType: 'patient', entityId: id,
+      summary: `Deleted patient ${row.name} (${row.code}) — clinical and billing history preserved`,
+    });
+  });
+  return { ok: true };
+}
+
 export function archivePatient(ctx: Ctx, id: number): { ok: boolean } {
   requirePermission(ctx, 'patients.delete');
   const row = ctx.db.prepare('SELECT name, code, status FROM patients WHERE id = ? AND deleted_at IS NULL').get(id) as { name: string; code: string; status: string } | undefined;
