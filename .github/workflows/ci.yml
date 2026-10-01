@@ -169,8 +169,9 @@ jobs:
             if ($one.Length -gt 400) { $one = $one.Substring(0, 400) }
             Write-Host "::error title=artifact smoke::$one"
           }
-          $installer = Get-ChildItem dist\*.exe -ErrorAction SilentlyContinue | Select-Object -First 1
-          if (-not $installer) { Say 'No installer produced in dist/'; exit 1 }
+          $ver = (Get-Content package.json -Raw | ConvertFrom-Json).version
+          $installer = Get-Item (Join-Path (Get-Location) "dist\DentivaPro-Setup-$ver.exe") -ErrorAction SilentlyContinue
+          if (-not $installer) { Say "Version-matched installer missing: DentivaPro-Setup-$ver.exe"; exit 1 }
           $installDir = Join-Path $env:RUNNER_TEMP 'dentiva-installed'
           Write-Host "installer: $($installer.FullName)"
           $p = Start-Process -FilePath $installer.FullName -ArgumentList '/S', "/D=$installDir" -PassThru -Wait
@@ -255,3 +256,13 @@ jobs:
             gh release upload $tag $exe $sums --clobber
           }
           if ($LASTEXITCODE -ne 0) { throw 'Release step failed' }
+
+          # Production policy: keep exactly one published release/tag — this build.
+          # GitHub CLI supports deleting a release and its associated tag together.
+          $oldTags = gh release list --limit 100 --json tagName,isDraft,isPrerelease | ConvertFrom-Json | Where-Object { $_.tagName -ne $tag -and -not $_.isDraft -and -not $_.isPrerelease } | ForEach-Object { $_.tagName }
+          if ($LASTEXITCODE -ne 0) { throw 'Could not enumerate previous releases' }
+          foreach ($oldTag in ($oldTags -split "`n" | Where-Object { $_.Trim() -ne '' })) {
+            Write-Host "Removing superseded release: $oldTag"
+            gh release delete $oldTag --yes --cleanup-tag
+            if ($LASTEXITCODE -ne 0) { throw "Failed to remove superseded release $oldTag" }
+          }

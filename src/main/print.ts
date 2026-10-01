@@ -74,7 +74,7 @@ export function openPrintWindow(doc: PrintDocRef): void {
 
 export function closePrintWindow(): void {
   if (printWindow && !printWindow.isDestroyed()) {
-    printWindow.close();
+    printWindow.destroy();
   }
 }
 

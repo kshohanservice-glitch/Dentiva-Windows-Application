@@ -650,7 +650,7 @@ export function PrintPage() {
     <div className="print-root">
       <div className="print-toolbar">
         <div className="row gap-2">
-          <Button variant="secondary" size="sm" icon={Icon.chevronL} onClick={() => void api['print/close']().catch(() => window.close())}>Back</Button>
+          <Button variant="secondary" size="sm" icon={Icon.chevronL} onClick={async () => { try { await api['print/close'](); } finally { window.close(); } }}>Back</Button>
           <strong>{state?.title ?? 'Print document'}</strong>
         </div>
         <div className="row gap-2">

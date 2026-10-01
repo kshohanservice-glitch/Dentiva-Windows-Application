@@ -142,8 +142,8 @@
 }
 
 .print-header .logo {
-  width: 54px;
-  height: 54px;
+  width: 68px;
+  height: 68px;
   border-radius: 12px;
   background: var(--print-ink);
   color: #fff;
@@ -154,7 +154,7 @@
   font-weight: 800;
   flex: none;
   object-fit: contain;
-  padding: 4px;
+  padding: 0;
   background: #fff;
 }
 
@@ -221,6 +221,7 @@
 .print-doc .mono {
   font-variant-numeric: tabular-nums;
   font-family: ui-monospace, 'Cascadia Mono', monospace;
+  white-space: nowrap;
 }
 
 .print-kv {
@@ -366,8 +367,8 @@
   margin-bottom: 9px;
 }
 .print-doc.thermal80 .print-header .logo {
-  width: 34px;
-  height: 34px;
+  width: 46px;
+  height: 46px;
   border-radius: 7px;
 }
 .print-doc.thermal80 .print-header .head-main {
@@ -414,8 +415,8 @@
 }
 .print-doc.thermal80 .print-kv .v {
   min-width: 0;
-  overflow-wrap: anywhere;
-  word-break: break-word;
+  overflow-wrap: break-word;
+  word-break: normal;
 }
 .print-doc.thermal80 .totals {
   width: 100%;
