@@ -91,6 +91,7 @@ button, input, select, textarea {
 }
 
 .app-header {
+  box-shadow: 0 1px 0 rgba(15, 23, 42, 0.02), 0 6px 20px rgba(15, 23, 42, 0.035);
   grid-area: header;
   display: flex;
   align-items: center;
@@ -377,6 +378,20 @@ button, input, select, textarea {
   border: 1px solid var(--line);
   border-radius: var(--r-md);
   box-shadow: var(--e1);
+}
+.card:hover {
+  border-color: var(--line-strong);
+  box-shadow: var(--e2);
+}
+.stat-card {
+  transition: transform 140ms ease, box-shadow 140ms ease, border-color 140ms ease;
+}
+.stat-card:hover {
+  transform: translateY(-1px);
+  box-shadow: var(--e2);
+}
+.btn-primary {
+  box-shadow: 0 4px 12px rgba(8, 95, 121, 0.16);
 }
 .card-pad { padding: var(--sp-5); }
 .card-header {
