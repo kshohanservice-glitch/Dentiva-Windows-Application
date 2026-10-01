@@ -335,6 +335,18 @@ export function updatePatient(ctx: Ctx, id: number, raw: unknown): PatientDTO {
   return getPatient(ctx, id);
 }
 
+/** Remove a patient from active data views while preserving the clinical audit trail and related records. */
+export function deletePatient(ctx: Ctx, id: number): { ok: boolean } {
+  requirePermission(ctx, 'patients.delete');
+  const row = ctx.db.prepare('SELECT id, name, code FROM patients WHERE id = ? AND deleted_at IS NULL').get(id) as { id: number; name: string; code: string } | undefined;
+  if (!row) throw notFound('Patient not found.');
+  tx(ctx.db, () => {
+    ctx.db.prepare("UPDATE patients SET deleted_at = ?, status = 'archived' WHERE id = ? AND deleted_at IS NULL").run(nowISO(), id);
+    audit(ctx, { action: 'patient.delete', entityType: 'patient', entityId: id, summary: `Deleted patient ${row.name} (${row.code}) from active records` });
+  });
+  return { ok: true };
+}
+
 /** Archive (soft) — clinical history is preserved; not a hard delete. */
 export function archivePatient(ctx: Ctx, id: number): { ok: boolean } {
   requirePermission(ctx, 'patients.delete');
