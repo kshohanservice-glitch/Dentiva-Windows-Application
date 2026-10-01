@@ -126,6 +126,7 @@ test('selects and updates the dental chart reliably', async () => {
   await page.getByPlaceholder('Search name, phone, patient ID, tag…').fill('E2E Test Patient');
   await page.getByRole('cell', { name: 'E2E Test Patient' }).click();
   await expect(page.getByRole('heading', { name: 'E2E Test Patient' })).toBeVisible({ timeout: 30_000 });
+  await page.getByRole('button', { name: 'Dental chart', exact: true }).click();
 
   const chart = page.locator('.tooth-chart');
   await expect(chart).toBeVisible({ timeout: 30_000 });
