@@ -194,7 +194,8 @@ export function ToothChart(props: {
                 const color = toothColor(tooth);
                 return (
                   <div className="tooth" key={t}>
-                    <div
+                    <button
+                      type="button"
                       className={`tooth-body ${sel ? 'selected' : ''} ${marks.length ? 'marked' : ''}`}
                       style={marks.length ? { background: color.bg, color: color.fg } : undefined}
                       onClick={() => toggleTooth(tooth)}
@@ -204,14 +205,11 @@ export function ToothChart(props: {
                           ? `Tooth ${tooth}: ${marks.map((m) => m.label).join(', ')} (double-click to clear)`
                           : `Tooth ${tooth} — click to select`
                       }
-                      role="button"
                       aria-pressed={sel}
-                      tabIndex={0}
-                      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleTooth(tooth); } }}
                     >
                       <span className="tooth-num">{tooth}</span>
                       {marks.length > 0 && <span className="tooth-flag">●</span>}
-                    </div>
+                    </button>
                     <div className="tooth-surfaces">
                       {SURFACES.map((sf) => {
                         const sSel = selection.some((s) => s.tooth === tooth && s.surface === sf.key);
