@@ -148,6 +148,89 @@ function invoiceDoc(data: any): React.ReactNode {
   );
 }
 
+function thermalHeader(clinic: any): React.ReactNode {
+  return (
+    <div className="thermal-head">
+      {clinic?.logoDataUrl ? <img src={clinic.logoDataUrl} alt="" /> : <div className="logo">D</div>}
+      <div className="thermal-clinic">
+        <strong>{clinic?.clinicName || 'Dental Clinic'}</strong>
+        {clinic?.phone && <span>{clinic.phone}</span>}
+        {clinic?.address && <span>{clinic.address}</span>}
+      </div>
+    </div>
+  );
+}
+
+function thermalMeta(invoice: any): React.ReactNode {
+  return (
+    <div className="thermal-meta">
+      <div><span className="k">Patient</span><span className="v">{invoice.patientName}</span></div>
+      <div><span className="k">Invoice</span><span className="v mono">{invoice.invoiceNumber}</span></div>
+      <div><span className="k">Date</span><span className="v">{new Date(invoice.invoiceDate).toLocaleDateString()}</span></div>
+      <div><span className="k">Phone</span><span className="v">{invoice.patientPhone || '—'}</span></div>
+    </div>
+  );
+}
+
+function thermalInvoiceDoc(data: any): React.ReactNode {
+  const { invoice, payments, clinic } = data;
+  const lines: any[] = invoice.lines ?? [];
+  const subtotal = lines.reduce((s: number, l: any) => s + l.totalPaisa, 0);
+  const discount = invoice.discountPaisa ?? 0;
+  return (
+    <div className="thermal-invoice">
+      {thermalHeader(clinic)}
+      <div className="thermal-title">INVOICE</div>
+      {thermalMeta(invoice)}
+      <div>
+        {lines.map((l: any) => (
+          <div className="thermal-line" key={l.id}>
+            <div className="desc">
+              <strong>{l.description}</strong>
+              <div className="thermal-subline">{l.quantity} × {fmtBdt(l.unitPricePaisa)}{l.toothNumber ? ' · Tooth ' + l.toothNumber : ''}</div>
+            </div>
+            <div className="amount">{fmtBdt(l.totalPaisa)}</div>
+          </div>
+        ))}
+      </div>
+      <div className="thermal-total">
+        <div className="thermal-total-row"><span>Subtotal</span><span>{fmtBdt(subtotal)}</span></div>
+        {discount > 0 && <div className="thermal-total-row"><span>Discount</span><span>−{fmtBdt(discount)}</span></div>}
+        <div className="thermal-total-row"><strong>Total</strong><strong>{fmtBdt(invoice.totalPaisa)}</strong></div>
+        <div className="thermal-total-row"><span>Paid</span><span>{fmtBdt(invoice.paidPaisa ?? 0)}</span></div>
+        <div className="thermal-total-row"><strong>Balance due</strong><strong>{fmtBdt(invoice.duePaisa ?? 0)}</strong></div>
+      </div>
+      {payments?.length > 0 && (
+        <div className="thermal-note">
+          Last payment: {fmtBdt(payments[payments.length - 1].amountPaisa)} · {payments[payments.length - 1].method}
+        </div>
+      )}
+      <div className="thermal-note">{invoice.footerNote || 'Thank you for your visit.'}</div>
+    </div>
+  );
+}
+
+function thermalReceiptDoc(data: any): React.ReactNode {
+  const { invoice, payments, clinic } = data;
+  const lastPayment = payments?.[payments.length - 1];
+  return (
+    <div className="thermal-receipt">
+      {thermalHeader(clinic)}
+      <div className="thermal-title">PAYMENT RECEIPT</div>
+      {thermalMeta(invoice)}
+      <div className="thermal-total">
+        <div className="thermal-total-row"><span>Amount received</span><strong>{fmtBdt(lastPayment?.amountPaisa ?? 0)}</strong></div>
+        <div className="thermal-total-row"><span>Method</span><span>{lastPayment?.method ?? '—'}</span></div>
+        {lastPayment?.reference && <div className="thermal-total-row"><span>Reference</span><span>{lastPayment.reference}</span></div>}
+        <div className="thermal-total-row"><span>Invoice total</span><span>{fmtBdt(invoice.totalPaisa)}</span></div>
+        <div className="thermal-total-row"><span>Total paid</span><span>{fmtBdt(invoice.paidPaisa ?? 0)}</span></div>
+        <div className="thermal-total-row"><strong>Balance due</strong><strong>{fmtBdt(invoice.duePaisa ?? 0)}</strong></div>
+      </div>
+      <div className="thermal-note">Payment received and recorded by Dentiva Pro.</div>
+    </div>
+  );
+}
+
 function receiptDoc(data: any): React.ReactNode {
   const { invoice, payments, clinic } = data;
   const lastPayment = payments?.[payments.length - 1];
@@ -614,6 +697,8 @@ export function PrintPage() {
         printerName: activeProfile.printerName || undefined,
         copies: activeProfile.copies,
         landscape: activeProfile.orientation === 'landscape',
+        widthMm: dims.widthMm,
+        heightMm: dims.heightMm,
         marginsMm: activeProfile.margins,
         scale: activeProfile.scale,
       });
@@ -645,9 +730,21 @@ export function PrintPage() {
     activeProfile.paperSize === 'thermal'
       ? 'print-doc thermal80'
       : 'print-doc';
+  const renderedDoc =
+    activeProfile.paperSize === 'thermal' && state?.kind === 'invoice'
+      ? thermalInvoiceDoc(state.data)
+      : activeProfile.paperSize === 'thermal' && state?.kind === 'receipt'
+        ? thermalReceiptDoc(state.data)
+        : state?.doc;
+  const pageW = activeProfile.orientation === 'landscape' ? dims.heightMm : dims.widthMm;
+  const pageH = activeProfile.orientation === 'landscape' ? dims.widthMm : dims.heightMm;
+  const profilePrintCss = '@page { size: ' + pageW + 'mm ' + pageH + 'mm; margin: ' +
+    activeProfile.margins.top + 'mm ' + activeProfile.margins.right + 'mm ' +
+    activeProfile.margins.bottom + 'mm ' + activeProfile.margins.left + 'mm; }';
 
   return (
     <div className="print-root">
+      <style>{profilePrintCss}</style>
       <div className="print-toolbar">
         <div className="row gap-2">
           <Button variant="secondary" size="sm" icon={Icon.chevronL} onClick={async () => { try { await api['print/close'](); } finally { window.close(); } }}>Back</Button>
@@ -679,7 +776,7 @@ export function PrintPage() {
             <ErrorState error={error} onRetry={() => { setState(null); setError(null); window.location.reload(); }} />
           </div>
         )}
-        {!loading && error == null && <div className={docClass}>{state?.doc}</div>}
+        {!loading && error == null && <div className={docClass}>{renderedDoc}</div>}
       </div>
     </div>
   );
