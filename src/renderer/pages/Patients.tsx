@@ -591,6 +591,7 @@ function OverviewTab(props: { patient: PatientDetailDTO; onGoto: (t: ProfileTab)
 }
 
 function VisitsTab(props: { patientId: number; refreshKey?: number; onCreate: () => void }) {
+  const { can } = useApp();
   const { data, loading, error, reload } = useAsync(() => api['visits/list']({ patientId: props.patientId, pageSize: 100 }), [props.patientId, props.refreshKey]);
   const toast = useToast();
 
