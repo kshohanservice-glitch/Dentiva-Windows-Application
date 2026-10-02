@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { api, useAsync } from '../api';
 import { useApp } from '../state/app-context';
-import { Badge, Button, Card, Modal, Pagination, useToast } from '../components/primitives';
+import { Badge, Button, Card, ConfirmDialog, Modal, Pagination, useToast } from '../components/primitives';
 import { Field, Input, Select, Textarea } from '../components/forms';
 import { DataTable, TableToolbar, type Column } from '../components/table';
 import { Icon } from '../components/shell';
@@ -129,6 +129,7 @@ function InvoiceDetailModal(props: { invoice: InvoiceDTO; onClose: () => void; o
   const [payOpen, setPayOpen] = useState(false);
   const [voidOpen, setVoidOpen] = useState(false);
   const [voidReason, setVoidReason] = useState('');
+  const [removeAttachmentId, setRemoveAttachmentId] = useState<number | null>(null);
   const { data: pays, reload: reloadPays } = useAsync(() => api['payments/list']({ invoiceId: invoice.id, pageSize: 200 }), [invoice.id]);
   const { data: attachments, reload: reloadAtt } = useAsync(() => api['attachments/list']({ entityType: 'invoice', entityId: invoice.id }), [invoice.id]);
 
@@ -240,18 +241,30 @@ function InvoiceDetailModal(props: { invoice: InvoiceDTO; onClose: () => void; o
                 <Button size="sm" variant="ghost" onClick={() => void api['attachments/open'](a.id).catch(() => undefined)}>Open</Button>
                 <Button size="sm" variant="ghost" onClick={() => void api['attachments/export'](a.id).catch((err) => toast.fromError(err, 'Could not save attachment'))}>Save a copy</Button>
                 {can('billing.invoice.edit') && (
-                  <Button size="sm" variant="ghost" onClick={() => {
-                    if (!window.confirm(`Remove attachment "${a.originalName}"?`)) return;
-                    void api['attachments/remove'](a.id)
-                      .then(() => { toast.success('Attachment removed'); reloadAtt(); })
-                      .catch((err) => toast.fromError(err, 'Could not remove attachment'));
-                  }}>Remove</Button>
+                  <Button size="sm" variant="ghost" onClick={() => setRemoveAttachmentId(a.id)}>Remove</Button>
                 )}
               </div>
             ))}
           </div>
         </>
       )}
+
+      <ConfirmDialog
+        open={removeAttachmentId != null}
+        title="Remove attachment?"
+        body="The attachment will be removed from this invoice record and its stored file will be deleted when possible."
+        confirmLabel="Remove attachment"
+        danger
+        onCancel={() => setRemoveAttachmentId(null)}
+        onConfirm={() => {
+          const attachmentId = removeAttachmentId;
+          setRemoveAttachmentId(null);
+          if (attachmentId == null) return;
+          void api['attachments/remove'](attachmentId)
+            .then(() => { toast.success('Attachment removed'); reloadAtt(); })
+            .catch((err) => toast.fromError(err, 'Could not remove attachment'));
+        }}
+      />
 
       {payOpen && <PaymentModal invoice={invoice} onClose={() => setPayOpen(false)} onPaid={(fresh) => { setInvoice(fresh); props.onChanged(); reloadAtt(); reloadPays(); }} />}
 
