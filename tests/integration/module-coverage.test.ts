@@ -29,6 +29,7 @@ import { getDashboard } from '../../src/main/services/dashboard';
 import { saveSettings, getSettings } from '../../src/main/services/settings';
 import { createInvoice, createPayment, paidNetFor } from '../../src/main/services/billing';
 import { runReport } from '../../src/main/services/reports';
+import { todayISO } from '../../src/shared/currency';
 
 let env: TestEnv;
 
