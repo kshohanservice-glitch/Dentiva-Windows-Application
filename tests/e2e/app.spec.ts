@@ -171,6 +171,11 @@ test('creates an invoice and receives full payment', async () => {
   await detail.getByRole('button', { name: 'Close' }).click();
 
   await expect(page.getByRole('cell', { name: 'INV-', exact: false }).first()).toBeVisible();
+
+  // Dashboard is live: the same payment must be reflected without a manual refresh.
+  await page.getByRole('link', { name: 'Dashboard' }).click();
+  const paidCard = page.locator('.stat-card', { hasText: 'Paid Today' });
+  await expect(paidCard).toContainText('৳500.00', { timeout: 10_000 });
 });
 
 test('shows developer credit on the About page', async () => {
@@ -296,11 +301,16 @@ test('renders an 80mm receipt without overflow and closes with Back', async () =
 
   const [printWin] = await Promise.all([
     app.waitForEvent('window', { timeout: 60_000 }),
-    detail.getByRole('button', { name: 'Print receipt', exact: true }).click(),
+    detail.getByRole('button', { name: 'Print invoice', exact: true }).click(),
   ]);
   await printWin.waitForLoadState('domcontentloaded');
-  await expect(printWin.getByRole('combobox', { name: 'Print profile' })).toHaveValue('inv-thermal');
-  await expect(printWin.getByText('PAYMENT RECEIPT')).toBeVisible({ timeout: 60_000 });
+  const profile = printWin.getByRole('combobox', { name: 'Print profile' });
+  await expect(profile).toHaveValue('inv-a4');
+  await expect(printWin.getByText('INVOICE')).toBeVisible({ timeout: 60_000 });
+
+  // Switching from A4 to thermal must replace the document geometry, not merely squeeze A4.
+  await profile.selectOption('inv-thermal');
+  await expect(printWin.getByText('INVOICE')).toBeVisible({ timeout: 30_000 });
 
   const overflow = await printWin.evaluate(() => {
     const root = document.documentElement;
@@ -339,6 +349,32 @@ test('runs reports from the UI — the full catalogue contract (ISS-020 guard)',
   await page.getByRole('button', { name: 'Run report' }).click();
   await expect(page.getByText('Net', { exact: true }).first()).toBeVisible({ timeout: 30_000 });
   await expect(page.locator('.toast-title', { hasText: 'Unknown report' })).toHaveCount(0);
+});
+
+test('completes a patient visit from the profile and supports patient deletion', async () => {
+  await page.getByRole('link', { name: 'Patients' }).click();
+  await page.getByPlaceholder('Search name, phone, patient ID, tag…').fill('E2E Test Patient');
+  await page.getByRole('cell', { name: 'E2E Test Patient' }).click();
+  await expect(page.getByRole('heading', { name: 'E2E Test Patient' })).toBeVisible({ timeout: 30_000 });
+
+  await page.getByRole('button', { name: 'New visit', exact: true }).first().click();
+  const visit = page.locator('.modal[role="dialog"]', { hasText: 'Record visit' });
+  await expect(visit).toBeVisible();
+  await visit.getByLabel('Dentist').selectOption({ label: 'Dr. E2E Dentist' });
+  await visit.getByLabel('Chief complaint').fill('E2E completion check');
+  await visit.getByRole('button', { name: 'Save visit' }).click();
+  await expect(page.locator('.toast-title', { hasText: 'Visit recorded' })).toBeVisible({ timeout: 30_000 });
+
+  await page.getByRole('tab', { name: 'Visits', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Complete visit', exact: true })).toBeVisible({ timeout: 30_000 });
+  await page.getByRole('button', { name: 'Complete visit', exact: true }).click();
+  await expect(page.locator('.toast-title', { hasText: 'Visit completed' })).toBeVisible({ timeout: 30_000 });
+
+  await page.getByRole('button', { name: 'Delete', exact: true }).click();
+  const confirm = page.locator('.modal[role="dialog"]', { hasText: 'Delete patient record?' });
+  await expect(confirm).toBeVisible();
+  await confirm.getByRole('button', { name: 'Delete patient', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'Patients', level: 1 })).toBeVisible({ timeout: 30_000 });
 });
 
 test('adapts cleanly across 1280×720 and 1920×1080 viewports without horizontal overflow', async () => {
