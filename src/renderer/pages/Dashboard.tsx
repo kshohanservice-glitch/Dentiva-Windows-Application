@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { api, useAsync } from '../api';
+import { api, useAsync, useInterval } from '../api';
 import { useApp } from '../state/app-context';
 import { Badge, Button, Card, EmptyState, ErrorState, Spinner, StatCard, useToast } from '../components/primitives';
 import { Icon } from '../components/shell';
@@ -15,8 +15,10 @@ export function DashboardPage() {
   const { data, loading, error, reload } = useAsync(() => api['dashboard/get'](), []);
   const canFinance = can('dashboard.finance') && can('finance.view');
 
+  useInterval(() => { void reload(); }, 1500);
+
   useEffect(() => {
-    const refresh = () => { void reload(); };
+    const refresh = () => { void reload(); }
     window.addEventListener('focus', refresh);
     document.addEventListener('visibilitychange', refresh);
     return () => {
