@@ -291,7 +291,7 @@ test('creates a prescription and opens the print window', async () => {
   await expect(detail).toBeHidden();
 });
 
-test('renders an 80mm receipt without overflow and closes with Back', async () => {
+test('switches invoice output from A4 to 80mm thermal without overflow and closes with Back', async () => {
   await page.getByRole('link', { name: 'Invoice', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Invoices', level: 1 })).toBeVisible();
   const row = page.getByRole('cell', { name: 'INV-', exact: false }).first();
@@ -306,11 +306,11 @@ test('renders an 80mm receipt without overflow and closes with Back', async () =
   await printWin.waitForLoadState('domcontentloaded');
   const profile = printWin.getByRole('combobox', { name: 'Print profile' });
   await expect(profile).toHaveValue('inv-a4');
-  await expect(printWin.getByText('INVOICE')).toBeVisible({ timeout: 60_000 });
+  await expect(printWin.locator('.print-doc .doc-title', { hasText: 'Invoice' })).toBeVisible({ timeout: 60_000 });
 
   // Switching from A4 to thermal must replace the document geometry, not merely squeeze A4.
   await profile.selectOption('inv-thermal');
-  await expect(printWin.getByText('INVOICE')).toBeVisible({ timeout: 30_000 });
+  await expect(printWin.locator('.print-doc.thermal80 .thermal-title', { hasText: 'INVOICE' })).toBeVisible({ timeout: 30_000 });
 
   const overflow = await printWin.evaluate(() => {
     const root = document.documentElement;
