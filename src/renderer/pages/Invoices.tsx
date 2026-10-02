@@ -249,8 +249,7 @@ function InvoiceDetailModal(props: { invoice: InvoiceDTO; onClose: () => void; o
         </>
       )}
 
-      <ConfirmDialog
-        open={removeAttachmentId != null}
+      {removeAttachmentId != null && <ConfirmDialog
         title="Remove attachment?"
         body="The attachment will be removed from this invoice record and its stored file will be deleted when possible."
         confirmLabel="Remove attachment"
@@ -264,7 +263,7 @@ function InvoiceDetailModal(props: { invoice: InvoiceDTO; onClose: () => void; o
             .then(() => { toast.success('Attachment removed'); reloadAtt(); })
             .catch((err) => toast.fromError(err, 'Could not remove attachment'));
         }}
-      />
+      />}
 
       {payOpen && <PaymentModal invoice={invoice} onClose={() => setPayOpen(false)} onPaid={(fresh) => { setInvoice(fresh); props.onChanged(); reloadAtt(); reloadPays(); }} />}
 
