@@ -304,6 +304,32 @@ describe('dashboard module', () => {
     const denied = ctxWith('patients.view');
     expect(() => getDashboard(denied)).toThrow(/permission/i);
   });
+
+  it('counts a payment made now in Paid Today immediately, including a refund as a negative net', () => {
+    const ctx = ownerCtx(env);
+    const patient = p(ctx, '01755550001');
+    const inv = createInvoice(ctx, {
+      patientId: patient.id,
+      date: todayISO(),
+      items: [{ description: 'Dashboard payment test', qty: 1, unitPricePaisa: 75000 }],
+    });
+    createPayment(ctx, {
+      invoiceId: inv.id,
+      patientId: patient.id,
+      amountPaisa: 75000,
+      method: 'cash',
+    });
+    expect(getDashboard(ctx).financial?.todayRevenuePaisa).toBe(75000);
+
+    createPayment(ctx, {
+      invoiceId: inv.id,
+      patientId: patient.id,
+      amountPaisa: 10000,
+      method: 'cash',
+      type: 'refund',
+    });
+    expect(getDashboard(ctx).financial?.todayRevenuePaisa).toBe(65000);
+  });
 });
 
 /* -------------------------------- settings ------------------------------- */
