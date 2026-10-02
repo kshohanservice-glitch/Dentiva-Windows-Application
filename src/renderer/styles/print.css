@@ -3,7 +3,6 @@
    produces clean clinic stationery. Screen mode provides editable context. */
 
 @page {
-  size: A4;
   margin: 14mm;
 }
 
@@ -429,4 +428,109 @@
   flex-direction: column;
   gap: 4px;
   text-align: center;
+}
+
+
+/* Thermal rolls use a deliberately different document geometry. The renderer
+   selects the compact thermal document; the main process also sends the exact
+   physical page size to Electron so the driver cannot fall back to A4. */
+.print-doc.thermal80.thermal-receipt,
+.print-doc.thermal80.thermal-invoice {
+  width: 72mm;
+  max-width: 72mm;
+  padding: 3mm 2.5mm;
+  margin: 0;
+  font-size: 9.5px;
+  line-height: 1.28;
+  overflow: hidden;
+}
+.print-doc.thermal80 .thermal-head {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  text-align: center;
+  border-bottom: 1.5px solid #111;
+  padding-bottom: 6px;
+  margin-bottom: 7px;
+}
+.print-doc.thermal80 .thermal-head img,
+.print-doc.thermal80 .thermal-head .logo {
+  width: 30px;
+  height: 30px;
+  object-fit: contain;
+  flex: none;
+}
+.print-doc.thermal80 .thermal-clinic {
+  min-width: 0;
+}
+.print-doc.thermal80 .thermal-clinic strong {
+  display: block;
+  font-size: 12px;
+  line-height: 1.1;
+  overflow-wrap: anywhere;
+}
+.print-doc.thermal80 .thermal-clinic span {
+  display: block;
+  color: #666;
+  font-size: 8px;
+  overflow-wrap: anywhere;
+}
+.print-doc.thermal80 .thermal-title {
+  text-align: center;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: .08em;
+  margin: 5px 0 7px;
+}
+.print-doc.thermal80 .thermal-meta {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 2px 6px;
+  margin-bottom: 7px;
+}
+.print-doc.thermal80 .thermal-meta > div { min-width: 0; }
+.print-doc.thermal80 .thermal-meta .k { color: #666; display:block; font-size: 7.5px; text-transform: uppercase; }
+.print-doc.thermal80 .thermal-meta .v { display:block; font-weight: 700; overflow-wrap: anywhere; }
+.print-doc.thermal80 .thermal-line {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 6px;
+  padding: 4px 0;
+  border-bottom: 1px dotted #ccc;
+}
+.print-doc.thermal80 .thermal-line .desc { min-width: 0; overflow-wrap: anywhere; word-break: normal; }
+.print-doc.thermal80 .thermal-line .amount { white-space: nowrap; text-align: right; font-variant-numeric: tabular-nums; }
+.print-doc.thermal80 .thermal-subline { color:#666; font-size: 8px; }
+.print-doc.thermal80 .thermal-total {
+  margin-top: 7px;
+  border-top: 1.5px solid #111;
+  padding-top: 5px;
+}
+.print-doc.thermal80 .thermal-total-row {
+  display:flex;
+  justify-content:space-between;
+  gap:8px;
+  padding:2px 0;
+}
+.print-doc.thermal80 .thermal-total-row strong { font-size: 11px; }
+.print-doc.thermal80 .thermal-note {
+  margin-top: 7px;
+  padding-top: 5px;
+  border-top: 1px dotted #ccc;
+  color: #666;
+  text-align: center;
+  font-size: 8px;
+  overflow-wrap: anywhere;
+}
+@media print {
+  .print-doc.thermal80 {
+    width: 72mm !important;
+    max-width: 72mm !important;
+    padding: 3mm 2.5mm !important;
+    box-shadow: none !important;
+    border: 0 !important;
+  }
+  .print-doc.thermal80.thermal-receipt,
+  .print-doc.thermal80.thermal-invoice { width: 72mm !important; max-width:72mm !important; }
 }
