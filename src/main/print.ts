@@ -134,6 +134,12 @@ export async function executePrint(opts: PrintExecuteOptions): Promise<PrintResu
           margins: marginsMmToPrintMargins(opts.marginsMm),
           pagesPerSheet: 1,
           scaleFactor: opts.scale ? Math.max(25, Math.min(200, Math.round(opts.scale))) : 100,
+          ...(opts.widthMm && opts.heightMm
+            ? { pageSize: {
+                width: Math.max(353, Math.round(Number(opts.widthMm) * 1000)),
+                height: Math.max(353, Math.round(Number(opts.heightMm) * 1000)),
+              } }
+            : {}),
         },
         (success, failureReason) => {
           if (success) resolve(true);
@@ -186,6 +192,7 @@ export async function saveAsPdf(opts: PdfOptions): Promise<PdfResult> {
         left: mmToInches(m.left),
       },
       printBackground: true,
+      preferCSSPageSize: true,
     });
     fs.writeFileSync(save.filePath, data);
     const stat = fs.statSync(save.filePath);
