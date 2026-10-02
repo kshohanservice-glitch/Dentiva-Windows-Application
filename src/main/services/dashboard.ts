@@ -22,9 +22,14 @@ export function getDashboard(ctx: Ctx): DashboardDTO {
     Number((ctx.db.prepare(sql).get(...params) as any)?.n ?? 0);
 
   const todayPatients = scalar(
-    `SELECT COUNT(DISTINCT patient_id) n FROM visits WHERE date(datetime) = ? AND deleted_at IS NULL`,
+    `SELECT COUNT(*) n FROM (
+       SELECT patient_id id FROM visits WHERE date(datetime, 'localtime') = ? AND deleted_at IS NULL
+       UNION
+       SELECT id FROM patients WHERE registration_date = ? AND deleted_at IS NULL
+     )`,
     today,
-  ) + scalar(`SELECT COUNT(*) n FROM patients WHERE registration_date = ? AND deleted_at IS NULL`, today);
+    today,
+  );
 
   const todayAppointments = canAppts
     ? scalar(`SELECT COUNT(*) n FROM appointments WHERE date = ? AND deleted_at IS NULL AND status NOT IN ('cancelled','no_show')`, today)
@@ -33,7 +38,7 @@ export function getDashboard(ctx: Ctx): DashboardDTO {
     ? scalar(`SELECT COUNT(*) n FROM queue_entries WHERE day = ? AND status IN ('waiting','called','paused','in_treatment')`, today)
     : 0;
   const completedVisits = canClinical
-    ? scalar(`SELECT COUNT(*) n FROM visits WHERE date(datetime) = ? AND deleted_at IS NULL AND status = 'closed'`, today)
+    ? scalar(`SELECT COUNT(*) n FROM visits WHERE date(datetime, 'localtime') = ? AND deleted_at IS NULL AND status = 'closed'`, today)
     : 0;
   const noShows = canAppts
     ? scalar(`SELECT COUNT(*) n FROM appointments WHERE date = ? AND deleted_at IS NULL AND status = 'no_show'`, today)
