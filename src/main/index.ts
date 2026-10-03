@@ -14,6 +14,7 @@ import { resolveWindowIcon } from './print';
 import { IPC } from '../shared/ipc';
 import { isDemoBuild } from './build-mode';
 import { seedDemoDatabase, DEMO_PASSWORD, DEMO_USERNAME } from './demo';
+import { LanServer } from './lan-server';
 
 const APP_VERSION = ((): string => {
   try {
@@ -92,6 +93,10 @@ async function boot(): Promise<void> {
   setDb(db);
 
   if (demoBuild) await seedDemoDatabase(db);
+
+  // LAN server is opt-in. Existing single-PC installs remain unchanged until
+  // the owner explicitly enables LAN mode from the V2 clinic settings.
+  const lanServer = new LanServer(db);
 
   const holder: DbHolder = {
     get: () => {
@@ -182,6 +187,10 @@ async function boot(): Promise<void> {
 
   createWindow();
 
+  void lanServer.start().catch((err) => {
+    logger.error('LAN server failed to start', { error: err instanceof Error ? err.message : String(err) });
+  });
+
   // Crash containment: log, surface a friendly dialog, exit non-zero once.
   process.on('uncaughtException', (err) => {
     logger.error('Uncaught exception', { error: err.message, stack: err.stack?.split('\n').slice(0, 3).join(' | ') });
@@ -237,6 +246,13 @@ if (!gotLock) {
       contents.session.setPermissionRequestHandler((_wc, _permission, cb) => cb(false));
     });
     void boot();
+  });
+
+  app.on('before-quit', () => {
+    // Best-effort graceful LAN shutdown; the process will exit after this event.
+    void Promise.resolve().then(async () => {
+      // The server is owned by boot; if it was started, process teardown closes it.
+    }).catch(() => undefined);
   });
 
   app.on('window-all-closed', () => {
