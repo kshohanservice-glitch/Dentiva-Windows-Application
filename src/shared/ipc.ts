@@ -24,7 +24,7 @@ export interface BackupRecordDTO {
 
 export interface DentivaApi {
   /* system */
-  'system/info'(): Promise<{ version: string; schemaVersion: number; dataDir: string; platform: string }>;
+  'system/info'(): Promise<{ version: string; schemaVersion: number; dataDir: string; platform: string; demo: boolean }>;
   'system/activity'(): Promise<null>;
   'system/lock'(): Promise<null>;
   'system/onLock'(cb: () => void): () => void;

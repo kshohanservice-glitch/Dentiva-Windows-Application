@@ -11,7 +11,7 @@ interface AppState {
   user: SessionUser | null;
   locked: boolean;
   settings: SettingsDTO | null;
-  system: { version: string; schemaVersion: number; dataDir: string; platform: string } | null;
+  system: { version: string; schemaVersion: number; dataDir: string; platform: string; demo: boolean } | null;
   activation: ActivationStatus | null;
   login: (username: string, password: string) => Promise<{ ok: boolean; reason?: string; retryAfterMs?: number }>;
   logout: () => Promise<void>;
@@ -66,7 +66,8 @@ export function AppProvider(props: { children: React.ReactNode }) {
       setSystem(sys);
       setActivation(act);
       setUser(session);
-      if (!act.activated) setPhase('activation');
+      if (sys.demo) setPhase('ready');
+      else if (!act.activated) setPhase('activation');
       else if (setup.needsSetup) setPhase('setup');
       else if (!session) setPhase('auth');
       else {
