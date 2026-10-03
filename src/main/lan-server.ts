@@ -47,7 +47,7 @@ export class LanServer {
   private readonly host = '0.0.0.0';
   private readonly pairAttempts = new Map<string, { count: number; resetAt: number }>();
 
-  constructor(private readonly db: DB) {}
+  constructor(private readonly db: DB, private readonly securityPolicy: SecurityPolicy = { maxFailedLogins: 5, minPasswordLength: 8 }) {}
 
   getStatus(): LanServerStatus {
     const row = this.db.prepare(
@@ -131,7 +131,7 @@ export class LanServer {
             try {
               const auth = String(req.headers.authorization ?? ''); const token = auth.startsWith('Bearer ') ? auth.slice(7) : '';
               const input = JSON.parse(body) as { username?: string; password?: string };
-              const result = await this.loginUser(token, String(input.username ?? ''), String(input.password ?? ''), { maxFailedLogins: 5, minPasswordLength: 8 });
+              const result = await this.loginUser(token, String(input.username ?? ''), String(input.password ?? ''), this.securityPolicy);
               if (!result) { if (!responded) { responded = true; json(res, 401, { ok: false, error: 'INVALID_CREDENTIALS_OR_SESSION' }); } return; }
               if (!responded) { responded = true; json(res, 200, { ok: true, deviceId: result.deviceId, user: result.user }); }
             } catch (err) { if (!responded) { responded = true; json(res, 401, { ok: false, error: err instanceof Error ? err.message : 'LOGIN_FAILED' }); } }
