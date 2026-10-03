@@ -5,7 +5,7 @@ import { useApp } from '../state/app-context';
 import { Badge, Button, Card, Kbd, Modal, Spinner, Tabs, useToast } from '../components/primitives';
 import { Field, Input, Select, Textarea } from '../components/forms';
 
-type SetTab = 'clinic' | 'security' | 'appearance' | 'notifications' | 'billing' | 'prescription' | 'print' | 'data' | 'shortcuts';
+type SetTab = 'clinic' | 'security' | 'network' | 'appearance' | 'notifications' | 'billing' | 'prescription' | 'print' | 'data' | 'shortcuts';
 
 export function SettingsPage() {
   const { settings, refreshSettings, refresh, user, logout } = useApp();
@@ -61,6 +61,7 @@ export function SettingsPage() {
   const tabs: { key: SetTab; label: string }[] = [
     { key: 'clinic', label: 'Clinic' },
     { key: 'security', label: 'Security' },
+    { key: 'network', label: 'Clinic Network' },
     { key: 'appearance', label: 'Appearance' },
     { key: 'notifications', label: 'Notifications' },
     { key: 'billing', label: 'Billing' },
@@ -126,6 +127,8 @@ export function SettingsPage() {
         )}
 
         {tab === 'security' && <SecurityTab form={form} set={set} user={user} onLogout={logout} refresh={refresh} />}
+
+        {tab === 'network' && <LanNetworkTab toast={toast} />} 
 
         {tab === 'appearance' && (
           <Card title="Appearance">
@@ -552,4 +555,52 @@ function DataTab() {
       )}
     </>
   );
+}
+
+
+function LanNetworkTab({ toast }: { toast: ReturnType<typeof useToast> }) {
+  const [status, setStatus] = useState<any>(null);
+  const [devices, setDevices] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [pairing, setPairing] = useState<any>(null);
+  const [enabled, setEnabled] = useState(false);
+  const [port, setPort] = useState('47821');
+  const [serverName, setServerName] = useState('Dentiva Pro Server');
+
+  const load = async () => {
+    setLoading(true);
+    try {
+      const [nextStatus, nextDevices] = await Promise.all([api['lan/status'](), api['lan/devices']()]);
+      setStatus(nextStatus); setDevices(nextDevices ?? []);
+      setEnabled(Boolean(nextStatus.enabled)); setPort(String(nextStatus.port)); setServerName(nextStatus.serverName ?? 'Dentiva Pro Server');
+    } catch (err) { toast.fromError(err, 'Could not load clinic network settings'); }
+    finally { setLoading(false); }
+  };
+  useEffect(() => { void load(); }, []);
+
+  const save = async () => {
+    setSaving(true);
+    try { const next = await api['lan/configure']({ enabled, port: Number(port), serverName }); setStatus(next); toast.success(enabled ? 'Clinic network server enabled' : 'Clinic network server disabled'); await load(); }
+    catch (err) { toast.fromError(err, 'Network settings failed'); }
+    finally { setSaving(false); }
+  };
+
+  if (loading) return <Spinner label="Loading clinic network…" />;
+  return <>
+    <Card title="Clinic Network / LAN Server" subtitle="Use one Windows PC as the clinic server. Keep this on a trusted private network only.">
+      <div className="form-grid">
+        <Field label="Enable LAN server" hint="Disabled by default. Do not expose clinical data to public networks.">{() => <label className="checkbox"><input type="checkbox" checked={enabled} onChange={e => setEnabled(e.target.checked)} /><span>Allow other Dentiva Pro devices to connect</span></label>}</Field>
+        <Field label="Server name">{id => <Input id={id} value={serverName} onChange={setServerName} maxLength={120} />}</Field>
+        <Field label="Port" hint="1024–65535">{id => <Input id={id} type="number" min={1024} max={65535} value={port} onChange={setPort} />}</Field>
+      </div>
+      <div className="row gap-2 mt-4"><Button variant="primary" loading={saving} onClick={() => void save()}>Apply network settings</Button><Badge tone={status?.running ? 'success' : 'muted'}>{status?.running ? `Running · :${status.port}` : 'Stopped'}</Badge></div>
+    </Card>
+    <Card title="Device pairing" subtitle="Generate a short-lived code for a new Dentiva Pro device.">
+      <div className="row gap-2"><Button variant="secondary" disabled={!status?.running} onClick={async () => { try { const p = await api['lan/create-pairing-code'](); setPairing(p); toast.success('Pairing code generated'); } catch (err) { toast.fromError(err, 'Could not create pairing code'); } }}>Generate pairing code</Button>{pairing && <Badge tone="success">Code: {pairing.code} · expires {new Date(pairing.expiresAt).toLocaleTimeString()}</Badge>}</div>
+    </Card>
+    <Card title="Connected devices">
+      {devices.length === 0 ? <p className="muted">No paired devices.</p> : <div className="col gap-2">{devices.map(d => <div key={d.deviceId} className="row between"><div><strong>{d.deviceName}</strong><div className="xsmall muted">{d.deviceId} · {d.status}</div></div><Button variant="ghost" onClick={async () => { try { await api['lan/revoke-device'](d.deviceId); toast.success('Device revoked'); await load(); } catch (err) { toast.fromError(err, 'Could not revoke device'); } }}>Revoke</Button></div>)}</div>}
+    </Card>
+  </>;
 }
