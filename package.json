@@ -56,10 +56,8 @@
     "vitest": "^5.0.2"
   },
   "build": {
-    "asar": {
-      "unpack": [
-        "**/*.node"
-      ]
-    }
+    "asarUnpack": [
+      "**/*.node"
+    ]
   }
 }
