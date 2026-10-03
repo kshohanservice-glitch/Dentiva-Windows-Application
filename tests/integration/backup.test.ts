@@ -49,7 +49,7 @@ describe('backup engine', () => {
     expect(rec.status).toBe('ok');
     expect(rec.filename).toMatch(/^DentivaPro_Backup_.*\.dpv$/);
     expect(rec.sizeBytes).toBeGreaterThan(0);
-    expect(rec.schemaVersion).toBe(2);
+    expect(rec.schemaVersion).toBe(3);
     expect(rec.checksum).toMatch(/^[0-9a-f]{64}$/);
     expect(fs.existsSync(rec.path)).toBe(true);
 
@@ -61,7 +61,7 @@ describe('backup engine', () => {
 
     const manifest = JSON.parse((await zip.files.find((f) => f.path === 'manifest.json')!.buffer()).toString('utf8'));
     expect(manifest.format).toBe('dentiva-backup');
-    expect(manifest.schemaVersion).toBe(2);
+    expect(manifest.schemaVersion).toBe(3);
     expect(manifest.dbSha256).toBe(rec.checksum);
     expect(manifest.counts.patients).toBe(1);
   });
@@ -89,7 +89,7 @@ describe('restore engine', () => {
     expect(rec.status).toBe('ok');
     // mutate live data after the snapshot
     createPatient(ctx, { name: 'After Backup', gender: 'female', ageYears: 22, phone: '01822222222', forceCreate: true });
-    expect(listPatients(ctx, {}).total).toBe(2);
+    expect(listPatients(ctx, {}).total).toBe(3);
     return rec;
   }
 
@@ -147,7 +147,7 @@ describe('restore engine', () => {
     await expect(service.restoreBackup(limited as Ctx, good.path, 'RESTORE')).rejects.toThrow(/backup\.restore/);
 
     // live data untouched by all the failures above
-    expect(listPatients(ctx, {}).total).toBe(2);
+    expect(listPatients(ctx, {}).total).toBe(3);
     expect(fullIntegrityCheck(env.paths.dbFile).ok).toBe(true);
   });
 
@@ -178,7 +178,7 @@ describe('restore engine', () => {
     expect(rec.status).toBe('ok');
     // db still the same file we started with
     const reopened = openDatabase(env.paths.dbFile, { runMigrations: false });
-    expect(reopened.schemaVersion).toBe(2);
+    expect(reopened.schemaVersion).toBe(3);
     reopened.db.close();
   });
 });
