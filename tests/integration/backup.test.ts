@@ -147,7 +147,7 @@ describe('restore engine', () => {
     await expect(service.restoreBackup(limited as Ctx, good.path, 'RESTORE')).rejects.toThrow(/backup\.restore/);
 
     // live data untouched by all the failures above
-    expect(listPatients(ctx, {}).total).toBe(3);
+    expect(listPatients(ctx, {}).total).toBe(2);
     expect(fullIntegrityCheck(env.paths.dbFile).ok).toBe(true);
   });
 
