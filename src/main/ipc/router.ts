@@ -173,6 +173,9 @@ export function registerRouter(deps: RouterDeps): void {
     const db = getDb();
     const ctx = { db, paths: deps.paths(), session: null as any } as unknown as Ctx;
     const full = settingsSvc.getSettings(ctx);
+    if (deps.demo) {
+      full.clinic = { ...full.clinic, clinicName: full.clinic.clinicName || 'BrightSmile Dental Clinic — Demo' };
+    }
     if (deps.session.current()) return full;
     // Unauthenticated (login/setup screens): expose branding only.
     return { clinic: full.clinic, prescription: { labels: full.prescription.labels } } as any;
