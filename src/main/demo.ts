@@ -1,7 +1,7 @@
 import type { DB } from './db/database';
 import { hashPassword } from './core/passwords';
 import { tx } from './core/context';
-import { ALL_PERMISSIONS } from '../../shared/permissions';
+import { ALL_PERMISSIONS } from '../shared/permissions';
 
 const DEMO_SEED_VERSION = 1;
 export const DEMO_USERNAME = 'demo';
