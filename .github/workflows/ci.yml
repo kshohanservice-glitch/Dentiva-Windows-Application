@@ -161,6 +161,16 @@ jobs:
             }
             exit 1
           }
+      - name: Verify Windows Argon2 native binding is packaged
+        shell: pwsh
+        run: |
+          $native = Get-ChildItem -Recurse -File dist\\win-unpacked -Filter 'argon2.win32-x64-msvc.node' -ErrorAction SilentlyContinue | Select-Object -First 1
+          if (-not $native) {
+            Write-Host "::error title=Argon2 native binding missing::The Windows Argon2 x64 native binding was not included in the packaged app."
+            exit 1
+          }
+          Write-Host "Argon2 native binding: $($native.FullName)"
+
       - name: Silent-install the actual installer and smoke-test it
         shell: pwsh
         run: |
