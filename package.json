@@ -57,7 +57,9 @@
   },
   "build": {
     "asarUnpack": [
-      "**/*.node"
+      "node_modules/@node-rs/argon2/**",
+      "node_modules/@node-rs/argon2-win32-x64-msvc/**",
+      "node_modules/better-sqlite3/**"
     ]
   }
 }
