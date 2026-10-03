@@ -128,6 +128,12 @@ export function registerRouter(deps: RouterDeps): void {
   };
 
   /* --------------------------- unauthenticated -------------------------- */
+  handle(IPC.lanConfigure, { auth: true, fn: (p, ctx) => {
+    if (!ctx!.session.permissions.includes('settings.manage')) throw new AppError('PERMISSION', 'This action requires the "settings.manage" permission.');
+    const result = deps.lanServer.configure({ enabled: Boolean(p?.enabled), port: Number(p?.port), serverName: String(p?.serverName ?? '') });
+    audit(ctx!, { action: 'lan.config.update', entityType: 'system', entityId: null, summary: `LAN server configuration updated: ${result.enabled ? 'enabled' : 'disabled'}` });
+    return result;
+  } });
   handle(IPC.lanStatus, { auth: true, fn: (_p, ctx) => {
     if (!ctx!.session.permissions.includes('settings.manage')) throw new AppError('PERMISSION', 'This action requires the "settings.manage" permission.');
     return deps.lanServer.getStatus();
