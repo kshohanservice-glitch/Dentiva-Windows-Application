@@ -163,6 +163,8 @@ export class LanServer {
   }
 
   pairDevice(deviceId: string, deviceName: string, pairingCode: string, ip: string | null): LanPairingResult {
+    const config = this.db.prepare('SELECT enabled FROM lan_config WHERE id = 1').get() as { enabled: number } | undefined;
+    if (config?.enabled !== 1) throw new Error('LAN server is disabled.');
     const cleanId = String(deviceId || '').trim().slice(0, 128);
     const cleanName = String(deviceName || '').trim().slice(0, 120);
     const code = String(pairingCode || '').trim();
@@ -182,9 +184,20 @@ export class LanServer {
       throw new Error('Invalid or expired pairing code.');
     }
     const now = new Date().toISOString();
-    // Pairing codes are single-use; consume before issuing the session.
-    this.db.prepare(`UPDATE lan_config SET pairing_secret_hash = NULL, pairing_secret_expires_at = NULL, updated_at = ? WHERE id = 1`).run(now);
-    const device = this.db.prepare('SELECT id, device_name, status FROM lan_devices WHERE device_id = ?').get(cleanId) as { id: number; device_name: string; status: string } | undefined;
+    // Pairing is a single atomic DB transaction so concurrent requests cannot
+    // both consume the same one-time pairing code.
+    const pair = this.db.transaction(() => {
+      const current = this.db.prepare('SELECT pairing_secret_hash, pairing_secret_expires_at FROM lan_config WHERE id = 1').get() as { pairing_secret_hash: string | null; pairing_secret_expires_at: string | null } | undefined;
+      const currentExpected = tokenHash(code);
+      const currentValidHash = !!current?.pairing_secret_hash
+        && current.pairing_secret_hash.length === currentExpected.length
+        && crypto.timingSafeEqual(Buffer.from(current.pairing_secret_hash), Buffer.from(currentExpected));
+      if (!currentValidHash || !current?.pairing_secret_expires_at || current.pairing_secret_expires_at <= now) {
+        throw new Error('Invalid or expired pairing code.');
+      }
+      this.db.prepare(`UPDATE lan_config SET pairing_secret_hash = NULL, pairing_secret_expires_at = NULL, updated_at = ? WHERE id = 1`).run(now);
+
+      const device = this.db.prepare('SELECT id FROM lan_devices WHERE device_id = ?').get(cleanId) as { id: number } | undefined;
     let devicePk: number;
     if (device) {
       devicePk = device.id;
@@ -193,10 +206,12 @@ export class LanServer {
       const result = this.db.prepare(`INSERT INTO lan_devices (device_id, device_name, status, last_ip, last_seen_at, approved_at, created_at, updated_at) VALUES (?, ?, 'approved', ?, ?, ?, ?, ?)`).run(cleanId, cleanName, ip, now, now, now, now);
       devicePk = Number(result.lastInsertRowid);
     }
-    const rawToken = crypto.randomBytes(32).toString('base64url');
-    const expiresAt = new Date(Date.now() + SESSION_TTL_MS).toISOString();
-    this.db.prepare(`INSERT INTO lan_sessions (token_hash, device_id, created_at, expires_at, last_seen_at) VALUES (?, ?, ?, ?, ?)`).run(tokenHash(rawToken), devicePk, now, expiresAt, now);
-    return { deviceId: cleanId, deviceName: cleanName, sessionToken: rawToken, expiresAt };
+      const rawToken = crypto.randomBytes(32).toString('base64url');
+      const expiresAt = new Date(Date.now() + SESSION_TTL_MS).toISOString();
+      this.db.prepare(`INSERT INTO lan_sessions (token_hash, device_id, created_at, expires_at, last_seen_at) VALUES (?, ?, ?, ?, ?)`).run(tokenHash(rawToken), devicePk, now, expiresAt, now);
+      return { deviceId: cleanId, deviceName: cleanName, sessionToken: rawToken, expiresAt };
+    });
+    return pair();
   }
 
   revokeDevice(deviceId: string): void {
