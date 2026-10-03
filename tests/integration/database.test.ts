@@ -14,8 +14,8 @@ afterEach(() => {
 });
 
 describe('database migrations & seeds', () => {
-  it('migrates to schema v1 with pragmas applied', () => {
-    expect(schemaVersionOf(env.db)).toBe(1);
+  it('migrates to current schema with pragmas applied', () => {
+    expect(schemaVersionOf(env.db)).toBe(2);
     const foreignKeys = env.db.pragma('foreign_keys', { simple: true });
     expect(Number(foreign_keys_value(foreignKeys))).toBe(1);
     const journal = String(env.db.pragma('journal_mode', { simple: true }));
