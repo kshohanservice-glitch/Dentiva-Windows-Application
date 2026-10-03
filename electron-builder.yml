@@ -57,8 +57,12 @@ afterPack: scripts/after-pack.cjs
 asar: true
 # Native modules must be readable outside the asar archive.
 asarUnpack:
-  - '**/node_modules/better-sqlite3/**'
-  - '**/node_modules/@node-rs/**'
+  # Keep every native .node binary outside app.asar. This is required for
+  # @node-rs/argon2's platform package and better-sqlite3 on Windows.
+  - '**/*.node'
+  - 'node_modules/@node-rs/argon2/**'
+  - 'node_modules/@node-rs/argon2-win32-x64-msvc/**'
+  - 'node_modules/better-sqlite3/**'
 npmRebuild: true
 
 win:
