@@ -168,7 +168,7 @@ export class LanServer {
     const cleanId = String(deviceId || '').trim().slice(0, 128);
     const cleanName = String(deviceName || '').trim().slice(0, 120);
     const code = String(pairingCode || '').trim();
-    if (!/^[A-Za-z0-9._-]{3,128}$/.test(cleanId) || !cleanName || !/^\\d{6}$/.test(code)) {
+    if (!/^[A-Za-z0-9._-]{3,128}$/.test(cleanId) || !cleanName || !/^\d{6}$/.test(code)) {
       throw new Error('Invalid LAN pairing request.');
     }
     const attemptKey = ip ?? 'unknown';
