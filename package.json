@@ -19,7 +19,7 @@
     "test:e2e": "npm run build:main && npm run build:renderer -- --mode e2e && playwright test",
     "icons": "node scripts/generate-icons.mjs",
     "dist": "npm run build && electron-builder --win nsis --publish never",
-    "dist:dir": "npm run build && electron-builder --win nsis --publish never --config.directories.output=dist"
+    "dist:dir": "npm run build && electron-builder --win nsis --publish never --config.directories.output=release"
   },
   "dependencies": {
     "@fontsource/inter": "^5.1.0",
@@ -56,6 +56,9 @@
     "vitest": "^5.0.2"
   },
   "build": {
+    "directories": {
+      "output": "release"
+    },
     "asarUnpack": [
       "node_modules/@node-rs/argon2/**",
       "node_modules/@node-rs/argon2-win32-x64-msvc/**",
