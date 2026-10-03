@@ -2,6 +2,9 @@ import http from 'node:http';
 import crypto from 'node:crypto';
 import type { DB } from './db/database';
 
+const PAIRING_TTL_MS = 10 * 60 * 1000;
+const SESSION_TTL_MS = 12 * 60 * 60 * 1000;
+
 export type LanServerStatus = {
   enabled: boolean;
   running: boolean;
@@ -10,6 +13,8 @@ export type LanServerStatus = {
   serverName: string;
   connectedDevices: number;
 };
+
+export type LanPairingResult = { deviceId: string; deviceName: string; sessionToken: string; expiresAt: string };
 
 type ConfigRow = {
   enabled: number;
@@ -77,6 +82,27 @@ export class LanServer {
           json(res, 200, this.getStatus());
           return;
         }
+        if (req.method === 'POST' && url.pathname === '/api/lan/pair') {
+          let body = '';
+          req.setEncoding('utf8');
+          req.on('data', (chunk) => { body += chunk; if (body.length > 8192) req.destroy(); });
+          req.on('end', () => {
+            try {
+              const input = JSON.parse(body) as { deviceId?: string; deviceName?: string; pairingCode?: string };
+              const result = this.pairDevice(String(input.deviceId ?? ''), String(input.deviceName ?? ''), String(input.pairingCode ?? ''), req.socket.remoteAddress ?? null);
+              json(res, 200, { ok: true, ...result });
+            } catch (err) { json(res, 401, { ok: false, error: err instanceof Error ? err.message : 'PAIRING_FAILED' }); }
+          });
+          return;
+        }
+        if (req.method === 'GET' && url.pathname === '/api/lan/session') {
+          const auth = String(req.headers.authorization ?? '');
+          const token = auth.startsWith('Bearer ') ? auth.slice(7) : '';
+          const session = this.authenticate(token);
+          if (!session) { json(res, 401, { ok: false, error: 'UNAUTHORIZED' }); return; }
+          json(res, 200, { ok: true, session });
+          return;
+        }
         json(res, 404, { ok: false, error: 'NOT_FOUND' });
       } catch {
         json(res, 400, { ok: false, error: 'BAD_REQUEST' });
@@ -108,5 +134,54 @@ export class LanServer {
 
   issueSessionToken(rawToken: string): string {
     return tokenHash(rawToken);
+  }
+
+  createPairingCode(): { code: string; expiresAt: string } {
+    const code = crypto.randomInt(100000, 1000000).toString();
+    const expiresAt = new Date(Date.now() + PAIRING_TTL_MS).toISOString();
+    const hash = tokenHash(code);
+    this.db.prepare(`UPDATE lan_config SET pairing_secret_hash = ?, updated_at = ? WHERE id = 1`).run(hash, new Date().toISOString());
+    return { code, expiresAt };
+  }
+
+  pairDevice(deviceId: string, deviceName: string, pairingCode: string, ip: string | null): LanPairingResult {
+    const cleanId = String(deviceId || '').trim().slice(0, 128);
+    const cleanName = String(deviceName || '').trim().slice(0, 120);
+    const code = String(pairingCode || '').trim();
+    if (!/^[A-Za-z0-9._-]{3,128}$/.test(cleanId) || !cleanName || !/^\\d{6}$/.test(code)) {
+      throw new Error('Invalid LAN pairing request.');
+    }
+    const row = this.db.prepare('SELECT pairing_secret_hash FROM lan_config WHERE id = 1').get() as { pairing_secret_hash: string | null } | undefined;
+    if (!row?.pairing_secret_hash || !crypto.timingSafeEqual(Buffer.from(row.pairing_secret_hash), Buffer.from(tokenHash(code)))) {
+      throw new Error('Invalid or expired pairing code.');
+    }
+    const now = new Date().toISOString();
+    const device = this.db.prepare('SELECT id, device_name, status FROM lan_devices WHERE device_id = ?').get(cleanId) as { id: number; device_name: string; status: string } | undefined;
+    let devicePk: number;
+    if (device) {
+      devicePk = device.id;
+      this.db.prepare(`UPDATE lan_devices SET device_name = ?, status = 'approved', last_ip = ?, last_seen_at = ?, approved_at = ?, revoked_at = NULL, updated_at = ? WHERE id = ?`).run(cleanName, ip, now, now, now, devicePk);
+    } else {
+      const result = this.db.prepare(`INSERT INTO lan_devices (device_id, device_name, status, last_ip, last_seen_at, approved_at, created_at, updated_at) VALUES (?, ?, 'approved', ?, ?, ?, ?, ?)`).run(cleanId, cleanName, ip, now, now, now, now);
+      devicePk = Number(result.lastInsertRowid);
+    }
+    const rawToken = crypto.randomBytes(32).toString('base64url');
+    const expiresAt = new Date(Date.now() + SESSION_TTL_MS).toISOString();
+    this.db.prepare(`INSERT INTO lan_sessions (token_hash, device_id, created_at, expires_at, last_seen_at) VALUES (?, ?, ?, ?, ?)`).run(tokenHash(rawToken), devicePk, now, expiresAt, now);
+    return { deviceId: cleanId, deviceName: cleanName, sessionToken: rawToken, expiresAt };
+  }
+
+  revokeDevice(deviceId: string): void {
+    const now = new Date().toISOString();
+    this.db.prepare(`UPDATE lan_devices SET status = 'revoked', revoked_at = ?, updated_at = ? WHERE device_id = ?`).run(now, now, deviceId);
+    this.db.prepare(`UPDATE lan_sessions SET revoked_at = ? WHERE device_id IN (SELECT id FROM lan_devices WHERE device_id = ?) AND revoked_at IS NULL`).run(now, deviceId);
+  }
+
+  authenticate(rawToken: string): { deviceId: string; userId: number | null } | null {
+    const hash = tokenHash(rawToken);
+    const row = this.db.prepare(`SELECT d.device_id, s.user_id, d.status, s.expires_at, s.revoked_at FROM lan_sessions s JOIN lan_devices d ON d.id = s.device_id WHERE s.token_hash = ?`).get(hash) as any;
+    if (!row || row.status !== 'approved' || row.revoked_at || row.expires_at <= new Date().toISOString()) return null;
+    this.db.prepare('UPDATE lan_sessions SET last_seen_at = ? WHERE token_hash = ?').run(new Date().toISOString(), hash);
+    return { deviceId: row.device_id, userId: row.user_id ?? null };
   }
 }
