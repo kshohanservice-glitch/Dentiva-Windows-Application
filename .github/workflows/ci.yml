@@ -201,6 +201,15 @@ jobs:
             Say "smoke test failed (exit $code)"
             if (Test-Path smoke-output.log) {
               Get-Content smoke-output.log | Where-Object { $_.Trim() -ne '' } | Select-Object -Last 25 | ForEach-Object { Say $_ }
+              if ($env:GITHUB_EVENT_NAME -eq 'push') {
+                git config user.name "github-actions[bot]"
+                git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+                git add -f smoke-output.log
+                if (!(git diff --cached --quiet)) {
+                  git commit -m "ci: capture installed artifact smoke log"
+                  git push origin "HEAD:$env:GITHUB_REF_NAME"
+                }
+              }
             }
             exit 1
           }
