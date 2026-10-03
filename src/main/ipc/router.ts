@@ -132,6 +132,10 @@ export function registerRouter(deps: RouterDeps): void {
     if (!ctx!.session.permissions.includes('settings.manage')) throw new AppError('PERMISSION', 'This action requires the "settings.manage" permission.');
     return deps.lanServer.getStatus();
   } });
+  handle(IPC.lanDevices, { auth: true, fn: (_p, ctx) => {
+    if (!ctx!.session.permissions.includes('settings.manage')) throw new AppError('PERMISSION', 'This action requires the "settings.manage" permission.');
+    return deps.lanServer.listDevices();
+  } });
   handle(IPC.lanCreatePairingCode, { auth: true, fn: (_p, ctx) => {
     if (!ctx!.session.permissions.includes('settings.manage')) throw new AppError('PERMISSION', 'This action requires the "settings.manage" permission.');
     const result = deps.lanServer.createPairingCode();
