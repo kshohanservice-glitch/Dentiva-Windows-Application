@@ -4,6 +4,10 @@ import type { DB } from './db/database';
 
 const PAIRING_TTL_MS = 10 * 60 * 1000;
 const SESSION_TTL_MS = 12 * 60 * 60 * 1000;
+const MAX_BODY_BYTES = 8 * 1024;
+const REQUEST_TIMEOUT_MS = 10_000;
+const PAIR_ATTEMPT_WINDOW_MS = 60_000;
+const MAX_PAIR_ATTEMPTS_PER_IP = 10;
 
 export type LanServerStatus = {
   enabled: boolean;
@@ -39,6 +43,7 @@ function tokenHash(token: string): string {
 export class LanServer {
   private server: http.Server | null = null;
   private readonly host = '0.0.0.0';
+  private readonly pairAttempts = new Map<string, { count: number; resetAt: number }>();
 
   constructor(private readonly db: DB) {}
 
@@ -72,6 +77,8 @@ export class LanServer {
     }
 
     const server = http.createServer((req, res) => {
+      req.setTimeout(REQUEST_TIMEOUT_MS, () => req.destroy());
+      res.setTimeout(REQUEST_TIMEOUT_MS, () => res.destroy());
       try {
         const url = new URL(req.url ?? '/', 'http://127.0.0.1');
         if (req.method === 'GET' && url.pathname === '/health') {
@@ -84,10 +91,21 @@ export class LanServer {
         }
         if (req.method === 'POST' && url.pathname === '/api/lan/pair') {
           let body = '';
+          let bodyBytes = 0;
+          let tooLarge = false;
           req.setEncoding('utf8');
-          req.on('data', (chunk) => { body += chunk; if (body.length > 8192) req.destroy(); });
+          req.on('data', (chunk) => {
+            bodyBytes += Buffer.byteLength(chunk, 'utf8');
+            if (bodyBytes > MAX_BODY_BYTES) {
+              tooLarge = true;
+              req.destroy();
+              return;
+            }
+            body += chunk;
+          });
           req.on('end', () => {
             try {
+              if (tooLarge) { json(res, 413, { ok: false, error: 'REQUEST_TOO_LARGE' }); return; }
               const input = JSON.parse(body) as { deviceId?: string; deviceName?: string; pairingCode?: string };
               const result = this.pairDevice(String(input.deviceId ?? ''), String(input.deviceName ?? ''), String(input.pairingCode ?? ''), req.socket.remoteAddress ?? null);
               json(res, 200, { ok: true, ...result });
@@ -140,7 +158,7 @@ export class LanServer {
     const code = crypto.randomInt(100000, 1000000).toString();
     const expiresAt = new Date(Date.now() + PAIRING_TTL_MS).toISOString();
     const hash = tokenHash(code);
-    this.db.prepare(`UPDATE lan_config SET pairing_secret_hash = ?, updated_at = ? WHERE id = 1`).run(hash, new Date().toISOString());
+    this.db.prepare(`UPDATE lan_config SET pairing_secret_hash = ?, pairing_secret_expires_at = ?, updated_at = ? WHERE id = 1`).run(hash, expiresAt, new Date().toISOString());
     return { code, expiresAt };
   }
 
@@ -151,11 +169,21 @@ export class LanServer {
     if (!/^[A-Za-z0-9._-]{3,128}$/.test(cleanId) || !cleanName || !/^\\d{6}$/.test(code)) {
       throw new Error('Invalid LAN pairing request.');
     }
-    const row = this.db.prepare('SELECT pairing_secret_hash FROM lan_config WHERE id = 1').get() as { pairing_secret_hash: string | null } | undefined;
-    if (!row?.pairing_secret_hash || !crypto.timingSafeEqual(Buffer.from(row.pairing_secret_hash), Buffer.from(tokenHash(code)))) {
+    const attemptKey = ip ?? 'unknown';
+    const nowMs = Date.now();
+    const attempt = this.pairAttempts.get(attemptKey);
+    if (attempt && attempt.resetAt > nowMs && attempt.count >= MAX_PAIR_ATTEMPTS_PER_IP) throw new Error('Too many pairing attempts. Try again later.');
+    if (!attempt || attempt.resetAt <= nowMs) this.pairAttempts.set(attemptKey, { count: 1, resetAt: nowMs + PAIR_ATTEMPT_WINDOW_MS });
+    else attempt.count += 1;
+    const row = this.db.prepare('SELECT pairing_secret_hash, pairing_secret_expires_at FROM lan_config WHERE id = 1').get() as { pairing_secret_hash: string | null; pairing_secret_expires_at: string | null } | undefined;
+    const expected = tokenHash(code);
+    const validHash = !!row?.pairing_secret_hash && row.pairing_secret_hash.length === expected.length && crypto.timingSafeEqual(Buffer.from(row.pairing_secret_hash), Buffer.from(expected));
+    if (!validHash || !row?.pairing_secret_expires_at || row.pairing_secret_expires_at <= new Date().toISOString()) {
       throw new Error('Invalid or expired pairing code.');
     }
     const now = new Date().toISOString();
+    // Pairing codes are single-use; consume before issuing the session.
+    this.db.prepare(`UPDATE lan_config SET pairing_secret_hash = NULL, pairing_secret_expires_at = NULL, updated_at = ? WHERE id = 1`).run(now);
     const device = this.db.prepare('SELECT id, device_name, status FROM lan_devices WHERE device_id = ?').get(cleanId) as { id: number; device_name: string; status: string } | undefined;
     let devicePk: number;
     if (device) {
