@@ -15,7 +15,7 @@ afterEach(() => {
 
 describe('database migrations & seeds', () => {
   it('migrates to current schema with pragmas applied', () => {
-    expect(schemaVersionOf(env.db)).toBe(2);
+    expect(schemaVersionOf(env.db)).toBe(3);
     const foreignKeys = env.db.pragma('foreign_keys', { simple: true });
     expect(Number(foreign_keys_value(foreignKeys))).toBe(1);
     const journal = String(env.db.pragma('journal_mode', { simple: true }));
@@ -46,7 +46,7 @@ describe('database migrations & seeds', () => {
     const cats = env.db.prepare('SELECT kind FROM account_categories').all<{ kind: string }>();
     expect(cats.length).toBe(11);
     expect(cats.filter((c) => c.kind === 'expense').length).toBe(9);
-    expect(cats.filter((c) => c.kind === 'income').length).toBe(2);
+    expect(cats.filter((c) => c.kind === 'income').length).toBe(3);
   });
 
   it('seeds default settings rows for every module', () => {
