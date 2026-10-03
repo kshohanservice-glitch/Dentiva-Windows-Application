@@ -375,7 +375,7 @@ export function AppShell() {
     [can],
   );
 
-  const clinicName = settings?.clinic.clinicName || 'Your clinic';
+  const clinicName = demo ? 'BrightSmile Dental Clinic — Demo' : (settings?.clinic.clinicName || 'Your clinic');
 
   const persistCollapse = async (next: boolean) => {
     setCollapsed(next);
