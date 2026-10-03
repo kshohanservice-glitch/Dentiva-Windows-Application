@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 
+// Deterministic staging keeps the Windows binding beside index.js so Node's first native lookup succeeds.
 if (process.platform !== 'win32') {
   console.log('Argon2 staging skipped: not Windows.');
   process.exit(0);
