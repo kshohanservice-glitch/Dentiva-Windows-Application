@@ -98,7 +98,7 @@ async function boot(): Promise<void> {
 
   // LAN server is opt-in. Existing single-PC installs remain unchanged until
   // the owner explicitly enables LAN mode from the V2 clinic settings.
-  const lanServer = new LanServer(db);
+  const lanServer = new LanServer(db, readSecurityPolicy());
   activeLanServer = lanServer;
 
   const holder: DbHolder = {
