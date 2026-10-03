@@ -25,6 +25,7 @@ export interface BackupRecordDTO {
 export interface DentivaApi {
   /* LAN */
   'lan/status'(): Promise<{ enabled: boolean; running: boolean; port: number; host: string; serverName: string; connectedDevices: number }>;
+  'lan/configure'(input: { enabled: boolean; port: number; serverName: string }): Promise<{ enabled: boolean; running: boolean; port: number; host: string; serverName: string; connectedDevices: number }>;
   'lan/create-pairing-code'(): Promise<{ code: string; expiresAt: string }>;
   'lan/devices'(): Promise<{ deviceId: string; deviceName: string; status: string; lastIp: string | null; lastSeenAt: string | null; approvedAt: string | null; revokedAt: string | null }[]>;
   'lan/revoke-device'(deviceId: string): Promise<{ ok: true }>;
@@ -283,6 +284,7 @@ export interface SetupInput {
 
 export const IPC = {
   lanStatus: 'lan/status',
+  lanConfigure: 'lan/configure',
   lanCreatePairingCode: 'lan/create-pairing-code',
   lanDevices: 'lan/devices',
   lanRevokeDevice: 'lan/revoke-device',
