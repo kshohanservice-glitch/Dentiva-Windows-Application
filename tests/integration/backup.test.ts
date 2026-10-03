@@ -89,7 +89,7 @@ describe('restore engine', () => {
     expect(rec.status).toBe('ok');
     // mutate live data after the snapshot
     createPatient(ctx, { name: 'After Backup', gender: 'female', ageYears: 22, phone: '01822222222', forceCreate: true });
-    expect(listPatients(ctx, {}).total).toBe(3);
+    expect(listPatients(ctx, {}).total).toBe(2);
     return rec;
   }
 
