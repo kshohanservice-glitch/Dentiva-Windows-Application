@@ -1,7 +1,7 @@
 import http from 'node:http';
 import crypto from 'node:crypto';
 import type { DB } from './db/database';
-import { login as loginUser, type SecurityPolicy } from './services/auth';
+import { loadSessionUser, login as loginUser, type SecurityPolicy } from './services/auth';
 
 const PAIRING_TTL_MS = 10 * 60 * 1000;
 const SESSION_TTL_MS = 12 * 60 * 60 * 1000;
@@ -148,7 +148,8 @@ export class LanServer {
           const token = auth.startsWith('Bearer ') ? auth.slice(7) : '';
           const session = this.authenticate(token);
           if (!session) { json(res, 401, { ok: false, error: 'UNAUTHORIZED' }); return; }
-          json(res, 200, { ok: true, session });
+          const user = session.userId != null ? loadSessionUser(this.db, session.userId) : null;
+          json(res, 200, { ok: true, session: { ...session, user } });
           return;
         }
         json(res, 404, { ok: false, error: 'NOT_FOUND' });
