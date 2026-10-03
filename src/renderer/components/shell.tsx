@@ -310,6 +310,7 @@ export function LockOverlay() {
 
 export function AppShell() {
   const { user, settings, system, lock, logout, can } = useApp();
+  const demo = !!system?.demo;
   const [collapsed, setCollapsed] = useState(() => settings?.appearance.sidebarCollapsed ?? false);
   const [searchOpen, setSearchOpen] = useState(false);
   const location = useLocation();
@@ -374,7 +375,7 @@ export function AppShell() {
     [can],
   );
 
-  const clinicName = settings?.clinic.clinicName || 'Your clinic';
+  const clinicName = demo ? 'BrightSmile Dental Clinic — Demo' : (settings?.clinic.clinicName || 'Your clinic');
 
   const persistCollapse = async (next: boolean) => {
     setCollapsed(next);
@@ -415,7 +416,7 @@ export function AppShell() {
             <div className="num">{now.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })}</div>
           </div>
           <NotificationBell />
-          <IconButton icon={Icon.lock} title="Lock application (Ctrl+L)" onClick={lock} />
+          {!demo && <IconButton icon={Icon.lock} title="Lock application (Ctrl+L)" onClick={lock} />}
           <div className="row gap-2" style={{ paddingLeft: 4, borderLeft: '1px solid var(--line)' }}>
             <div className="avatar sm" title={user?.displayName}>{(user?.displayName ?? '?').slice(0, 1).toUpperCase()}</div>
             <div style={{ lineHeight: 1.15 }}>
@@ -423,7 +424,7 @@ export function AppShell() {
               <Badge tone="brand">{user?.roleName}</Badge>
             </div>
             <div className="popover-anchor">
-              <DropdownUserMenu onSettings={() => navigate('/settings')} onAbout={() => navigate('/about')} onPassword={() => navigate('/settings?tab=security')} onLogout={() => void logout()} canSettings={can('settings.manage')} />
+              <DropdownUserMenu demo={demo} onSettings={() => navigate('/settings')} onAbout={() => navigate('/about')} onPassword={() => navigate('/settings?tab=security')} onLogout={() => void logout()} canSettings={can('settings.manage')} />
             </div>
           </div>
         </div>
@@ -459,6 +460,7 @@ export function AppShell() {
       </nav>
 
       <main className="main" id="main-content">
+        {demo && <div className="demo-banner" role="status" style={{ margin: '0 0 14px', padding: '10px 14px', borderRadius: 10, background: 'var(--surface-2)', border: '1px solid var(--line)', display: 'flex', gap: 10, alignItems: 'center' }}><strong>DEMO MODE</strong><span className="muted">Read-only showcase — all displayed data is fictional and cannot be changed.</span></div>}
         <Outlet />
       </main>
 
@@ -467,7 +469,7 @@ export function AppShell() {
   );
 }
 
-function DropdownUserMenu(props: { onSettings: () => void; onAbout: () => void; onPassword: () => void; onLogout: () => void; canSettings: boolean }) {
+function DropdownUserMenu(props: { demo?: boolean; onSettings: () => void; onAbout: () => void; onPassword: () => void; onLogout: () => void; canSettings: boolean }) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -486,13 +488,12 @@ function DropdownUserMenu(props: { onSettings: () => void; onAbout: () => void; 
       <button className="btn btn-ghost btn-sm" onClick={() => setOpen((o) => !o)} type="button" aria-haspopup="menu" aria-expanded={open}>▾</button>
       {open && (
         <div className="dropdown" style={{ right: 0, top: 40 }} role="menu">
-          <button className="dropdown-item" onClick={() => { setOpen(false); props.onPassword(); }} type="button">Change password</button>
+          {!props.demo && <button className="dropdown-item" onClick={() => { setOpen(false); props.onPassword(); }} type="button">Change password</button>}
           {props.canSettings && (
             <button className="dropdown-item" onClick={() => { setOpen(false); props.onSettings(); }} type="button">Settings</button>
           )}
           <button className="dropdown-item" onClick={() => { setOpen(false); props.onAbout(); }} type="button">About Dentiva Pro</button>
-          <div className="dropdown-sep" />
-          <button className="dropdown-item danger" onClick={() => { setOpen(false); props.onLogout(); }} type="button">Sign out</button>
+          {!props.demo && <><div className="dropdown-sep" /><button className="dropdown-item danger" onClick={() => { setOpen(false); props.onLogout(); }} type="button">Sign out</button></>}
         </div>
       )}
     </div>

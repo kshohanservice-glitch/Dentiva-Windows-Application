@@ -43,6 +43,7 @@ export interface RouterDeps {
   appVersion: string;
   schemaVersion: () => number;
   refreshNotifications: () => void;
+  demo: boolean;
 }
 
 type Result<T> = { ok: true; data: T } | { ok: false; error: ReturnType<typeof toWireError> };
@@ -74,9 +75,30 @@ async function pickFile(title: string, filters: Electron.FileFilter[]): Promise<
 }
 
 export function registerRouter(deps: RouterDeps): void {
-    const handle = (channel: string, opts: { auth: boolean; fn: (payload: any, ctx: Ctx | null) => any | Promise<any> }) => {
+    const demoBlocked: Set<string> = new Set([
+    IPC.activationVerify, IPC.authLogout, IPC.authChangePassword, IPC.authUnlock, IPC.setupComplete, IPC.systemLock,
+    IPC.patientsCreate, IPC.patientsUpdate, IPC.patientsArchive, IPC.patientsDelete,
+    IPC.visitsCreate, IPC.visitsUpdate, IPC.chartSet,
+    IPC.treatmentsSave, IPC.treatmentsSetActive,
+    IPC.prescriptionsCreate, IPC.prescriptionsSaveTemplate,
+    IPC.appointmentsCreate, IPC.appointmentsUpdate, IPC.appointmentsCancel, IPC.appointmentsNoShow, IPC.appointmentsArrive,
+    IPC.queueAdd, IPC.queueAction, IPC.queueReorder,
+    IPC.invoicesCreate, IPC.invoicesVoid, IPC.paymentsCreate,
+    IPC.inventorySaveItem, IPC.inventoryStock, IPC.inventorySaveSupplier,
+    IPC.accountingAddExpense, IPC.accountingDeleteExpense, IPC.accountingAddIncome, IPC.accountingSaveCategory,
+    IPC.staffSave, IPC.dentistsSave,
+    IPC.usersSave, IPC.usersResetPassword, IPC.rolesSave, IPC.rolesRemove,
+    IPC.attachmentsAdd, IPC.attachmentsRename, IPC.attachmentsRemove,
+    IPC.backupRun, IPC.backupRestore, IPC.backupSetAuto,
+    IPC.settingsSave, IPC.settingsUploadLogo, IPC.settingsResetBusiness,
+    IPC.notificationsMarkRead, IPC.referralsSave,
+  ]);
+  const handle = (channel: string, opts: { auth: boolean; fn: (payload: any, ctx: Ctx | null) => any | Promise<any> }) => {
     ipcMain.handle(channel, async (_event, payload): Promise<Result<any>> => {
       try {
+        if (deps.demo && demoBlocked.has(channel)) {
+          throw new AppError('PERMISSION', 'Demo mode is read-only. This demo cannot be modified.');
+        }
         let ctx: Ctx | null = null;
         if (opts.auth) {
           const session: SessionUser = deps.session.require();
@@ -109,11 +131,12 @@ export function registerRouter(deps: RouterDeps): void {
     schemaVersion: deps.schemaVersion(),
     dataDir: deps.paths().root,
     platform: process.platform,
+    demo: deps.demo,
   }) });
 
   handle(IPC.systemActivity, { auth: false, fn: () => { deps.session.touch(); return null; } });
 
-  handle(IPC.activationStatus, { auth: false, fn: () => deps.activation.getStatus() });
+  handle(IPC.activationStatus, { auth: false, fn: () => deps.demo ? { activated: true, state: 'activated' as const } : deps.activation.getStatus() });
   handle(IPC.activationVerify, { auth: false, fn: (code: string) => {
     const result = deps.activation.activate(String(code ?? ''));
     if (result.activated) {
@@ -138,7 +161,7 @@ export function registerRouter(deps: RouterDeps): void {
     deps.session.signOut();
     return null;
   } });
-  handle(IPC.setupStatus, { auth: false, fn: () => ({ needsSetup: needsSetup(getDb()) }) });
+  handle(IPC.setupStatus, { auth: false, fn: () => ({ needsSetup: deps.demo ? false : needsSetup(getDb()) }) });
   handle(IPC.setupComplete, { auth: false, fn: async (p: any) => {
     const status = deps.activation.getStatus();
     if (!status.activated) throw new AppError('ACTIVATION', 'Complete activation before setup.');
@@ -150,6 +173,9 @@ export function registerRouter(deps: RouterDeps): void {
     const db = getDb();
     const ctx = { db, paths: deps.paths(), session: null as any } as unknown as Ctx;
     const full = settingsSvc.getSettings(ctx);
+    if (deps.demo) {
+      full.clinic = { ...full.clinic, clinicName: full.clinic.clinicName || 'BrightSmile Dental Clinic — Demo' };
+    }
     if (deps.session.current()) return full;
     // Unauthenticated (login/setup screens): expose branding only.
     return { clinic: full.clinic, prescription: { labels: full.prescription.labels } } as any;

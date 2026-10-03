@@ -12,6 +12,8 @@ import { insertNotification, refreshNotifications } from './services/notificatio
 import { registerRouter } from './ipc/router';
 import { resolveWindowIcon } from './print';
 import { IPC } from '../shared/ipc';
+import { isDemoBuild } from './build-mode';
+import { seedDemoDatabase, DEMO_PASSWORD, DEMO_USERNAME } from './demo';
 
 const APP_VERSION = ((): string => {
   try {
@@ -70,6 +72,7 @@ function fatal(title: string, message: string): void {
 
 async function boot(): Promise<void> {
   Menu.setApplicationMenu(null);
+  const demoBuild = isDemoBuild();
   const paths = getPaths();
 
   // --- Database open with integrity guard -------------------------------
@@ -87,6 +90,8 @@ async function boot(): Promise<void> {
     return;
   }
   setDb(db);
+
+  if (demoBuild) await seedDemoDatabase(db);
 
   const holder: DbHolder = {
     get: () => {
@@ -127,6 +132,10 @@ async function boot(): Promise<void> {
     }
   });
   session_.start();
+  if (demoBuild) {
+    const result = await session_.signIn(DEMO_USERNAME, DEMO_PASSWORD);
+    if (!result.ok) throw new Error('Demo account could not be initialized.');
+  }
 
   // --- Activation --------------------------------------------------------
   const activation = new ActivationStore(path.join(paths.activationDir, 'state.bin'), buildCipher());
@@ -153,7 +162,9 @@ async function boot(): Promise<void> {
     securityPolicy: readSecurityPolicy,
     appVersion: APP_VERSION,
     schemaVersion: () => schemaVersionOf(holder.get()),
+    demo: demoBuild,
     refreshNotifications: () => {
+      if (demoBuild) return;
       try {
         const row = holder.get().prepare("SELECT value_json FROM settings WHERE key = 'notifications'").get<{ value_json: string }>();
         const prefs = row ? JSON.parse(row.value_json) : {};
@@ -182,6 +193,7 @@ async function boot(): Promise<void> {
   });
 
   // Post-ready maintenance: automatic backup + notification refresh (non-blocking)
+  if (demoBuild) return;
   setTimeout(() => {
     void (async () => {
       try {
