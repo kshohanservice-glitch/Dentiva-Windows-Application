@@ -160,6 +160,7 @@ async function boot(): Promise<void> {
   });
 
   registerRouter({
+    lanServer,
     paths: () => paths,
     session: session_,
     activation,
