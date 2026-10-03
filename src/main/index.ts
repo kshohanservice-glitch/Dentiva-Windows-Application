@@ -25,6 +25,8 @@ const APP_VERSION = ((): string => {
 })();
 
 let mainWindow: BrowserWindow | null = null;
+let activeLanServer: LanServer | null = null;
+let isQuitting = false;
 
 function buildCipher(): Cipher {
   if (safeStorage.isEncryptionAvailable()) {
@@ -97,6 +99,7 @@ async function boot(): Promise<void> {
   // LAN server is opt-in. Existing single-PC installs remain unchanged until
   // the owner explicitly enables LAN mode from the V2 clinic settings.
   const lanServer = new LanServer(db);
+  activeLanServer = lanServer;
 
   const holder: DbHolder = {
     get: () => {
@@ -249,11 +252,20 @@ if (!gotLock) {
     void boot();
   });
 
-  app.on('before-quit', () => {
-    // Best-effort graceful LAN shutdown; the process will exit after this event.
-    void Promise.resolve().then(async () => {
-      // The server is owned by boot; if it was started, process teardown closes it.
-    }).catch(() => undefined);
+  app.on('before-quit', (event) => {
+    if (isQuitting) return;
+    event.preventDefault();
+    isQuitting = true;
+    void (async () => {
+      try {
+        await activeLanServer?.stop();
+      } catch (err) {
+        logger.warn('LAN server shutdown failed', { error: err instanceof Error ? err.message : String(err) });
+      } finally {
+        activeLanServer = null;
+        app.exit(0);
+      }
+    })();
   });
 
   app.on('window-all-closed', () => {
