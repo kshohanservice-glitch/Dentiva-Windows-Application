@@ -30,6 +30,14 @@ jobs:
       ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
     steps:
       - uses: actions/checkout@v4
+      - name: Ensure checkout worktree is materialized
+        shell: bash
+        run: |
+          if [ ! -f package.json ]; then
+            git restore --source=HEAD --worktree --staged .
+          fi
+          test -f package.json
+          test -f package-lock.json
       - uses: actions/setup-node@v4
         with:
           node-version: 22
