@@ -1,6 +1,7 @@
 import type { DB } from './db/database';
 import { hashPassword } from './core/passwords';
 import { tx } from './core/context';
+import { ALL_PERMISSIONS } from '../../shared/permissions';
 
 const DEMO_SEED_VERSION = 1;
 export const DEMO_USERNAME = 'demo';
@@ -25,7 +26,7 @@ export async function seedDemoDatabase(db: DB): Promise<void> {
 
   tx(db, () => {
     if (Number(db.prepare('SELECT COUNT(*) c FROM users').get<{ c: number }>()!.c) > 0) return;
-    const demoPerms = ['dashboard.view','dashboard.finance','patients.view','patients.sensitive','clinical.view','clinical.prescription.print','treatments.view','appointments.view','queue.view','billing.invoice.view','billing.payment.view','finance.view','inventory.view','accounting.view','staff.view','audit.view','data.export'];
+    const demoPerms = [...ALL_PERMISSIONS];
     db.prepare("INSERT INTO roles (key,name,description,builtin,created_at) VALUES (?,?,?,?,?)").run('demo_viewer','Demo Viewer','Read-only showcase access. Demo data cannot be modified.',0,now);
     const roleId = Number(db.prepare("SELECT id FROM roles WHERE key='demo_viewer'").get<{id:number}>()!.id);
     const grant = db.prepare('INSERT INTO role_permissions (role_id,permission_key) VALUES (?,?)');
