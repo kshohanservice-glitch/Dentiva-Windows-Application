@@ -98,9 +98,7 @@ async function boot(): Promise<void> {
 
   // LAN server is opt-in. Existing single-PC installs remain unchanged until
   // the owner explicitly enables LAN mode from the V2 clinic settings.
-  const lanServer = new LanServer(db, readSecurityPolicy());
-  activeLanServer = lanServer;
-
+  
   const holder: DbHolder = {
     get: () => {
       try { return db; } catch { throw new Error('Database unavailable'); }
@@ -118,6 +116,9 @@ async function boot(): Promise<void> {
       return { maxFailedLogins: 5, minPasswordLength: 8 };
     }
   };
+
+  const lanServer = new LanServer(db, readSecurityPolicy());
+  activeLanServer = lanServer;
 
   const session_ = new SessionManager({
     db: () => holder.get(),
