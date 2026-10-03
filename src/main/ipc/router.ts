@@ -75,7 +75,7 @@ async function pickFile(title: string, filters: Electron.FileFilter[]): Promise<
 }
 
 export function registerRouter(deps: RouterDeps): void {
-    const demoBlocked = new Set([
+    const demoBlocked: Set<string> = new Set([
     IPC.activationVerify, IPC.authLogout, IPC.authChangePassword, IPC.authUnlock, IPC.setupComplete, IPC.systemLock,
     IPC.patientsCreate, IPC.patientsUpdate, IPC.patientsArchive, IPC.patientsDelete,
     IPC.visitsCreate, IPC.visitsUpdate, IPC.chartSet,
