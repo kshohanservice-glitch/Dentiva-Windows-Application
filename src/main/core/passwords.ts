@@ -1,6 +1,17 @@
-import { hash, verify } from '@node-rs/argon2';
-import type { Algorithm } from '@node-rs/argon2';
 import { randomBytes } from 'node:crypto';
+import type { Algorithm } from '@node-rs/argon2';
+
+type Argon2Api = { hash: (password: string, options: object) => Promise<string>; verify: (phc: string, password: string) => Promise<boolean> };
+
+function loadArgon2(): Argon2Api {
+  if (process.platform === 'win32' && process.arch === 'x64') {
+    const nativePath = require.resolve('@node-rs/argon2-win32-x64-msvc');
+    return require(nativePath) as Argon2Api;
+  }
+  return require('@node-rs/argon2') as Argon2Api;
+}
+
+const argon2 = loadArgon2();
 
 // Argon2id === 2 (Algorithm enum value inlined: ambient const enums cannot
 // be read as values when isolatedModules is enabled).
@@ -13,12 +24,12 @@ const ARGON_OPTS = {
 
 /** Argon2id password hash (PHC string). Never log or audit the input or output. */
 export async function hashPassword(password: string): Promise<string> {
-  return hash(password, ARGON_OPTS);
+  return argon2.hash(password, ARGON_OPTS);
 }
 
 export async function verifyPassword(phc: string, password: string): Promise<boolean> {
   try {
-    return await verify(phc, password);
+    return await argon2.verify(phc, password);
   } catch {
     return false;
   }
