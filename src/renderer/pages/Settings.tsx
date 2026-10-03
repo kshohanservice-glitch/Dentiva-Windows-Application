@@ -588,15 +588,15 @@ function LanNetworkTab({ toast }: { toast: ReturnType<typeof useToast> }) {
 
   if (loading) return <Spinner label="Loading clinic network…" />;
   return <>
-    <Card title="Clinic Network / LAN Server" subtitle="Use one Windows PC as the clinic server. Keep this on a trusted private network only.">
+    <Card title="Clinic Network / LAN Server" >
       <div className="form-grid">
         <Field label="Enable LAN server" hint="Disabled by default. Do not expose clinical data to public networks.">{() => <label className="checkbox"><input type="checkbox" checked={enabled} onChange={e => setEnabled(e.target.checked)} /><span>Allow other Dentiva Pro devices to connect</span></label>}</Field>
         <Field label="Server name">{id => <Input id={id} value={serverName} onChange={setServerName} maxLength={120} />}</Field>
         <Field label="Port" hint="1024–65535">{id => <Input id={id} type="number" min={1024} max={65535} value={port} onChange={setPort} />}</Field>
       </div>
-      <div className="row gap-2 mt-4"><Button variant="primary" loading={saving} onClick={() => void save()}>Apply network settings</Button><Badge tone={status?.running ? 'success' : 'muted'}>{status?.running ? `Running · :${status.port}` : 'Stopped'}</Badge></div>
+      <div className="row gap-2 mt-4"><Button variant="primary" loading={saving} onClick={() => void save()}>Apply network settings</Button><Badge tone={status?.running ? 'success' : 'neutral'}>{status?.running ? `Running · :${status.port}` : 'Stopped'}</Badge></div>
     </Card>
-    <Card title="Device pairing" subtitle="Generate a short-lived code for a new Dentiva Pro device.">
+    <Card title="Device pairing" >
       <div className="row gap-2"><Button variant="secondary" disabled={!status?.running} onClick={async () => { try { const p = await api['lan/create-pairing-code'](); setPairing(p); toast.success('Pairing code generated'); } catch (err) { toast.fromError(err, 'Could not create pairing code'); } }}>Generate pairing code</Button>{pairing && <Badge tone="success">Code: {pairing.code} · expires {new Date(pairing.expiresAt).toLocaleTimeString()}</Badge>}</div>
     </Card>
     <Card title="Connected devices">
