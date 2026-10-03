@@ -49,6 +49,15 @@ export class LanServer {
 
   constructor(private readonly db: DB, private readonly securityPolicy: SecurityPolicy = { maxFailedLogins: 5, minPasswordLength: 8 }) {}
 
+  configure(input: { enabled: boolean; port: number; serverName: string }): LanServerStatus {
+    const port = Number(input.port);
+    const serverName = String(input.serverName ?? '').trim().slice(0, 120);
+    if (!Number.isInteger(port) || port < 1024 || port > 65535) throw new Error('LAN port must be between 1024 and 65535.');
+    if (!serverName) throw new Error('LAN server name is required.');
+    this.db.prepare('UPDATE lan_config SET enabled = ?, port = ?, server_name = ?, updated_at = ? WHERE id = 1').run(input.enabled ? 1 : 0, port, serverName, new Date().toISOString());
+    return this.getStatus();
+  }
+
   getStatus(): LanServerStatus {
     const row = this.db.prepare(
       'SELECT enabled, port, server_name FROM lan_config WHERE id = 1'
