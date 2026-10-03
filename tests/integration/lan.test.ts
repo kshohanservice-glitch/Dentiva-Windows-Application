@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { cleanupEnv, createTestEnv, type TestEnv } from '../helpers';
 import { LanServer } from '../../src/main/lan-server';
+import { hashPassword } from '../../src/main/core/passwords';
 
 let env: TestEnv;
 let lan: LanServer;
@@ -44,6 +45,37 @@ describe('LAN pairing and sessions', () => {
 
     expect(() => lan.pairDevice('disabled-01', 'Disabled Device', code, '192.168.1.23'))
       .toThrow(/disabled/i);
+  });
+
+  it('binds a paired device session to a real Dentiva user', async () => {
+    const role = env.db.prepare("SELECT id FROM roles WHERE key = 'owner'").get<{ id: number }>();
+    expect(role?.id).toBeTruthy();
+    const now = new Date().toISOString();
+    const passwordHash = await hashPassword('StrongPass123!');
+    const result = env.db.prepare(`
+      INSERT INTO users (username, display_name, password_hash, role_id, status, failed_attempts, created_at, updated_at)
+      VALUES (?, ?, ?, ?, 'active', 0, ?, ?)
+    `).run('lanadmin', 'LAN Admin', passwordHash, role!.id, now, now);
+
+    const { code } = lan.createPairingCode();
+    const paired = lan.pairDevice('auth-01', 'Auth Device', code, '192.168.1.30');
+
+    const authenticated = await lan.loginUser(paired.sessionToken, 'lanadmin', 'StrongPass123!', {
+      maxFailedLogins: 5,
+      minPasswordLength: 8,
+    });
+    expect(authenticated?.deviceId).toBe('auth-01');
+    expect(authenticated?.user.username).toBe('lanadmin');
+
+    const session = lan.authenticate(paired.sessionToken);
+    expect(session?.userId).toBe(Number(result.lastInsertRowid));
+  });
+
+  it('rejects LAN login with an invalid device session', async () => {
+    await expect(lan.loginUser('invalid-token', 'nobody', 'wrong-password', {
+      maxFailedLogins: 5,
+      minPasswordLength: 8,
+    })).resolves.toBeNull();
   });
 
   it('revokes a device and invalidates its active session', () => {
