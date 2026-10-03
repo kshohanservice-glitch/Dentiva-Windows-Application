@@ -66,8 +66,10 @@ export function AppProvider(props: { children: React.ReactNode }) {
       setSystem(sys);
       setActivation(act);
       setUser(session);
-      if (sys.demo) setPhase('ready');
-      else if (!act.activated) setPhase('activation');
+      if (sys.demo) {
+        setPhase('ready');
+        void refreshSettings();
+      } else if (!act.activated) setPhase('activation');
       else if (setup.needsSetup) setPhase('setup');
       else if (!session) setPhase('auth');
       else {
