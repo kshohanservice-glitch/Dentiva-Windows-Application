@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import crypto from 'node:crypto';
 import { cleanupEnv, createTestEnv, type TestEnv } from '../helpers';
 import { LanServer } from '../../src/main/lan-server';
 import { hashPassword } from '../../src/main/core/passwords';
@@ -76,6 +77,14 @@ describe('LAN pairing and sessions', () => {
       maxFailedLogins: 5,
       minPasswordLength: 8,
     })).resolves.toBeNull();
+  });
+
+  it('rejects an expired device session', () => {
+    const { code } = lan.createPairingCode();
+    const paired = lan.pairDevice('expired-session-01', 'Expired Session Device', code, '192.168.1.26');
+    env.db.prepare('UPDATE lan_sessions SET expires_at = ? WHERE token_hash = ?')
+      .run(new Date(Date.now() - 1000).toISOString(), crypto.createHash('sha256').update(paired.sessionToken, 'utf8').digest('hex'));
+    expect(lan.authenticate(paired.sessionToken)).toBeNull();
   });
 
   it('revokes a device and invalidates its active session', () => {
