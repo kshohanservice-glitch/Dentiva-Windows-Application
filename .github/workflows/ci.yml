@@ -164,7 +164,7 @@ jobs:
       - name: Verify Windows Argon2 native binding is packaged
         shell: pwsh
         run: |
-          $native = Get-ChildItem -Recurse -File dist\\win-unpacked -Filter 'argon2.win32-x64-msvc.node' -ErrorAction SilentlyContinue | Select-Object -First 1
+          $native = Get-ChildItem -Recurse -File release\\win-unpacked -Filter 'argon2.win32-x64-msvc.node' -ErrorAction SilentlyContinue | Select-Object -First 1
           if (-not $native) {
             Write-Host "::error title=Argon2 native binding missing::The Windows Argon2 x64 native binding was not included in the packaged app."
             exit 1
@@ -213,19 +213,19 @@ jobs:
         run: |
           $exe = Get-ChildItem dist\*.exe | Select-Object -First 1
           $hash = (Get-FileHash $exe.FullName -Algorithm SHA256).Hash.ToLower()
-          "$hash  $($exe.Name)" | Out-File -Encoding ascii dist/SHA256SUMS.txt
-          Get-Content dist/SHA256SUMS.txt
+          "$hash  $($exe.Name)" | Out-File -Encoding ascii release/SHA256SUMS.txt
+          Get-Content release/SHA256SUMS.txt
       - uses: actions/upload-artifact@v4
         with:
           name: DentivaPro-Windows-NSIS
           path: |
-            dist/*.exe
-            dist/SHA256SUMS.txt
+            release/*.exe
+            release/SHA256SUMS.txt
           retention-days: 30
       - name: Installer payload size report (top 20)
         shell: pwsh
         run: |
-          $root = (Get-ChildItem -Directory dist | Where-Object { Test-Path (Join-Path $_.FullName 'Dentiva Pro.exe') } | Select-Object -First 1)
+          $root = (Get-ChildItem -Directory release | Where-Object { Test-Path (Join-Path $_.FullName 'Dentiva Pro.exe') } | Select-Object -First 1)
           if ($root) {
             $files = Get-ChildItem -Recurse -File $root.FullName | Sort-Object Length -Descending | Select-Object -First 20
             foreach ($f in $files) {
@@ -235,7 +235,7 @@ jobs:
             $total = (Get-ChildItem -Recurse -File $root.FullName | Measure-Object Length -Sum).Sum
             Write-Host "win-unpacked total: $total bytes"
           }
-          Get-ChildItem dist -File | ForEach-Object { Write-Host "dist/$($_.Name): $($_.Length) bytes" }
+          Get-ChildItem release -File | ForEach-Object { Write-Host "release/$($_.Name): $($_.Length) bytes" }
 
       - name: Create or update GitHub Release
         if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/heads/arena/'))
@@ -248,7 +248,7 @@ jobs:
           $expectedExe = Join-Path (Get-Location) "dist\DentivaPro-Setup-$ver.exe"
           if (!(Test-Path $expectedExe)) { throw "Expected versioned installer not found: $expectedExe" }
           $exe = (Resolve-Path $expectedExe).Path
-          $sums = (Resolve-Path dist/SHA256SUMS.txt).Path
+          $sums = (Resolve-Path release/SHA256SUMS.txt).Path
           gh release view $tag *> $null
           if ($LASTEXITCODE -ne 0) {
             gh release create $tag $exe $sums `
