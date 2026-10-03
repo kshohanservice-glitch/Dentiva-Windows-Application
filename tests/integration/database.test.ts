@@ -70,7 +70,6 @@ describe('database migrations & seeds', () => {
   });
 
   it('rejects negative inventory batch quantities via CHECK', () => {
-    // Simulate direct tampering — constraints hold even below the service layer.
     const existing = env.db.prepare("SELECT value_json FROM settings WHERE key = 'clinic'").get();
     expect(existing).toBeTruthy();
     expect(() =>
@@ -82,7 +81,6 @@ describe('database migrations & seeds', () => {
     env.db.close();
     const res = fullIntegrityCheck(env.paths.dbFile);
     expect(res.ok).toBe(true);
-    // reopen for afterEach cleanup
     env.db = openDatabase(env.paths.dbFile, { runMigrations: false }).db;
   });
 });
