@@ -11,6 +11,10 @@ const app = await electron.launch({ executablePath: exePath, args: [], timeout: 
 try {
   const page = await app.firstWindow({ timeout: 90_000 });
   await page.waitForLoadState('domcontentloaded');
+  await page.waitForTimeout(5000);
+  console.log('DEMO PAGE URL:', page.url());
+  console.log('DEMO PAGE TITLE:', await page.title());
+  console.log('DEMO BODY:', (await page.locator('body').innerText()).slice(0, 4000));
   await page.getByText('BrightSmile Dental Clinic — Demo').waitFor({ state: 'visible', timeout: 90_000 });
   await page.getByText('Arif Hossain').waitFor({ state: 'visible', timeout: 30_000 });
   await page.evaluate(() => { window.location.hash = '#/patients'; });
