@@ -1,6 +1,7 @@
 import http from 'node:http';
 import crypto from 'node:crypto';
 import type { DB } from './db/database';
+import { login as loginUser, type SecurityPolicy } from './services/auth';
 
 const PAIRING_TTL_MS = 10 * 60 * 1000;
 const SESSION_TTL_MS = 12 * 60 * 60 * 1000;
@@ -121,6 +122,27 @@ export class LanServer {
           });
           return;
         }
+        if (req.method === 'POST' && url.pathname === '/api/lan/auth/login') {
+          let body = ''; let bodyBytes = 0; let tooLarge = false; let responded = false;
+          req.setEncoding('utf8');
+          req.on('data', (chunk) => { bodyBytes += Buffer.byteLength(chunk, 'utf8'); if (bodyBytes > MAX_BODY_BYTES) { tooLarge = true; if (!responded) { responded = true; json(res, 413, { ok: false, error: 'REQUEST_TOO_LARGE' }); } req.destroy(); return; } body += chunk; });
+          req.on('end', async () => {
+            if (tooLarge || responded) return;
+            try {
+              const auth = String(req.headers.authorization ?? ''); const token = auth.startsWith('Bearer ') ? auth.slice(7) : '';
+              const input = JSON.parse(body) as { username?: string; password?: string };
+              const result = await this.loginUser(token, String(input.username ?? ''), String(input.password ?? ''), { maxFailedLogins: 5, minPasswordLength: 8 });
+              if (!result) { if (!responded) { responded = true; json(res, 401, { ok: false, error: 'INVALID_CREDENTIALS_OR_SESSION' }); } return; }
+              if (!responded) { responded = true; json(res, 200, { ok: true, deviceId: result.deviceId, user: result.user }); }
+            } catch (err) { if (!responded) { responded = true; json(res, 401, { ok: false, error: err instanceof Error ? err.message : 'LOGIN_FAILED' }); } }
+          });
+          return;
+        }
+        if (req.method === 'POST' && url.pathname === '/api/lan/auth/logout') {
+          const auth = String(req.headers.authorization ?? ''); const token = auth.startsWith('Bearer ') ? auth.slice(7) : '';
+          if (!this.logoutUser(token)) { json(res, 401, { ok: false, error: 'UNAUTHORIZED' }); return; }
+          json(res, 200, { ok: true }); return;
+        }
         if (req.method === 'GET' && url.pathname === '/api/lan/session') {
           const auth = String(req.headers.authorization ?? '');
           const token = auth.startsWith('Bearer ') ? auth.slice(7) : '';
@@ -226,6 +248,22 @@ export class LanServer {
     const now = new Date().toISOString();
     this.db.prepare(`UPDATE lan_devices SET status = 'revoked', revoked_at = ?, updated_at = ? WHERE device_id = ?`).run(now, now, deviceId);
     this.db.prepare(`UPDATE lan_sessions SET revoked_at = ? WHERE device_id IN (SELECT id FROM lan_devices WHERE device_id = ?) AND revoked_at IS NULL`).run(now, deviceId);
+  }
+
+  async loginUser(rawToken: string, username: string, password: string, policy: SecurityPolicy): Promise<{ deviceId: string; user: import('../shared/types').SessionUser } | null> {
+    const session = this.authenticate(rawToken);
+    if (!session) return null;
+    const result = await loginUser(this.db, username, password, policy);
+    if (!result.ok || result.userId == null) return null;
+    this.db.prepare('UPDATE lan_sessions SET user_id = ?, last_seen_at = ? WHERE token_hash = ? AND revoked_at IS NULL').run(result.userId, new Date().toISOString(), tokenHash(rawToken));
+    return { deviceId: session.deviceId, user: result.user };
+  }
+
+  logoutUser(rawToken: string): boolean {
+    const session = this.authenticate(rawToken);
+    if (!session) return false;
+    this.db.prepare('UPDATE lan_sessions SET user_id = NULL, last_seen_at = ? WHERE token_hash = ? AND revoked_at IS NULL').run(new Date().toISOString(), tokenHash(rawToken));
+    return true;
   }
 
   authenticate(rawToken: string): { deviceId: string; userId: number | null } | null {
