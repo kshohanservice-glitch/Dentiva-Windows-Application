@@ -33,6 +33,7 @@ import { closePrintWindow, executePrint, listPrinters, openPrintWindow, saveAsPd
 import { toCsv } from '../../shared/csv';
 import type { AppPaths } from '../paths';
 import { getDb } from '../app';
+import type { LanServer } from '../lan-server';
 
 export interface RouterDeps {
   paths: () => AppPaths;
@@ -44,6 +45,7 @@ export interface RouterDeps {
   schemaVersion: () => number;
   refreshNotifications: () => void;
   demo: boolean;
+  lanServer: LanServer;
 }
 
 type Result<T> = { ok: true; data: T } | { ok: false; error: ReturnType<typeof toWireError> };
@@ -126,6 +128,23 @@ export function registerRouter(deps: RouterDeps): void {
   };
 
   /* --------------------------- unauthenticated -------------------------- */
+  handle(IPC.lanStatus, { auth: true, fn: (_p, ctx) => {
+    if (!ctx!.session.permissions.includes('settings.manage')) throw new AppError('PERMISSION', 'This action requires the "settings.manage" permission.');
+    return deps.lanServer.getStatus();
+  } });
+  handle(IPC.lanCreatePairingCode, { auth: true, fn: (_p, ctx) => {
+    if (!ctx!.session.permissions.includes('settings.manage')) throw new AppError('PERMISSION', 'This action requires the "settings.manage" permission.');
+    const result = deps.lanServer.createPairingCode();
+    audit(ctx!, { action: 'lan.pairing_code.create', entityType: 'system', entityId: null, summary: 'LAN device pairing code generated' });
+    return result;
+  } });
+  handle(IPC.lanRevokeDevice, { auth: true, fn: (p, ctx) => {
+    if (!ctx!.session.permissions.includes('settings.manage')) throw new AppError('PERMISSION', 'This action requires the "settings.manage" permission.');
+    deps.lanServer.revokeDevice(String(p?.deviceId ?? ''));
+    audit(ctx!, { action: 'lan.device.revoke', entityType: 'lan_device', entityId: String(p?.deviceId ?? ''), summary: 'LAN device revoked' });
+    return { ok: true as const };
+  } });
+
   handle(IPC.systemInfo, { auth: false, fn: () => ({
     version: deps.appVersion,
     schemaVersion: deps.schemaVersion(),
