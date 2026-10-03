@@ -24,13 +24,14 @@
   "dependencies": {
     "@fontsource/inter": "^5.1.0",
     "@fontsource/noto-sans-bengali": "^5.1.0",
-    "@node-rs/argon2": "^2.0.2",
+    "@node-rs/argon2": "2.2.1",
     "archiver": "^7.0.1",
     "better-sqlite3": "^13.0.3",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "react-router-dom": "^7.18.4",
-    "unzipper": "^0.12.3"
+    "unzipper": "^0.12.3",
+    "@node-rs/argon2-win32-x64-msvc": "2.2.1"
   },
   "devDependencies": {
     "@eslint/js": "^9.17.0",
@@ -54,5 +55,12 @@
     "typescript-eslint": "^8.18.2",
     "vite": "^6.0.7",
     "vitest": "^5.0.2"
+  },
+  "build": {
+    "asar": {
+      "unpack": [
+        "**/*.node"
+      ]
+    }
   }
 }
