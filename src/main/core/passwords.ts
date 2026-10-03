@@ -5,9 +5,12 @@ type Argon2Api = { hash: (password: string, options: object) => Promise<string>;
 
 function loadArgon2(): Argon2Api {
   if (process.platform === 'win32' && process.arch === 'x64') {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
     const nativePath = require.resolve('@node-rs/argon2-win32-x64-msvc');
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
     return require(nativePath) as Argon2Api;
   }
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
   return require('@node-rs/argon2') as Argon2Api;
 }
 
