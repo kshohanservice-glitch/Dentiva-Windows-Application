@@ -19,6 +19,7 @@ export type LanServerStatus = {
 };
 
 export type LanPairingResult = { deviceId: string; deviceName: string; sessionToken: string; expiresAt: string };
+export type LanDevice = { deviceId: string; deviceName: string; status: string; lastIp: string | null; lastSeenAt: string | null; approvedAt: string | null; revokedAt: string | null };
 
 type ConfigRow = {
   enabled: number;
@@ -64,6 +65,11 @@ export class LanServer {
     };
   }
 
+  listDevices(): LanDevice[] {
+    const rows = this.db.prepare(`SELECT device_id, device_name, status, last_ip, last_seen_at, approved_at, revoked_at FROM lan_devices ORDER BY COALESCE(last_seen_at, created_at) DESC`).all() as Array<Record<string, unknown>>;
+    return rows.map((row) => ({ deviceId: String(row.device_id), deviceName: String(row.device_name), status: String(row.status), lastIp: row.last_ip == null ? null : String(row.last_ip), lastSeenAt: row.last_seen_at == null ? null : String(row.last_seen_at), approvedAt: row.approved_at == null ? null : String(row.approved_at), revokedAt: row.revoked_at == null ? null : String(row.revoked_at) }));
+  }
+
   async start(): Promise<void> {
     if (this.server) return;
     const row = this.db.prepare(
@@ -93,11 +99,13 @@ export class LanServer {
           let body = '';
           let bodyBytes = 0;
           let tooLarge = false;
+          let responded = false;
           req.setEncoding('utf8');
           req.on('data', (chunk) => {
             bodyBytes += Buffer.byteLength(chunk, 'utf8');
             if (bodyBytes > MAX_BODY_BYTES) {
               tooLarge = true;
+              if (!responded) { responded = true; json(res, 413, { ok: false, error: 'REQUEST_TOO_LARGE' }); }
               req.destroy();
               return;
             }
@@ -105,11 +113,11 @@ export class LanServer {
           });
           req.on('end', () => {
             try {
-              if (tooLarge) { json(res, 413, { ok: false, error: 'REQUEST_TOO_LARGE' }); return; }
+              if (tooLarge || responded) return;
               const input = JSON.parse(body) as { deviceId?: string; deviceName?: string; pairingCode?: string };
               const result = this.pairDevice(String(input.deviceId ?? ''), String(input.deviceName ?? ''), String(input.pairingCode ?? ''), req.socket.remoteAddress ?? null);
-              json(res, 200, { ok: true, ...result });
-            } catch (err) { json(res, 401, { ok: false, error: err instanceof Error ? err.message : 'PAIRING_FAILED' }); }
+              if (!responded) { responded = true; json(res, 200, { ok: true, ...result }); }
+            } catch (err) { if (!responded) { responded = true; json(res, 401, { ok: false, error: err instanceof Error ? err.message : 'PAIRING_FAILED' }); } }
           });
           return;
         }
