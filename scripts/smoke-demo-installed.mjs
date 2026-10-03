@@ -16,9 +16,9 @@ try {
   console.log('DEMO PAGE TITLE:', await page.title());
   console.log('DEMO BODY:', (await page.locator('body').innerText()).slice(0, 4000));
   await page.getByText('BrightSmile Dental Clinic — Demo').first().waitFor({ state: 'visible', timeout: 90_000 });
-  await page.getByText('Arif Hossain').waitFor({ state: 'visible', timeout: 30_000 });
+  await page.getByText('Arif Hossain').first().waitFor({ state: 'visible', timeout: 30_000 });
   await page.evaluate(() => { window.location.hash = '#/patients'; });
-  await page.getByText('Nabila Sultana').waitFor({ state: 'visible', timeout: 30_000 });
+  await page.getByText('Nabila Sultana').first().waitFor({ state: 'visible', timeout: 30_000 });
   const mutation = await page.evaluate(async () => {
     try {
       await window.dentiva['patients/create']({ name: 'SHOULD NOT SAVE', gender: 'unknown' });
