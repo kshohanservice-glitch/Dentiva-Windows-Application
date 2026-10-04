@@ -101,7 +101,7 @@ export function saveSettings(ctx: Ctx, patch: Partial<SettingsDTO>): SettingsDTO
         footerMessage: patch.prescription.footerMessage !== undefined ? patch.prescription.footerMessage : current.footerMessage ?? null,
         visitingHours: patch.prescription.visitingHours !== undefined ? patch.prescription.visitingHours : current.visitingHours ?? null,
         labels,
-        signatureReserved: true,
+        signatureReserved: patch.prescription.signatureReserved !== undefined ? !!patch.prescription.signatureReserved : current.signatureReserved ?? true,
       });
     }
 
