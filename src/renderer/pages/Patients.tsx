@@ -719,7 +719,7 @@ export function RxDetailModal(props: { rx: PrescriptionDTO; onClose: () => void;
             toast.fromError(err, 'Could not delete prescription');
           }
         }}
-      />
+      />}
     </Modal>
   );
 }
