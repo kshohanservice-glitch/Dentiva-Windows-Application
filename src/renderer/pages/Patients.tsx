@@ -10,7 +10,7 @@ import { Field, Input, Select, Textarea, useForm } from '../components/forms';
 import { DataTable, TableToolbar, type Column } from '../components/table';
 import { Icon } from '../components/shell';
 import { ToothChart } from '../components/ToothChart';
-import { bdt, isoDate, localDateTime } from '../format';
+import { bdt, formatDate, isoDate, localDateTime } from '../format';
 import type { DuplicateCandidate, PatientDTO, PatientFilters, PatientDetailDTO, PrescriptionDTO, TreatmentDTO } from '../../shared/types';
 import type { PatientInputPayload } from '../../shared/ipc';
 
@@ -321,7 +321,7 @@ export function PatientsPage() {
     },
     { key: 'phone', label: 'Phone', render: (r) => <span className="mono">{r.phone ?? '—'}</span> },
     { key: 'age', label: 'Age / Sex', sortValue: (r) => r.ageYears ?? 999, render: (r) => `${r.ageText ?? (r.ageYears != null ? `${r.ageYears}y` : '—')} · ${r.gender}` },
-    { key: 'lastVisit', label: 'Last visit', sortValue: (r) => r.lastVisitAt ?? '', render: (r) => (r.lastVisitAt ? new Date(r.lastVisitAt).toLocaleDateString() : <span className="muted">never</span>) },
+    { key: 'lastVisit', label: 'Last visit', sortValue: (r) => r.lastVisitAt ?? '', render: (r) => (r.lastVisitAt ? formatDate(r.lastVisitAt) : <span className="muted">never</span>) },
     { key: 'visits', label: 'Visits', align: 'right', sortValue: (r) => r.visitCount, render: (r) => <span className="num">{r.visitCount}</span> },
     { key: 'status', label: 'Status', render: (r) => <Badge tone={r.status === 'active' ? 'success' : r.status === 'blocked' ? 'danger' : 'neutral'}>{r.status}</Badge> },
     { key: 'city', label: 'Area', clip: true, render: (r) => r.city ?? r.address ?? '—' },
@@ -460,7 +460,7 @@ export function PatientProfilePage() {
             {patient.bloodGroup && <span>Blood {patient.bloodGroup}</span>}
             <span>{patient.phone ?? 'no phone'}</span>
             <span>{patient.city ?? patient.address ?? ''}</span>
-            <span>Registered {new Date(patient.registrationDate).toLocaleDateString()}</span>
+            <span>Registered {formatDate(patient.registrationDate)}</span>
             <span>{patient.visitCount} visit{patient.visitCount === 1 ? '' : 's'}</span>
             {patient.preferredDentistName && <span>Preferred: {patient.preferredDentistName}</span>}
           </div>
@@ -637,7 +637,7 @@ function VisitsTab(props: { patientId: number; refreshKey?: number; onCreate: ()
             {v.diagnosis && <div className="small mt-2"><strong>Diagnosis:</strong> {v.diagnosis}</div>}
             {v.treatmentPlan && <div className="small"><strong>Plan:</strong> {v.treatmentPlan}</div>}
             {v.advice && <div className="small"><strong>Advice:</strong> {v.advice}</div>}
-            {v.followUpDate && <div className="xsmall muted">Follow-up: {new Date(v.followUpDate).toLocaleDateString()}</div>}
+            {v.followUpDate && <div className="xsmall muted">Follow-up: {formatDate(v.followUpDate)}</div>}
           </div>
         ))
       )}
@@ -670,7 +670,7 @@ export function RxDetailModal(props: { rx: PrescriptionDTO; onClose: () => void 
     >
       <div className="kv-list mb-4">
         <div className="kv"><span className="k">Patient</span><span className="v">{rx.patientName} ({rx.patientCode})</span></div>
-        <div className="kv"><span className="k">Date</span><span className="v">{new Date(rx.date).toLocaleDateString()}</span></div>
+        <div className="kv"><span className="k">Date</span><span className="v">{formatDate(rx.date)}</span></div>
         <div className="kv"><span className="k">Dentist</span><span className="v">{rx.dentistName}</span></div>
         {rx.diagnosis && <div className="kv"><span className="k">Diagnosis</span><span className="v">{rx.diagnosis}</span></div>}
         {rx.cC && <div className="kv"><span className="k">C/C</span><span className="v">{rx.cC}</span></div>}
@@ -678,7 +678,7 @@ export function RxDetailModal(props: { rx: PrescriptionDTO; onClose: () => void 
         {rx.rE && <div className="kv"><span className="k">R/E</span><span className="v">{rx.rE}</span></div>}
         {rx.treatment && <div className="kv"><span className="k">Treatment</span><span className="v">{rx.treatment}</span></div>}
         {rx.advice && <div className="kv"><span className="k">Advice</span><span className="v">{rx.advice}</span></div>}
-        {rx.followUp && <div className="kv"><span className="k">Follow-up</span><span className="v">{new Date(rx.followUp).toLocaleDateString()}</span></div>}
+        {rx.followUp && <div className="kv"><span className="k">Follow-up</span><span className="v">{formatDate(rx.followUp)}</span></div>}
       </div>
       <table className="table">
         <thead>
@@ -719,7 +719,7 @@ function PrescriptionsForPatient(props: { patientId: number; refreshKey?: number
             <span className="flex-1">
               <strong className="mono">{rx.number}</strong>
               <div className="xsmall muted">
-                {new Date(rx.date).toLocaleDateString()} · {rx.dentistName} · {rx.items.length} medicine{rx.items.length === 1 ? '' : 's'}
+                {formatDate(rx.date)} · {rx.dentistName} · {rx.items.length} medicine{rx.items.length === 1 ? '' : 's'}
               </div>
             </span>
             <span className="small muted truncate" style={{ maxWidth: 320 }}>
@@ -748,7 +748,7 @@ function InvoicesForPatient(props: { patientId: number; refreshKey?: number; onO
       {items.map((inv) => (
         <div className="list-row clickable" key={inv.id} onClick={() => props.onOpen(inv.id)}>
           <span className="mono strong">{inv.number}</span>
-          <span className="flex-1 xsmall muted">{new Date(inv.date).toLocaleDateString()} · {inv.items.length} line(s)</span>
+          <span className="flex-1 xsmall muted">{formatDate(inv.date)} · {inv.items.length} line(s)</span>
           <span className="num small">{bdt(inv.totalPaisa)}</span>
           <Badge tone={inv.status === 'paid' ? 'success' : inv.status === 'voided' ? 'danger' : inv.status === 'partial' ? 'warning' : 'info'}>{inv.status}</Badge>
         </div>
@@ -1024,6 +1024,7 @@ export function RxFormModal(props: { patientId: number; visitId?: number | null;
   const patientId = props.patientId;
   const { values, set, validate, errors } = useForm({
     dentistId: '', date: isoDate(new Date()), cC: '', oE: '', rE: '', diagnosis: '', treatment: '', advice: '', followUp: '',
+    ccOther: '', oeOther: '',
     items: [{ medicineName: '', strength: '', dosage: '', frequency: '', duration: '', generic: '', form: '', qty: '', instruction: '' }] as {
       medicineName: string; strength: string; dosage: string; frequency: string; duration: string; generic: string; form: string; qty: string; instruction: string;
     }[],
@@ -1079,7 +1080,8 @@ export function RxFormModal(props: { patientId: number; visitId?: number | null;
         visitId: props.visitId ?? null,
         dentistId: Number(values.dentistId),
         date: values.date,
-        cC: values.cC || null, oE: values.oE || null, rE: values.rE || null,
+        cC: (values.cC === 'Other' ? values.ccOther : values.cC) || null,
+        oE: (values.oE === 'Other' ? values.oeOther : values.oE) || null, rE: values.rE || null,
         diagnosis: values.diagnosis || null, treatment: values.treatment || null,
         advice: values.advice || null, followUp: values.followUp || null,
         items: values.items.filter((i) => i.medicineName.trim()),
@@ -1145,11 +1147,55 @@ export function RxFormModal(props: { patientId: number; visitId?: number | null;
           )}
         </Field>
         <Field label={<>C/C <span className="muted">(chief complaint)</span></>} className="span-2">
-          {(id) => <Input id={id} value={values.cC} onChange={(v) => set('cC', v)} />}
+          {(id) => (
+            <Select
+              id={id}
+              value={values.cC}
+              onChange={(v) => set('cC', v)}
+              placeholder="Select chief complaint…"
+              options={[
+                { value: 'Pain On', label: 'Pain On' },
+                { value: 'G. Carries', label: 'G. Carries' },
+                { value: 'Swelling', label: 'Swelling' },
+                { value: 'Gum Bleeding', label: 'Gum Bleeding' },
+                { value: 'Bad Breath', label: 'Bad Breath' },
+                { value: 'Sensitivity', label: 'Sensitivity' },
+                { value: 'Other', label: 'Other' },
+              ]}
+            />
+          )}
         </Field>
+        {values.cC === 'Other' && (
+          <Field label="C/C — Other" className="span-2">
+            {(id) => <Input id={id} value={values.ccOther} onChange={(v) => set('ccOther', v)} placeholder="Write the chief complaint…" />}
+          </Field>
+        )}
         <Field label={<>O/E <span className="muted">(on examination)</span></>} className="span-2">
-          {(id) => <Textarea id={id} rows={2} value={values.oE} onChange={(v) => set('oE', v)} />}
+          {(id) => (
+            <Select
+              id={id}
+              value={values.oE}
+              onChange={(v) => set('oE', v)}
+              placeholder="Select examination finding…"
+              options={[
+                { value: 'Carries/G.Carries', label: 'Carries/G.Carries' },
+                { value: 'BDR/BDC', label: 'BDR/BDC' },
+                { value: 'Gingivitis', label: 'Gingivitis' },
+                { value: 'Parodental Pocket', label: 'Parodental Pocket' },
+                { value: 'Perio Dontitis', label: 'Perio Dontitis' },
+                { value: 'Plupitis', label: 'Plupitis' },
+                { value: 'Impected Teeth', label: 'Impected Teeth' },
+                { value: 'Dry Socket', label: 'Dry Socket' },
+                { value: 'Attrition/Errosion', label: 'Attrition/Errosion' },
+              ]}
+            />
+          )}
         </Field>
+        {values.oE === 'Other' && (
+          <Field label="O/E — Other" className="span-2">
+            {(id) => <Input id={id} value={values.oeOther} onChange={(v) => set('oeOther', v)} placeholder="Write the examination finding…" />}
+          </Field>
+        )}
         <Field label={<>R/E <span className="muted">(radiographic examination)</span></>} className="span-2">
           {(id) => <Textarea id={id} rows={2} value={values.rE} onChange={(v) => set('rE', v)} />}
         </Field>
