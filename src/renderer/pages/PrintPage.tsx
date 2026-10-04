@@ -237,7 +237,7 @@ function receiptDoc(data: any): React.ReactNode {
   const lastPayment = payments?.[payments.length - 1];
   return (
     <>
-      <Header clinic={clinic} right={<><div><b>Receipt</b></div><div>{formatDate()}</div></>} />
+      <Header clinic={clinic} right={<><div><b>Receipt</b></div><div>{formatDate(new Date())}</div></>} />
       <div className="doc-title">Payment Receipt</div>
       <div className="print-kv">
         <div><span className="k">Received from</span><span className="v">{invoice.patientName}</span></div>
