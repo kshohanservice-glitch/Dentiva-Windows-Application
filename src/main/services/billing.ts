@@ -149,6 +149,24 @@ export function createInvoice(ctx: Ctx, raw: unknown): InvoiceDTO {
   return getInvoice(ctx, id);
 }
 
+export function deleteInvoice(ctx: Ctx, id: number): { ok: boolean } {
+  requirePermission(ctx, 'data.delete');
+  const row = ctx.db.prepare('SELECT id, number, patient_id, status FROM invoices WHERE id = ? AND deleted_at IS NULL').get(id) as { id: number; number: string; patient_id: number; status: string } | undefined;
+  if (!row) throw notFound('Invoice not found.');
+  const payment = ctx.db.prepare('SELECT 1 FROM payments WHERE invoice_id = ? LIMIT 1').get(id);
+  if (payment) throw conflict('This invoice has payment history. Void/refund it instead of deleting it.');
+  tx(ctx.db, () => {
+    ctx.db.prepare('UPDATE invoices SET deleted_at = ? WHERE id = ?').run(nowISO(), id);
+    ctx.db.prepare('UPDATE visits SET invoice_id = NULL WHERE invoice_id = ?').run(id);
+    audit(ctx, {
+      action: 'invoice.delete', entityType: 'invoice', entityId: id,
+      summary: `Invoice ${row.number} deleted manually`,
+      before: { number: row.number, patientId: row.patient_id, status: row.status },
+    });
+  });
+  return { ok: true };
+}
+
 export function voidInvoice(ctx: Ctx, id: number, reason: string): InvoiceDTO {
   requirePermission(ctx, 'billing.invoice.void');
   const row = ctx.db.prepare('SELECT * FROM invoices WHERE id = ? AND deleted_at IS NULL').get(id) as InvoiceRow | undefined;
