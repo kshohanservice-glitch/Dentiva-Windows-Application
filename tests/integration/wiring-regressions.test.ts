@@ -43,7 +43,7 @@ describe('wiring regressions', () => {
 
   it('referral save/list is reachable end-to-end for a patient', () => {
     const ctx = ownerCtx(env);
-    const patient = createPatient(ctx, { name: 'Referral Wiring', gender: 'female', ageYears: 40, forceCreate: true });
+    const patient = createPatient(ctx, { name: 'Referral Wiring', gender: 'female', ageYears: 40, phone1: '01700000003', forceCreate: true });
     const saved = saveReferral(ctx, {
       patientId: patient.id,
       direction: 'out',
