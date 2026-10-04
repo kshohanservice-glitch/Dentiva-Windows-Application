@@ -1,4 +1,5 @@
 import { useEffect } from 'react';
+import { formatDate } from '../format';
 import { useNavigate } from 'react-router-dom';
 import { api, useAsync, useInterval } from '../api';
 import { useApp } from '../state/app-context';
@@ -49,7 +50,7 @@ export function DashboardPage() {
         <div>
           <h1 className="page-title">{greeting}, {user?.displayName?.split(' ')[0] ?? 'there'}</h1>
           <p className="page-sub">
-            {settings?.clinic.clinicName} · {new Date().toLocaleDateString(undefined, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+            {settings?.clinic.clinicName} · {formatDate(new Date())}
           </p>
         </div>
         <div className="row gap-2 wrap">
@@ -118,7 +119,7 @@ export function DashboardPage() {
                       <strong>{p.name}</strong>
                       <div className="xsmall muted mono">{p.code}</div>
                     </span>
-                    <span className="xsmall muted">{new Date(p.at).toLocaleDateString()}</span>
+                    <span className="xsmall muted">{formatDate(p.at)}</span>
                   </div>
                 ))}
               </div>
