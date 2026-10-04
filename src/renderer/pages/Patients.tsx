@@ -709,7 +709,7 @@ export function RxDetailModal(props: { rx: PrescriptionDTO; onClose: () => void;
         body={`Prescription ${rx.number} will be hidden from the records and cannot be restored from the app.`}
         confirmLabel="Delete prescription"
         danger
-        onClose={() => setDeleteOpen(false)}
+        onCancel={() => setDeleteOpen(false)}
         onConfirm={async () => {
           try {
             await api['prescriptions/delete'](rx.id);
