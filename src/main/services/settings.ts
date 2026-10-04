@@ -5,7 +5,8 @@ import type { PrintProfile, SettingsDTO } from '../../shared/types';
 import { forbidden, validation } from '../errors';
 import { audit, requirePermission, tx } from '../core/context';
 import { ensureDir, safeResolve } from '../paths';
-import { nowISO } from '../../shared/currency';
+import { nowISO, todayISO } from '../../shared/currency';
+import { peekNextInvoiceNumber, parseInvoiceNumber } from '../core/sequences';
 import { reqString } from '../core/validate';
 
 function readSetting<T>(ctx: Ctx, key: string, fallback: T): T {
@@ -47,7 +48,8 @@ export function getSettings(ctx: Ctx): SettingsDTO {
   const clinic = readSetting(ctx, 'clinic', {} as SettingsDTO['clinic']);
   const logoDataUrl = clinicLogoDataUrl(ctx, clinic.logoPath);
   const prescription = readSetting(ctx, 'prescription', {} as SettingsDTO['prescription']);
-  const invoice = readSetting(ctx, 'invoice', {} as SettingsDTO['invoice']);
+  const rawInvoice = readSetting(ctx, 'invoice', {} as Partial<SettingsDTO['invoice']>);
+  const invoice = { ...rawInvoice, nextNumber: rawInvoice.nextNumber || peekNextInvoiceNumber(ctx.db, todayISO()) } as SettingsDTO['invoice'];
   const security = readSetting<SettingsDTO['security']>(ctx, 'security', { autoLockMinutes: 10, minPasswordLength: 8, maxFailedLogins: 5 });
   const backup = readSetting<SettingsDTO['backup']>(ctx, 'backup', { autoFrequencyDays: 7, destination: null, retention: 10 });
   const appearance = readSetting<SettingsDTO['appearance']>(ctx, 'appearance', { theme: 'light', density: 'comfortable', animations: true, sidebarCollapsed: false });
@@ -107,7 +109,10 @@ export function saveSettings(ctx: Ctx, patch: Partial<SettingsDTO>): SettingsDTO
 
     if (patch.invoice) {
       const current = readSetting<SettingsDTO['invoice']>(ctx, 'invoice', {} as any);
+      const nextNumber = patch.invoice.nextNumber !== undefined ? String(patch.invoice.nextNumber).trim() : current.nextNumber;
+      if (nextNumber && !parseInvoiceNumber(nextNumber)) throw validation('Next invoice number must look like INV-YYYY-00001.');
       writeSetting(ctx, 'invoice', {
+        nextNumber,
         footerNote: patch.invoice.footerNote !== undefined ? patch.invoice.footerNote : current.footerNote ?? null,
       });
     }
