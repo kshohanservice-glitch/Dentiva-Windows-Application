@@ -78,6 +78,21 @@ export function getPrescription(ctx: Ctx, id: number): PrescriptionDTO {
   return hydrate(ctx, row);
 }
 
+export function deletePrescription(ctx: Ctx, id: number): { ok: boolean } {
+  requirePermission(ctx, 'data.delete');
+  const row = ctx.db.prepare('SELECT id, number, patient_id FROM prescriptions WHERE id = ? AND deleted_at IS NULL').get(id) as { id: number; number: string; patient_id: number } | undefined;
+  if (!row) throw notFound('Prescription not found.');
+  tx(ctx.db, () => {
+    ctx.db.prepare('UPDATE prescriptions SET deleted_at = ? WHERE id = ?').run(nowISO(), id);
+    audit(ctx, {
+      action: 'prescription.delete', entityType: 'prescription', entityId: id,
+      summary: `Prescription ${row.number} deleted manually`,
+      before: { number: row.number, patientId: row.patient_id },
+    });
+  });
+  return { ok: true };
+}
+
 export interface PrescriptionInput {
   patientId: number; visitId?: number | null; dentistId: number; date?: string;
   cC?: string | null; oE?: string | null; rE?: string | null;
