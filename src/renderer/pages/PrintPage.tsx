@@ -378,7 +378,7 @@ function appointmentCardDoc(data: any): React.ReactNode {
       <div className="print-kv">
         <div><span className="k">Patient</span><span className="v">{patient.name}</span></div>
         <div><span className="k">Phone</span><span className="v">{patient.phone || '—'}</span></div>
-        <div><span className="k">Date</span><span className="v">{start.toLocaleDateString(undefined, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</span></div>
+        <div><span className="k">Date</span><span className="v">{formatDate(start)}</span></div>
         <div><span className="k">Time</span><span className="v">{start.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })}</span></div>
         <div><span className="k">Dentist</span><span className="v">{appointment.dentistName || '—'}</span></div>
         <div><span className="k">Purpose</span><span className="v">{appointment.purpose || '—'}</span></div>
