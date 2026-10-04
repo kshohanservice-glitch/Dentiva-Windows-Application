@@ -703,8 +703,7 @@ export function RxDetailModal(props: { rx: PrescriptionDTO; onClose: () => void;
           ))}
         </tbody>
       </table>
-      <ConfirmDialog
-        open={deleteOpen}
+      {deleteOpen && <ConfirmDialog
         title="Delete prescription?"
         body={`Prescription ${rx.number} will be hidden from the records and cannot be restored from the app.`}
         confirmLabel="Delete prescription"
