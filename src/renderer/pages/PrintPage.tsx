@@ -174,7 +174,7 @@ function thermalMeta(invoice: any): React.ReactNode {
 }
 
 function thermalInvoiceDoc(data: any): React.ReactNode {
-  const { invoice, payments, clinic } = data;
+  const { invoice, payments, clinic, settings } = data;
   const lines: any[] = invoice.lines ?? [];
   const subtotal = lines.reduce((s: number, l: any) => s + l.totalPaisa, 0);
   const discount = invoice.discountPaisa ?? 0;
@@ -213,7 +213,7 @@ function thermalInvoiceDoc(data: any): React.ReactNode {
 }
 
 function thermalReceiptDoc(data: any): React.ReactNode {
-  const { invoice, payments, clinic } = data;
+  const { invoice, payments, clinic, settings } = data;
   const lastPayment = payments?.[payments.length - 1];
   return (
     <div className="thermal-receipt">
