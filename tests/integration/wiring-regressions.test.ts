@@ -33,7 +33,7 @@ describe('wiring regressions', () => {
       date: '2026-10-04',
       items: [{ description: 'Exam', qty: 1, unitPricePaisa: 5000 }],
     });
-    expect(() => saveSettings(ctx, { invoice: { ...getSettings(ctx).invoice, nextNumber: 'INV-2026-00001' } })).not.toThrow();
+    expect(() => saveSettings(ctx, { invoice: { ...getSettings(ctx).invoice, nextNumber: 'INV-2026-00001' } })).toThrow(/greater than the current/i);
     expect(() => createInvoice(ctx, {
       patientId: patient.id,
       date: '2026-10-04',
