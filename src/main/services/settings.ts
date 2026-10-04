@@ -116,7 +116,7 @@ export function saveSettings(ctx: Ctx, patch: Partial<SettingsDTO>): SettingsDTO
       const current = readSetting<SettingsDTO['security']>(ctx, 'security', { autoLockMinutes: 10, minPasswordLength: 8, maxFailedLogins: 5 });
       const autoLock = patch.security.autoLockMinutes;
       if (autoLock !== null && autoLock !== undefined && ![5, 10, 15, 30].includes(Number(autoLock))) {
-        throw validation('Auto-lock must be 5, 10, 15 or 30 minutes (or disabled).');
+        throw validation('Auto-lock must be 5, 10, 15, 30 or 60 minutes (or disabled).');
       }
       writeSetting(ctx, 'security', {
         autoLockMinutes: autoLock === undefined ? current.autoLockMinutes : autoLock,
