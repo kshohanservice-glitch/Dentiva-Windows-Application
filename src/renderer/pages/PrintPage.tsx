@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { formatDate } from '../format';
 import { useLocation } from 'react-router-dom';
 import { api } from '../api';
 import { Button, ErrorState, Spinner, useToast } from '../components/primitives';
@@ -89,14 +90,14 @@ function invoiceDoc(data: any): React.ReactNode {
       <Header clinic={clinic} right={<>
         <div><b>Invoice</b></div>
         <div className="mono">{invoice.invoiceNumber}</div>
-        <div>{new Date(invoice.invoiceDate).toLocaleDateString()}</div>
+        <div>{formatDate(invoice.invoiceDate)}</div>
       </>} />
       <div className="doc-title">Invoice</div>
       <div className="print-kv">
         <div><span className="k">Patient</span><span className="v">{invoice.patientName}</span></div>
         <div><span className="k">Phone</span><span className="v">{invoice.patientPhone || '—'}</span></div>
         <div><span className="k">Invoice No</span><span className="v mono">{invoice.invoiceNumber}</span></div>
-        <div><span className="k">Date</span><span className="v">{new Date(invoice.invoiceDate).toLocaleDateString()}</span></div>
+        <div><span className="k">Date</span><span className="v">{formatDate(invoice.invoiceDate)}</span></div>
         <div><span className="k">Dentist</span><span className="v">{invoice.dentistName || '—'}</span></div>
         <div><span className="k">Status</span><span className="v">{invoice.status}</span></div>
       </div>
@@ -133,7 +134,7 @@ function invoiceDoc(data: any): React.ReactNode {
             <tbody>
               {payments.map((p: any) => (
                 <tr key={p.id}>
-                  <td>{new Date(p.paidAt).toLocaleDateString()}</td>
+                  <td>{formatDate(p.paidAt)}</td>
                   <td>{p.method}</td>
                   <td className="mono">{p.reference || '—'}</td>
                   <td className="right mono">{fmtBdt(p.amountPaisa)}</td>
@@ -166,7 +167,7 @@ function thermalMeta(invoice: any): React.ReactNode {
     <div className="thermal-meta">
       <div><span className="k">Patient</span><span className="v">{invoice.patientName}</span></div>
       <div><span className="k">Invoice</span><span className="v mono">{invoice.invoiceNumber}</span></div>
-      <div><span className="k">Date</span><span className="v">{new Date(invoice.invoiceDate).toLocaleDateString()}</span></div>
+      <div><span className="k">Date</span><span className="v">{formatDate(invoice.invoiceDate)}</span></div>
       <div><span className="k">Phone</span><span className="v">{invoice.patientPhone || '—'}</span></div>
     </div>
   );
@@ -236,13 +237,13 @@ function receiptDoc(data: any): React.ReactNode {
   const lastPayment = payments?.[payments.length - 1];
   return (
     <>
-      <Header clinic={clinic} right={<><div><b>Receipt</b></div><div>{new Date().toLocaleDateString()}</div></>} />
+      <Header clinic={clinic} right={<><div><b>Receipt</b></div><div>{formatDate()}</div></>} />
       <div className="doc-title">Payment Receipt</div>
       <div className="print-kv">
         <div><span className="k">Received from</span><span className="v">{invoice.patientName}</span></div>
         <div><span className="k">Phone</span><span className="v">{invoice.patientPhone || '—'}</span></div>
         <div><span className="k">Invoice</span><span className="v mono">{invoice.invoiceNumber}</span></div>
-        <div><span className="k">Payment date</span><span className="v">{lastPayment ? new Date(lastPayment.paidAt).toLocaleDateString() : '—'}</span></div>
+        <div><span className="k">Payment date</span><span className="v">{lastPayment ? formatDate(lastPayment.paidAt) : '—'}</span></div>
       </div>
       <table>
         <tbody>
@@ -272,7 +273,7 @@ function prescriptionDoc(data: any): React.ReactNode {
       <Header clinic={clinic} right={<>
         <div><b>Prescription</b></div>
         <div className="mono">Rx {rx.rxNumber}</div>
-        <div>{new Date(rx.rxDate).toLocaleDateString()}</div>
+        <div>{formatDate(rx.rxDate)}</div>
       </>} />
       <div className="print-kv">
         <div><span className="k">Patient</span><span className="v">{patient.name}</span></div>
@@ -301,7 +302,7 @@ function prescriptionDoc(data: any): React.ReactNode {
         </div>
       ))}
       {rx.advice && <><h3>Advice</h3><div>{rx.advice}</div></>}
-      {rx.followUp && <><h3>Follow-up</h3><div>{new Date(rx.followUp).toLocaleDateString()}</div></>}
+      {rx.followUp && <><h3>Follow-up</h3><div>{formatDate(rx.followUp)}</div></>}
       <div className="sig-block">
         <div className="muted small">
           {watermark ? 'Duplicate copy — valid only with signature and seal.' : 'Please complete the full course as directed.'}
@@ -325,14 +326,14 @@ function visitSummaryDoc(data: any): React.ReactNode {
   const ageGender = `${patient.ageYears != null ? `${patient.ageYears}y ` : ''}${patient.gender || ''}`.trim() || '—';
   return (
     <>
-      <Header clinic={clinic} right={<><div><b>Visit summary</b></div><div>{new Date(visit.visitDate).toLocaleDateString()}</div></>} />
+      <Header clinic={clinic} right={<><div><b>Visit summary</b></div><div>{formatDate(visit.visitDate)}</div></>} />
       <div className="doc-title">Visit Summary</div>
       <div className="print-kv">
         <div><span className="k">Patient</span><span className="v">{patient.name}</span></div>
         <div><span className="k">Patient ID</span><span className="v mono">{patient.patientCode}</span></div>
         <div><span className="k">Age / Sex</span><span className="v">{ageGender}</span></div>
         <div><span className="k">Phone</span><span className="v">{patient.phone || '—'}</span></div>
-        <div><span className="k">Visit date</span><span className="v">{new Date(visit.visitDate).toLocaleDateString()}</span></div>
+        <div><span className="k">Visit date</span><span className="v">{formatDate(visit.visitDate)}</span></div>
         <div><span className="k">Dentist</span><span className="v">{visit.dentistName || '—'}</span></div>
       </div>
       <h2>Presenting complaint</h2>
@@ -361,7 +362,7 @@ function visitSummaryDoc(data: any): React.ReactNode {
         </div>
       )) : <div className="muted">No prescriptions for this visit.</div>}
       <h2>Next appointment</h2>
-      <div>{visit.nextVisitDate ? new Date(visit.nextVisitDate).toLocaleDateString() + (visit.nextVisitPurpose ? ` — ${visit.nextVisitPurpose}` : '') : 'None scheduled'}</div>
+      <div>{visit.nextVisitDate ? formatDate(visit.nextVisitDate) + (visit.nextVisitPurpose ? ` — ${visit.nextVisitPurpose}` : '') : 'None scheduled'}</div>
       <Footer text="Visit summary generated by Dentiva Pro" />
     </>
   );
@@ -408,7 +409,7 @@ function stockLabelDoc(data: any): React.ReactNode {
               <tr key={it.id}>
                 <td>{it.name}</td>
                 <td className="mono">{it.batchNumber || '—'}</td>
-                <td className="mono">{it.expiryDate ? new Date(it.expiryDate).toLocaleDateString() : '—'}</td>
+                <td className="mono">{it.expiryDate ? formatDate(it.expiryDate) : '—'}</td>
                 <td className="mono">{it.quantity}{it.unit ? ` ${it.unit}` : ''}</td>
                 <td><b>{state}</b></td>
               </tr>
