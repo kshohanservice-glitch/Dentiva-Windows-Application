@@ -213,7 +213,7 @@ function thermalInvoiceDoc(data: any): React.ReactNode {
 }
 
 function thermalReceiptDoc(data: any): React.ReactNode {
-  const { invoice, payments, clinic, settings } = data;
+  const { invoice, payments, clinic } = data;
   const lastPayment = payments?.[payments.length - 1];
   return (
     <div className="thermal-receipt">
