@@ -110,7 +110,14 @@ export function saveSettings(ctx: Ctx, patch: Partial<SettingsDTO>): SettingsDTO
     if (patch.invoice) {
       const current = readSetting<SettingsDTO['invoice']>(ctx, 'invoice', {} as any);
       const nextNumber = patch.invoice.nextNumber !== undefined ? String(patch.invoice.nextNumber).trim() : current.nextNumber;
-      if (nextNumber && !parseInvoiceNumber(nextNumber)) throw validation('Next invoice number must look like INV-YYYY-00001.');
+      if (nextNumber) {
+        const parsed = parseInvoiceNumber(nextNumber);
+        if (!parsed) throw validation('Next invoice number must look like INV-YYYY-00001.');
+        const seqRow = ctx.db.prepare('SELECT last_value FROM sequences WHERE name = ? AND year = ?').get('invoice', parsed.year) as { last_value: number } | undefined;
+        const invRow = ctx.db.prepare("SELECT COALESCE(MAX(CAST(substr(number, 10) AS INTEGER)), 0) m FROM invoices WHERE number LIKE ?").get(`INV-${parsed.year}-%`) as { m: number };
+        const floor = Math.max(Number(seqRow?.last_value ?? 0), Number(invRow?.m ?? 0));
+        if (parsed.sequence <= floor) throw validation(`Next invoice number must be greater than the current ${parsed.year} invoice sequence (${floor}).`);
+      }
       writeSetting(ctx, 'invoice', {
         nextNumber,
         footerNote: patch.invoice.footerNote !== undefined ? patch.invoice.footerNote : current.footerNote ?? null,
