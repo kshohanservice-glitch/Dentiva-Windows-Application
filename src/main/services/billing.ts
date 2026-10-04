@@ -130,8 +130,6 @@ export function createInvoice(ctx: Ctx, raw: unknown): InvoiceDTO {
       ctx.db.prepare(
         "INSERT INTO sequences (name, year, last_value) VALUES ('invoice', ?, ?) ON CONFLICT(name, year) DO UPDATE SET last_value = excluded.last_value"
       ).run(year, configured.sequence);
-    } else if (configured) {
-      throw validation(`Next invoice number year must match the invoice date (${year}).`);
     } else {
       number = nextInvoiceNumber(ctx.db, date);
     }
@@ -160,8 +158,10 @@ export function createInvoice(ctx: Ctx, raw: unknown): InvoiceDTO {
     const nextNumber = formatInvoiceNumber(year, Number(number.slice(9)) + 1);
     const currentSettingRow = ctx.db.prepare("SELECT value_json FROM settings WHERE key = 'invoice'").get() as { value_json: string } | undefined;
     const currentInvoiceSettings = currentSettingRow ? JSON.parse(currentSettingRow.value_json) as Record<string, unknown> : {};
-    ctx.db.prepare("INSERT INTO settings (key, value_json, updated_at, updated_by) VALUES ('invoice', ?, ?, ?) ON CONFLICT(key) DO UPDATE SET value_json = excluded.value_json, updated_at = excluded.updated_at, updated_by = excluded.updated_by")
-      .run(JSON.stringify({ ...currentInvoiceSettings, nextNumber }), nowISO(), ctx.session.userId);
+    if (configured && configured.year === year) {
+      ctx.db.prepare("INSERT INTO settings (key, value_json, updated_at, updated_by) VALUES ('invoice', ?, ?, ?) ON CONFLICT(key) DO UPDATE SET value_json = excluded.value_json, updated_at = excluded.updated_at, updated_by = excluded.updated_by")
+        .run(JSON.stringify({ ...currentInvoiceSettings, nextNumber }), nowISO(), ctx.session.userId);
+    }
     audit(ctx, {
       action: 'invoice.create', entityType: 'invoice', entityId: invoiceId,
       summary: `Invoice ${number} issued (total ${(total / 100).toFixed(2)} BDT)`,
