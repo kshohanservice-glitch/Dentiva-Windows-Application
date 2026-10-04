@@ -23,6 +23,8 @@ concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
 
+# Keep release verification independent from stale queued attempts.
+
 jobs:
   verify:
     name: Typecheck, lint, unit & integration tests
