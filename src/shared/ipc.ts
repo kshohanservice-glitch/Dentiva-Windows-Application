@@ -73,6 +73,7 @@ export interface DentivaApi {
   'prescriptions/list'(filter: { patientId?: number; range?: string; page?: number; pageSize?: number }): Promise<Paged<PrescriptionDTO>>;
   'prescriptions/get'(id: number): Promise<PrescriptionDTO>;
   'prescriptions/create'(input: PrescriptionCreatePayload): Promise<PrescriptionDTO>;
+  'prescriptions/delete'(id: number): Promise<{ ok: boolean }>;
   'prescriptions/templates'(): Promise<{ id: number; name: string; items: any[] }[]>;
   'prescriptions/save-template'(payload: { name: string; items: any[] }): Promise<{ id: number }>;
 
@@ -95,6 +96,7 @@ export interface DentivaApi {
   'invoices/get'(id: number): Promise<InvoiceDTO>;
   'invoices/create'(input: InvoiceInput): Promise<InvoiceDTO>;
   'invoices/void'(payload: { id: number; reason: string }): Promise<InvoiceDTO>;
+  'invoices/delete'(id: number): Promise<{ ok: boolean }>;
   'payments/list'(filter: { patientId?: number; invoiceId?: number; range?: string; method?: string; page?: number; pageSize?: number }): Promise<Paged<PaymentDTO>>;
   'payments/create'(input: PaymentInput): Promise<{ payment: PaymentDTO; invoice: InvoiceDTO | null }>;
 
@@ -318,6 +320,7 @@ export const IPC = {
   prescriptionsList: 'prescriptions/list',
   prescriptionsGet: 'prescriptions/get',
   prescriptionsCreate: 'prescriptions/create',
+  prescriptionsDelete: 'prescriptions/delete',
   prescriptionsTemplates: 'prescriptions/templates',
   prescriptionsSaveTemplate: 'prescriptions/save-template',
 
@@ -337,6 +340,7 @@ export const IPC = {
   invoicesGet: 'invoices/get',
   invoicesCreate: 'invoices/create',
   invoicesVoid: 'invoices/void',
+  invoicesDelete: 'invoices/delete',
   paymentsList: 'payments/list',
   paymentsCreate: 'payments/create',
 
