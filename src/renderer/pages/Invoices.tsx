@@ -6,7 +6,7 @@ import { Badge, Button, Card, ConfirmDialog, Modal, Pagination, useToast } from 
 import { Field, Input, Select, Textarea } from '../components/forms';
 import { DataTable, TableToolbar, type Column } from '../components/table';
 import { Icon } from '../components/shell';
-import { bdt } from '../format';
+import { bdt, formatDate } from '../format';
 import { InvoiceFormModal } from './Patients';
 import type { InvoiceDTO, PaymentDTO } from '../../shared/types';
 
@@ -128,6 +128,7 @@ function InvoiceDetailModal(props: { invoice: InvoiceDTO; onClose: () => void; o
   const toast = useToast();
   const [payOpen, setPayOpen] = useState(false);
   const [voidOpen, setVoidOpen] = useState(false);
+  const [deleteOpen, setDeleteOpen] = useState(false);
   const [voidReason, setVoidReason] = useState('');
   const [removeAttachmentId, setRemoveAttachmentId] = useState<number | null>(null);
   const { data: pays, reload: reloadPays } = useAsync(() => api['payments/list']({ invoiceId: invoice.id, pageSize: 200 }), [invoice.id]);
@@ -168,6 +169,7 @@ function InvoiceDetailModal(props: { invoice: InvoiceDTO; onClose: () => void; o
       footer={
         <>
           <Button variant="secondary" onClick={props.onClose}>Close</Button>
+          {can('data.delete') && <Button variant="ghost" onClick={() => setDeleteOpen(true)}>Delete</Button>}
           <Button variant="secondary" onClick={() => void doPdf()}>Save as PDF</Button>
           <Button variant="secondary" onClick={() => void doPrint('receipt')} disabled={(pays?.items.length ?? 0) === 0}>Print receipt</Button>
           <Button variant="primary" icon={Icon.print} onClick={() => void doPrint('invoice')}>Print invoice</Button>
@@ -176,7 +178,7 @@ function InvoiceDetailModal(props: { invoice: InvoiceDTO; onClose: () => void; o
     >
       <div className="kv-list mb-4">
         <div className="kv"><span className="k">Patient</span><span className="v">{invoice.patientName} ({invoice.patientCode})</span></div>
-        <div className="kv"><span className="k">Date</span><span className="v">{new Date(invoice.date).toLocaleDateString()}</span></div>
+        <div className="kv"><span className="k">Date</span><span className="v">{formatDate(invoice.date)}</span></div>
         <div className="kv"><span className="k">Status</span><span className="v"><Badge tone={STATUS_TONE[invoice.status]}>{invoice.status}</Badge></span></div>
         {invoice.voidReason && <div className="kv"><span className="k">Void reason</span><span className="v">{invoice.voidReason}</span></div>}
       </div>
@@ -247,6 +249,27 @@ function InvoiceDetailModal(props: { invoice: InvoiceDTO; onClose: () => void; o
             ))}
           </div>
         </>
+      )}
+
+      {deleteOpen && (
+        <ConfirmDialog
+          title="Delete invoice?"
+          body={`Invoice ${invoice.number} will be hidden from invoice records. Invoices with payment history cannot be deleted.`}
+          confirmLabel="Delete invoice"
+          danger
+          onCancel={() => setDeleteOpen(false)}
+          onConfirm={async () => {
+            try {
+              await api['invoices/delete'](invoice.id);
+              toast.success('Invoice deleted', invoice.number);
+              setDeleteOpen(false);
+              props.onChanged();
+              props.onClose();
+            } catch (err) {
+              toast.fromError(err, 'Could not delete invoice');
+            }
+          }}
+        />
       )}
 
       {removeAttachmentId != null && <ConfirmDialog
@@ -340,7 +363,7 @@ export function InvoicesPage() {
 
   const columns: Column<InvoiceDTO>[] = [
     { key: 'number', label: 'Invoice', render: (inv) => <span className="mono strong">{inv.number}</span> },
-    { key: 'date', label: 'Date', sortValue: (inv) => inv.date, render: (inv) => new Date(inv.date).toLocaleDateString() },
+    { key: 'date', label: 'Date', sortValue: (inv) => inv.date, render: (inv) => formatDate(inv.date) },
     { key: 'patient', label: 'Patient', render: (inv) => (<div><strong>{inv.patientName}</strong><div className="xsmall muted mono">{inv.patientCode}</div></div>) },
     { key: 'total', label: 'Total', align: 'right', sortValue: (inv) => inv.totalPaisa, render: (inv) => <span className="num">{bdt(inv.totalPaisa)}</span> },
     { key: 'paid', label: 'Paid', align: 'right', render: (inv) => <span className="num success-text">{bdt(inv.paidPaisa)}</span> },
