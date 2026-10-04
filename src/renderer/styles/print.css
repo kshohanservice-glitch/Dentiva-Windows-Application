@@ -574,3 +574,5 @@
 @media print {
   .print-doc { border-radius: 0 !important; }
 }
+
+.sig-compact { margin-top: 12px; padding-top: 8px; border-top: 1px dotted var(--print-line); }
