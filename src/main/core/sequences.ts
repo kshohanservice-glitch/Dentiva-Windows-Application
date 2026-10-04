@@ -27,7 +27,7 @@ export function formatInvoiceNumber(year: number, n: number): string {
 }
 
 export function parseInvoiceNumber(value: string): { year: number; sequence: number } | null {
-  const m = /^INV-(\\d{4})-(\\d{1,9})$/.exec(String(value).trim());
+  const m = /^INV-(\d{4})-(\d{1,9})$/.exec(String(value).trim());
   if (!m) return null;
   const year = Number(m[1]);
   const sequence = Number(m[2]);
