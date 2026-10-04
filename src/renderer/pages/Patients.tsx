@@ -1101,7 +1101,7 @@ export function RxFormModal(props: { patientId: number; visitId?: number | null;
         dentistId: Number(values.dentistId),
         date: values.date,
         cC: (values.cC === 'Other' ? values.ccOther : values.cC) || null,
-        oE: (values.oE === 'Other' ? values.oeOther : values.oE) || null, rE: values.rE || null,
+        oE: values.oE || null, rE: values.rE || null,
         diagnosis: values.diagnosis || null, treatment: values.treatment || null,
         advice: values.advice || null, followUp: values.followUp || null,
         items: values.items.filter((i) => i.medicineName.trim()),
