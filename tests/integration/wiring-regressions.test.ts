@@ -13,7 +13,7 @@ afterEach(() => { cleanupEnv(env); });
 describe('wiring regressions', () => {
   it('honours and advances the configured next invoice number', () => {
     const ctx = ownerCtx(env);
-    const patient = createPatient(ctx, { name: 'Invoice Wiring', gender: 'female', ageYears: 28, forceCreate: true });
+    const patient = createPatient(ctx, { name: 'Invoice Wiring', gender: 'female', ageYears: 28, phone1: '01700000001', forceCreate: true });
     const settings = getSettings(ctx);
     saveSettings(ctx, { invoice: { ...settings.invoice, nextNumber: 'INV-2026-00421' } });
     const invoice = createInvoice(ctx, {
@@ -27,7 +27,7 @@ describe('wiring regressions', () => {
 
   it('rejects a configured invoice number that is already behind existing invoices', () => {
     const ctx = ownerCtx(env);
-    const patient = createPatient(ctx, { name: 'Invoice Sequence', gender: 'male', ageYears: 31, forceCreate: true });
+    const patient = createPatient(ctx, { name: 'Invoice Sequence', gender: 'male', ageYears: 31, phone1: '01700000002', forceCreate: true });
     createInvoice(ctx, {
       patientId: patient.id,
       date: '2026-10-04',
