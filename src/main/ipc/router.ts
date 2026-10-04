@@ -80,10 +80,10 @@ export function registerRouter(deps: RouterDeps): void {
     IPC.patientsCreate, IPC.patientsUpdate, IPC.patientsArchive, IPC.patientsDelete,
     IPC.visitsCreate, IPC.visitsUpdate, IPC.chartSet,
     IPC.treatmentsSave, IPC.treatmentsSetActive,
-    IPC.prescriptionsCreate, IPC.prescriptionsSaveTemplate,
+    IPC.prescriptionsCreate, IPC.prescriptionsDelete, IPC.prescriptionsSaveTemplate,
     IPC.appointmentsCreate, IPC.appointmentsUpdate, IPC.appointmentsCancel, IPC.appointmentsNoShow, IPC.appointmentsArrive,
     IPC.queueAdd, IPC.queueAction, IPC.queueReorder,
-    IPC.invoicesCreate, IPC.invoicesVoid, IPC.paymentsCreate,
+    IPC.invoicesCreate, IPC.invoicesVoid, IPC.invoicesDelete, IPC.paymentsCreate,
     IPC.inventorySaveItem, IPC.inventoryStock, IPC.inventorySaveSupplier,
     IPC.accountingAddExpense, IPC.accountingDeleteExpense, IPC.accountingAddIncome, IPC.accountingSaveCategory,
     IPC.staffSave, IPC.dentistsSave,
@@ -223,6 +223,7 @@ export function registerRouter(deps: RouterDeps): void {
   handle(IPC.prescriptionsList, { auth: true, fn: (p, ctx) => prescriptions.listPrescriptions(ctx!, p) });
   handle(IPC.prescriptionsGet, { auth: true, fn: (p, ctx) => prescriptions.getPrescription(ctx!, Number(p)) });
   handle(IPC.prescriptionsCreate, { auth: true, fn: (p, ctx) => prescriptions.createPrescription(ctx!, p) });
+  handle(IPC.prescriptionsDelete, { auth: true, fn: (p, ctx) => prescriptions.deletePrescription(ctx!, Number(p)) });
   handle(IPC.prescriptionsTemplates, { auth: true, fn: (_p, ctx) => prescriptions.listTemplates(ctx!) });
   handle(IPC.prescriptionsSaveTemplate, { auth: true, fn: (p, ctx) => prescriptions.saveTemplate(ctx!, String(p?.name), p?.items) });
 
@@ -245,6 +246,7 @@ export function registerRouter(deps: RouterDeps): void {
   handle(IPC.invoicesGet, { auth: true, fn: (p, ctx) => billing.getInvoice(ctx!, Number(p)) });
   handle(IPC.invoicesCreate, { auth: true, fn: (p, ctx) => billing.createInvoice(ctx!, p) });
   handle(IPC.invoicesVoid, { auth: true, fn: (p, ctx) => billing.voidInvoice(ctx!, Number(p?.id), p?.reason) });
+  handle(IPC.invoicesDelete, { auth: true, fn: (p, ctx) => billing.deleteInvoice(ctx!, Number(p)) });
   handle(IPC.paymentsList, { auth: true, fn: (p, ctx) => billing.listPayments(ctx!, p) });
   handle(IPC.paymentsCreate, { auth: true, fn: (p, ctx) => billing.createPayment(ctx!, p) });
 
