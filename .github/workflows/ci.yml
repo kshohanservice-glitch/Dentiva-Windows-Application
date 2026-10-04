@@ -1,5 +1,6 @@
 name: CI
 
+# Dentiva Pro v2.0.0 release pipeline: verify, E2E, package and publish the Windows installer.
 on:
   push:
     paths-ignore:
