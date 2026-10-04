@@ -1207,6 +1207,7 @@ export function RxFormModal(props: { patientId: number; visitId?: number | null;
                 { value: 'Impected Teeth', label: 'Impected Teeth' },
                 { value: 'Dry Socket', label: 'Dry Socket' },
                 { value: 'Attrition/Errosion', label: 'Attrition/Errosion' },
+                { value: 'Other', label: 'Other' },
               ]}
             />
           )}
