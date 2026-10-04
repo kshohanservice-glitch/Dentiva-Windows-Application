@@ -1044,7 +1044,7 @@ export function RxFormModal(props: { patientId: number; visitId?: number | null;
   const patientId = props.patientId;
   const { values, set, validate, errors } = useForm({
     dentistId: '', date: isoDate(new Date()), cC: '', oE: '', rE: '', diagnosis: '', treatment: '', advice: '', followUp: '',
-    ccOther: '',
+    ccOther: '', oeOther: '',
     items: [{ medicineName: '', strength: '', dosage: '', frequency: '', duration: '', generic: '', form: '', qty: '', instruction: '' }] as {
       medicineName: string; strength: string; dosage: string; frequency: string; duration: string; generic: string; form: string; qty: string; instruction: string;
     }[],
@@ -1101,7 +1101,7 @@ export function RxFormModal(props: { patientId: number; visitId?: number | null;
         dentistId: Number(values.dentistId),
         date: values.date,
         cC: (values.cC === 'Other' ? values.ccOther : values.cC) || null,
-        oE: values.oE || null, rE: values.rE || null,
+        oE: (values.oE === 'Other' ? values.oeOther : values.oE) || null, rE: values.rE || null,
         diagnosis: values.diagnosis || null, treatment: values.treatment || null,
         advice: values.advice || null, followUp: values.followUp || null,
         items: values.items.filter((i) => i.medicineName.trim()),
@@ -1211,6 +1211,11 @@ export function RxFormModal(props: { patientId: number; visitId?: number | null;
             />
           )}
         </Field>
+        {values.oE === 'Other' && (
+          <Field label="O/E — Other" className="span-2">
+            {(id) => <Input id={id} value={values.oeOther} onChange={(v) => set('oeOther', v)} placeholder="Write the examination finding…" />}
+          </Field>
+        )}
         <Field label={<>R/E <span className="muted">(radiographic examination)</span></>} className="span-2">
           {(id) => <Textarea id={id} rows={2} value={values.rE} onChange={(v) => set('rE', v)} />}
         </Field>
