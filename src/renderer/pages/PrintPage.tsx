@@ -269,6 +269,8 @@ function prescriptionDoc(data: any): React.ReactNode {
   const { rx, patient, clinic, visit, watermark, settings } = data;
   const ageGender = `${patient.ageYears != null ? `${patient.ageYears}y ` : ''}${patient.gender || ''}`.trim() || '—';
   const diagnosisText = rx.diagnosis || visit?.diagnosis || null;
+  const labels = settings?.prescription?.labels ?? {};
+  const sigReserved = settings?.prescription?.signatureReserved !== false;
   return (
     <>
       {watermark && <div className="print-watermark"><span>Specimen</span></div>}
@@ -282,11 +284,11 @@ function prescriptionDoc(data: any): React.ReactNode {
         <div><span className="k">Age / Sex</span><span className="v">{ageGender}</span></div>
         <div><span className="k">Phone</span><span className="v">{patient.phone || '—'}</span></div>
         <div><span className="k">Patient ID</span><span className="v mono">{patient.patientCode}</span></div>
-        {diagnosisText && <div><span className="k">Diagnosis</span><span className="v">{diagnosisText}</span></div>}
-        {rx.cC && <div><span className="k">C/C</span><span className="v">{rx.cC}</span></div>}
-        {rx.oE && <div><span className="k">O/E</span><span className="v">{rx.oE}</span></div>}
-        {rx.rE && <div><span className="k">R/E</span><span className="v">{rx.rE}</span></div>}
-        {rx.treatment && <div><span className="k">Treatment</span><span className="v">{rx.treatment}</span></div>}
+        {diagnosisText && <div><span className="k">{labels.diagnosis || 'Diagnosis'}</span><span className="v">{diagnosisText}</span></div>}
+        {rx.cC && <div><span className="k">{labels.cc || 'C/C'}</span><span className="v">{rx.cC}</span></div>}
+        {rx.oE && <div><span className="k">{labels.oe || 'O/E'}</span><span className="v">{rx.oE}</span></div>}
+        {rx.rE && <div><span className="k">{labels.re || 'R/E'}</span><span className="v">{rx.rE}</span></div>}
+        {rx.treatment && <div><span className="k">{labels.treatment || 'Treatment'}</span><span className="v">{rx.treatment}</span></div>}
       </div>
       <h2>Medications</h2>
       {rx.items.map((it: any, i: number) => (
@@ -303,8 +305,9 @@ function prescriptionDoc(data: any): React.ReactNode {
           </span>
         </div>
       ))}
-      {rx.advice && <><h3>Advice</h3><div>{rx.advice}</div></>}
-      {rx.followUp && <><h3>Follow-up</h3><div>{formatDate(rx.followUp)}</div></>}
+      {rx.advice && <><h3>{labels.advice || 'Advice'}</h3><div>{rx.advice}</div></>}
+      {rx.followUp && <><h3>{labels.followUp || 'Follow-up'}</h3><div>{formatDate(rx.followUp)}</div></>}
+      {sigReserved ? (
       <div className="sig-block">
         <div className="muted small">
           {watermark ? 'Duplicate copy — valid only with signature and seal.' : 'Please complete the full course as directed.'}
@@ -318,6 +321,15 @@ function prescriptionDoc(data: any): React.ReactNode {
           </div>
         </div>
       </div>
+      ) : (
+        <div className="sig-compact">
+          <div><b>{data.dentist?.name ?? rx.dentistName}</b></div>
+          <div className="muted small">
+            {credentialLines(data.dentist?.qualifications).map((q, i) => <div key={i}>{q}</div>)}
+            {data.dentist?.regNo && <div>Reg. {data.dentist.regNo}</div>}
+          </div>
+        </div>
+      )}
       <Footer text={settings?.prescription?.footerMessage || clinic?.clinicName || ''} />
     </>
   );
