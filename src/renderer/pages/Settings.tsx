@@ -193,7 +193,7 @@ export function SettingsPage() {
           <>
             <Card title="Invoice numbering">
               <div className="form-grid">
-                <Field label="Next invoice number" hint="Auto-increments per invoice">
+                <Field label="Next invoice number" hint="Format INV-YYYY-00001 · auto-advances after each invoice">
                   {(id) => <Input id={id} value={form.invoice.nextNumber} onChange={(v) => set(['invoice', 'nextNumber'], v)} />}
                 </Field>
                 <Field label="Invoice footer note">
