@@ -144,7 +144,7 @@ export interface DentivaApi {
   'backup/run'(destination?: string): Promise<BackupRecordDTO>;
   'backup/list'(): Promise<BackupRecordDTO[]>;
   'backup/restore'(payload: { filePath?: string; typedConfirm: string }): Promise<{ ok: true; restoredAt: string } | { cancelled: true }>;
-  'backup/setAuto'(input: { frequencyDays: 7 | 15 | 30 | 0; destination?: string; retention: number }): Promise<{ ok: true; destination?: string; cancelled?: boolean }>;
+  'backup/set-auto'(input: { frequencyDays: 7 | 15 | 30 | 0; destination?: string; retention: number }): Promise<{ ok: true; destination?: string; cancelled?: boolean }>;
 
   /* settings */
   'settings/get'(): Promise<SettingsDTO | PublicSettings>;
