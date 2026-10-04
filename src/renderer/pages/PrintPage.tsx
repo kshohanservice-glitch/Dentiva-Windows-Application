@@ -279,6 +279,7 @@ function prescriptionDoc(data: any): React.ReactNode {
         <div className="mono">Rx {rx.rxNumber}</div>
         <div>{formatDate(rx.rxDate)}</div>
       </>} />
+      {settings?.prescription?.visitingHours && <div className="muted small" style={{ marginTop: -6, marginBottom: 8 }}>{settings.prescription.visitingHours}</div>}
       <div className="print-kv">
         <div><span className="k">Patient</span><span className="v">{patient.name}</span></div>
         <div><span className="k">Age / Sex</span><span className="v">{ageGender}</span></div>
