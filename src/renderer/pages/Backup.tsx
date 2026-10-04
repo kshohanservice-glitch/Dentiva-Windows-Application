@@ -206,7 +206,7 @@ export function BackupPage() {
                 onClick={async () => {
                   setAutoPending(true);
                   try {
-                    const res = await api['backup/setAuto']({
+                    const res = await api['backup/set-auto']({
                       frequencyDays: autoFreq,
                       retention: Math.max(1, Math.min(100, Number(autoRetention) || 10)),
                     });
