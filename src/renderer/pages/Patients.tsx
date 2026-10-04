@@ -645,9 +645,11 @@ function VisitsTab(props: { patientId: number; refreshKey?: number; onCreate: ()
   );
 }
 
-export function RxDetailModal(props: { rx: PrescriptionDTO; onClose: () => void }) {
+export function RxDetailModal(props: { rx: PrescriptionDTO; onClose: () => void; onDeleted?: () => void }) {
   const { rx } = props;
+  const { can } = useApp();
   const toast = useToast();
+  const [deleteOpen, setDeleteOpen] = useState(false);
   const print = async (kind: 'prescription' | 'prescription-duplicate') => {
     try {
       await api['reports/print']({ type: kind, id: rx.id } as any);
@@ -663,6 +665,7 @@ export function RxDetailModal(props: { rx: PrescriptionDTO; onClose: () => void 
       footer={
         <>
           <Button variant="secondary" onClick={props.onClose}>Close</Button>
+          {can('data.delete') && <Button variant="ghost" onClick={() => setDeleteOpen(true)}>Delete</Button>}
           <Button variant="secondary" onClick={() => void print('prescription-duplicate')}>Print duplicate (watermarked)</Button>
           <Button variant="primary" icon={Icon.print} onClick={() => void print('prescription')}>Print</Button>
         </>
@@ -700,6 +703,24 @@ export function RxDetailModal(props: { rx: PrescriptionDTO; onClose: () => void 
           ))}
         </tbody>
       </table>
+      <ConfirmDialog
+        open={deleteOpen}
+        title="Delete prescription?"
+        body={`Prescription ${rx.number} will be hidden from the records and cannot be restored from the app.`}
+        confirmLabel="Delete prescription"
+        danger
+        onClose={() => setDeleteOpen(false)}
+        onConfirm={async () => {
+          try {
+            await api['prescriptions/delete'](rx.id);
+            toast.success('Prescription deleted', rx.number);
+            setDeleteOpen(false);
+            props.onDeleted?.();
+          } catch (err) {
+            toast.fromError(err, 'Could not delete prescription');
+          }
+        }}
+      />
     </Modal>
   );
 }
@@ -1024,7 +1045,7 @@ export function RxFormModal(props: { patientId: number; visitId?: number | null;
   const patientId = props.patientId;
   const { values, set, validate, errors } = useForm({
     dentistId: '', date: isoDate(new Date()), cC: '', oE: '', rE: '', diagnosis: '', treatment: '', advice: '', followUp: '',
-    ccOther: '', oeOther: '',
+    ccOther: '',
     items: [{ medicineName: '', strength: '', dosage: '', frequency: '', duration: '', generic: '', form: '', qty: '', instruction: '' }] as {
       medicineName: string; strength: string; dosage: string; frequency: string; duration: string; generic: string; form: string; qty: string; instruction: string;
     }[],
@@ -1191,11 +1212,6 @@ export function RxFormModal(props: { patientId: number; visitId?: number | null;
             />
           )}
         </Field>
-        {values.oE === 'Other' && (
-          <Field label="O/E — Other" className="span-2">
-            {(id) => <Input id={id} value={values.oeOther} onChange={(v) => set('oeOther', v)} placeholder="Write the examination finding…" />}
-          </Field>
-        )}
         <Field label={<>R/E <span className="muted">(radiographic examination)</span></>} className="span-2">
           {(id) => <Textarea id={id} rows={2} value={values.rE} onChange={(v) => set('rE', v)} />}
         </Field>
