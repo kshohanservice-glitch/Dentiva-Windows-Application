@@ -17,6 +17,17 @@ export function isoDate(d: Date): string {
   return new Date(d.getTime() - tz).toISOString().slice(0, 10);
 }
 
+/** Display dates in Bangladesh-friendly day/month/year order: DD/MM/YYYY. */
+export function formatDate(value: string | Date | null | undefined): string {
+  if (!value) return '—';
+  const raw = value instanceof Date ? value : String(value);
+  const match = typeof raw === 'string' ? /^(\d{4})-(\d{2})-(\d{2})/.exec(raw) : null;
+  if (match) return `${match[3]}/${match[2]}/${match[1]}`;
+  const d = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(d.getTime())) return '—';
+  return `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`;
+}
+
 /** yyyy-MM-ddTHH:mm for <input type="datetime-local"> */
 export function localDateTime(d: Date): string {
   const tz = d.getTimezoneOffset() * 60_000;
