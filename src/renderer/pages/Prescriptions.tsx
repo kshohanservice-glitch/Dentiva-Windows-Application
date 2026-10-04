@@ -8,6 +8,7 @@ import { DataTable, TableToolbar, type Column } from '../components/table';
 import { Icon } from '../components/shell';
 import { RxDetailModal, RxFormModal } from './Patients';
 import type { PrescriptionDTO } from '../../shared/types';
+import { formatDate } from '../format';
 
 type RxTab = 'all' | 'today' | 'week' | 'month';
 
@@ -53,7 +54,7 @@ export function PrescriptionsPage() {
 
   const columns: Column<PrescriptionDTO>[] = [
     { key: 'number', label: 'Rx No', render: (rx) => <span className="mono strong">{rx.number}</span> },
-    { key: 'date', label: 'Date', sortValue: (rx) => rx.date, render: (rx) => new Date(rx.date).toLocaleDateString() },
+    { key: 'date', label: 'Date', sortValue: (rx) => rx.date, render: (rx) => formatDate(rx.date) },
     {
       key: 'patient', label: 'Patient',
       render: (rx) => (<div><strong>{rx.patientName}</strong><div className="xsmall muted mono">{rx.patientCode}</div></div>),
@@ -132,7 +133,7 @@ export function PrescriptionsPage() {
       </div>
 
       {createOpen && <RxFormModal patientId={0} onClose={() => setCreateOpen(false)} onSaved={() => { setCreateOpen(false); reload(); }} />}
-      {detail && <RxDetailModal rx={detail} onClose={() => setDetail(null)} />}
+      {detail && <RxDetailModal rx={detail} onClose={() => setDetail(null)} onDeleted={() => { setDetail(null); reload(); }} />}
     </div>
   );
 }
