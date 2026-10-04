@@ -2,7 +2,7 @@ import type { Ctx } from '../core/context';
 import type { InvoiceDTO, InvoiceInput, InvoiceItemDTO, PaymentDTO, PaymentInput, Paged } from '../../shared/types';
 import { conflict, notFound, validation } from '../errors';
 import { audit, requirePermission, tx } from '../core/context';
-import { nextInvoiceNumber } from '../core/sequences';
+import { formatInvoiceNumber, nextInvoiceNumber, parseInvoiceNumber } from '../core/sequences';
 import { nowISO, todayISO, dateRangeFor } from '../../shared/currency';
 import { optString, pageParams, reqDate, reqInt, reqString, oneOf } from '../core/validate';
 
@@ -116,7 +116,25 @@ export function createInvoice(ctx: Ctx, raw: unknown): InvoiceDTO {
   if (total < 0) throw validation('Discounts exceed the invoice subtotal.');
 
   const id = tx(ctx.db, () => {
-    const number = nextInvoiceNumber(ctx.db, date);
+    const settingRow = ctx.db.prepare("SELECT value_json FROM settings WHERE key = 'invoice'").get() as { value_json: string } | undefined;
+    const invoiceSettings = settingRow ? JSON.parse(settingRow.value_json) as { nextNumber?: string } : {};
+    const configured = invoiceSettings.nextNumber ? parseInvoiceNumber(invoiceSettings.nextNumber) : null;
+    const year = Number(date.slice(0, 4));
+    let number: string;
+    if (configured && configured.year === year) {
+      const existingMax = Number(ctx.db.prepare("SELECT COALESCE(MAX(CAST(substr(number, 10) AS INTEGER)), 0) m FROM invoices WHERE number LIKE ?").get(`INV-${year}-%`) as { m: number }).m;
+      if (configured.sequence <= existingMax) {
+        throw validation(`Next invoice number ${invoiceSettings.nextNumber} is already used or behind the existing sequence.`);
+      }
+      number = formatInvoiceNumber(configured.year, configured.sequence);
+      ctx.db.prepare(
+        "INSERT INTO sequences (name, year, last_value) VALUES ('invoice', ?, ?) ON CONFLICT(name, year) DO UPDATE SET last_value = excluded.last_value"
+      ).run(year, configured.sequence);
+    } else if (configured) {
+      throw validation(`Next invoice number year must match the invoice date (${year}).`);
+    } else {
+      number = nextInvoiceNumber(ctx.db, date);
+    }
     const info = ctx.db
       .prepare(
         `INSERT INTO invoices (number, patient_id, visit_id, date, status, subtotal_paisa, discount_paisa, total_paisa, note, created_by, created_at)
@@ -139,6 +157,11 @@ export function createInvoice(ctx: Ctx, raw: unknown): InvoiceDTO {
     if (input.visitId) {
       ctx.db.prepare('UPDATE visits SET invoice_id = ? WHERE id = ? AND invoice_id IS NULL').run(invoiceId, input.visitId);
     }
+    const nextNumber = formatInvoiceNumber(year, Number(number.slice(9)) + 1);
+    const currentSettingRow = ctx.db.prepare("SELECT value_json FROM settings WHERE key = 'invoice'").get() as { value_json: string } | undefined;
+    const currentInvoiceSettings = currentSettingRow ? JSON.parse(currentSettingRow.value_json) as Record<string, unknown> : {};
+    ctx.db.prepare("INSERT INTO settings (key, value_json, updated_at, updated_by) VALUES ('invoice', ?, ?, ?) ON CONFLICT(key) DO UPDATE SET value_json = excluded.value_json, updated_at = excluded.updated_at, updated_by = excluded.updated_by")
+      .run(JSON.stringify({ ...currentInvoiceSettings, nextNumber }), nowISO(), ctx.session.userId);
     audit(ctx, {
       action: 'invoice.create', entityType: 'invoice', entityId: invoiceId,
       summary: `Invoice ${number} issued (total ${(total / 100).toFixed(2)} BDT)`,
