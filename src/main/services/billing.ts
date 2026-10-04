@@ -122,7 +122,8 @@ export function createInvoice(ctx: Ctx, raw: unknown): InvoiceDTO {
     const year = Number(date.slice(0, 4));
     let number: string;
     if (configured && configured.year === year) {
-      const existingMax = Number(ctx.db.prepare("SELECT COALESCE(MAX(CAST(substr(number, 10) AS INTEGER)), 0) m FROM invoices WHERE number LIKE ?").get(`INV-${year}-%`) as { m: number }).m;
+      const existingMaxRow = ctx.db.prepare("SELECT COALESCE(MAX(CAST(substr(number, 10) AS INTEGER)), 0) AS m FROM invoices WHERE number LIKE ?").get(`INV-${year}-%`) as { m: number };
+      const existingMax = Number(existingMaxRow.m);
       if (configured.sequence <= existingMax) {
         throw validation(`Next invoice number ${invoiceSettings.nextNumber} is already used or behind the existing sequence.`);
       }
