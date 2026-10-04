@@ -22,10 +22,27 @@ export function nextSequence(db: DB, name: string, year: number): number {
   }
 }
 
+export function formatInvoiceNumber(year: number, n: number): string {
+  return `INV-${year}-${String(n).padStart(5, '0')}`;
+}
+
+export function parseInvoiceNumber(value: string): { year: number; sequence: number } | null {
+  const m = /^INV-(\\d{4})-(\\d{1,9})$/.exec(String(value).trim());
+  if (!m) return null;
+  const year = Number(m[1]);
+  const sequence = Number(m[2]);
+  return Number.isInteger(year) && sequence > 0 ? { year, sequence } : null;
+}
+
+export function peekNextInvoiceNumber(db: DB, date: string): string {
+  const year = Number(date.slice(0, 4));
+  const row = db.prepare('SELECT last_value FROM sequences WHERE name = ? AND year = ?').get('invoice', year) as { last_value: number } | undefined;
+  return formatInvoiceNumber(year, Number(row?.last_value ?? 0) + 1);
+}
+
 export function nextInvoiceNumber(db: DB, date: string): string {
   const year = Number(date.slice(0, 4));
-  const n = nextSequence(db, 'invoice', year);
-  return `INV-${year}-${String(n).padStart(5, '0')}`;
+  return formatInvoiceNumber(year, nextSequence(db, 'invoice', year));
 }
 
 export function nextPrescriptionNumber(db: DB, date: string): string {
