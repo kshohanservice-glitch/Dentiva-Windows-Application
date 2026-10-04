@@ -11,7 +11,7 @@ import { DataTable, TableToolbar, type Column } from '../components/table';
 import { Icon } from '../components/shell';
 import { ToothChart } from '../components/ToothChart';
 import { bdt, formatDate, isoDate, localDateTime } from '../format';
-import type { DuplicateCandidate, PatientDTO, PatientFilters, PatientDetailDTO, PrescriptionDTO, TreatmentDTO } from '../../shared/types';
+import type { DuplicateCandidate, PatientDTO, PatientFilters, PatientDetailDTO, PrescriptionDTO, TreatmentDTO, ReferralRecord, ReferralInput } from '../../shared/types';
 import type { PatientInputPayload } from '../../shared/ipc';
 
 /* ================================ List ================================= */
@@ -405,7 +405,7 @@ export function PatientsPage() {
 
 /* ============================== Profile ================================ */
 
-type ProfileTab = 'overview' | 'visits' | 'chart' | 'rx' | 'invoices' | 'files' | 'history';
+type ProfileTab = 'overview' | 'visits' | 'chart' | 'rx' | 'invoices' | 'referrals' | 'files' | 'history';
 
 export function PatientProfilePage() {
   const { id } = useParams();
@@ -420,6 +420,7 @@ export function PatientProfilePage() {
   const [visitOpen, setVisitOpen] = useState(false);
   const [rxOpen, setRxOpen] = useState(false);
   const [invoiceOpen, setInvoiceOpen] = useState(false);
+  const [referralOpen, setReferralOpen] = useState(false);
   const [refreshTick, setRefreshTick] = useState(0);
 
   const { data: patient, loading, error, reload } = useAsync(() => api['patients/get'](patientId), [patientId, refreshTick]);
@@ -434,6 +435,7 @@ export function PatientProfilePage() {
     { key: 'chart' as const, label: 'Dental chart' },
     { key: 'rx' as const, label: 'Prescriptions' },
     { key: 'invoices' as const, label: 'Invoices' },
+    ...(can('clinical.view') ? [{ key: 'referrals' as const, label: 'Referrals' }] : []),
     { key: 'files' as const, label: 'Attachments' },
     { key: 'history' as const, label: 'History' },
   ];
@@ -502,6 +504,7 @@ export function PatientProfilePage() {
             <InvoicesForPatient patientId={patient.id} refreshKey={refreshTick} onOpen={(invId) => navigate(`/invoices?invoice=${invId}`)} />
           </Card>
         )}
+        {tab === 'referrals' && <ReferralsTab patientId={patient.id} canManage={can('clinical.referral.manage')} onCreate={() => setReferralOpen(true)} />}
         {tab === 'files' && <AttachmentsTab entityType="patient" entityId={patient.id} />}
         {tab === 'history' && <TimelineTab patientId={patient.id} refreshKey={refreshTick} />}
       </div>
@@ -550,11 +553,79 @@ export function PatientProfilePage() {
 
       {visitOpen && <VisitFormModal patientId={patient.id} onClose={() => setVisitOpen(false)} onSaved={() => { setVisitOpen(false); setRefreshTick((n) => n + 1); setTab('visits'); }} />}
       {rxOpen && <RxFormModal patientId={patient.id} onClose={() => setRxOpen(false)} onSaved={() => { setRxOpen(false); setRefreshTick((n) => n + 1); setTab('rx'); }} />}
+      {referralOpen && <ReferralFormModal patientId={patient.id} onClose={() => setReferralOpen(false)} onSaved={() => { setReferralOpen(false); setRefreshTick((n) => n + 1); setTab('referrals'); }} />}
       {invoiceOpen && <InvoiceFormModal patientId={patient.id} onClose={() => setInvoiceOpen(false)} onSaved={(invId) => { setInvoiceOpen(false); setRefreshTick((n) => n + 1); setTab('invoices'); navigate(`/invoices?invoice=${invId}`); }} />}
     </div>
   );
 }
 
+function ReferralsTab(props: { patientId: number; canManage: boolean; onCreate: () => void }) {
+  const { data, loading, error, reload } = useAsync(() => api['referrals/list'](props.patientId), [props.patientId]);
+  const [editing, setEditing] = useState<ReferralRecord | null>(null);
+  if (loading && !data) return <Card title="Referrals"><Spinner label="Loading referrals…" /></Card>;
+  if (error) return <Card title="Referrals"><ErrorState error={error} onRetry={reload} /></Card>;
+  const rows = data ?? [];
+  return (
+    <>
+      <Card title="Referrals" actions={props.canManage ? <Button size="sm" variant="primary" onClick={props.onCreate}>New referral</Button> : undefined}>
+        {rows.length === 0 ? <EmptyState title="No referrals" body="Referral records for this patient will appear here." /> : (
+          <div className="list">
+            {rows.map((r) => (
+              <div key={r.id} className="list-row">
+                <div className="flex-1">
+                  <div className="row gap-2"><strong>{r.direction === 'out' ? 'Outgoing' : 'Incoming'}</strong><Badge tone={r.status === 'completed' ? 'success' : r.status === 'cancelled' ? 'danger' : 'warning'}>{r.status}</Badge></div>
+                  <div className="small">{r.person || r.clinic || 'Referral'}{r.specialty ? ' · ' + r.specialty : ''}</div>
+                  <div className="xsmall muted">{formatDate(r.date)}{r.reason ? ' · ' + r.reason : ''}{r.follow_up ? ' · Follow-up ' + formatDate(r.follow_up) : ''}</div>
+                </div>
+                {props.canManage && <Button size="sm" variant="ghost" onClick={() => setEditing(r)}>Edit</Button>}
+              </div>
+            ))}
+          </div>
+        )}
+      </Card>
+      {editing && <ReferralFormModal patientId={props.patientId} initial={editing} onClose={() => setEditing(null)} onSaved={() => { setEditing(null); reload(); }} />}
+    </>
+  );
+}
+
+function ReferralFormModal(props: { patientId: number; initial?: ReferralRecord | null; onClose: () => void; onSaved: (id: number) => void }) {
+  const toast = useToast();
+  const [pending, setPending] = useState(false);
+  const [values, setValues] = useState<ReferralInput>(() => ({
+    patientId: props.patientId, direction: props.initial?.direction ?? 'out', person: props.initial?.person ?? '',
+    clinic: props.initial?.clinic ?? '', specialty: props.initial?.specialty ?? '', reason: props.initial?.reason ?? '',
+    date: props.initial?.date ?? isoDate(new Date()), status: props.initial?.status ?? 'open',
+    followUp: props.initial?.follow_up ?? '', note: props.initial?.note ?? '',
+    ...(props.initial?.id ? { id: props.initial.id } : {}),
+  }));
+  const set = (key: keyof ReferralInput, value: unknown) => setValues((v) => ({ ...v, [key]: value }));
+  const submit = async () => {
+    if (!values.date) { toast.warning('Date required', 'Choose the referral date.'); return; }
+    setPending(true);
+    try {
+      const saved = await api['referrals/save']({ ...values, patientId: props.patientId });
+      toast.success(props.initial ? 'Referral updated' : 'Referral recorded');
+      props.onSaved(saved.id);
+    } catch (err) {
+      toast.fromError(err, props.initial ? 'Could not update referral' : 'Could not save referral');
+    } finally { setPending(false); }
+  };
+  return (
+    <Modal title={props.initial ? 'Edit referral' : 'New referral'} onClose={props.onClose} width="wide" footer={<><Button variant="secondary" onClick={props.onClose}>Cancel</Button><Button variant="primary" loading={pending} onClick={() => void submit()}>Save referral</Button></>}>
+      <div className="form-grid">
+        <Field label="Direction">{(id) => <Select id={id} value={values.direction ?? 'out'} onChange={(v) => set('direction', v)} options={[{ value: 'out', label: 'Outgoing — refer this patient' }, { value: 'in', label: 'Incoming — referred to us' }]} />}</Field>
+        <Field label="Date" required>{(id) => <Input id={id} type="date" value={values.date} onChange={(v) => set('date', v)} />}</Field>
+        <Field label="Person">{(id) => <Input id={id} value={values.person ?? ''} onChange={(v) => set('person', v)} placeholder="Doctor / contact person" />}</Field>
+        <Field label="Clinic / hospital">{(id) => <Input id={id} value={values.clinic ?? ''} onChange={(v) => set('clinic', v)} />}</Field>
+        <Field label="Specialty">{(id) => <Input id={id} value={values.specialty ?? ''} onChange={(v) => set('specialty', v)} placeholder="Orthodontics, Oral Surgery…" />}</Field>
+        <Field label="Status">{(id) => <Select id={id} value={values.status ?? 'open'} onChange={(v) => set('status', v)} options={[{ value: 'open', label: 'Open' }, { value: 'completed', label: 'Completed' }, { value: 'cancelled', label: 'Cancelled' }]} />}</Field>
+        <Field label="Reason" className="span-2">{(id) => <Textarea id={id} rows={3} value={values.reason ?? ''} onChange={(v) => set('reason', v)} />}</Field>
+        <Field label="Follow-up date">{(id) => <Input id={id} type="date" value={values.followUp ?? ''} onChange={(v) => set('followUp', v)} />}</Field>
+        <Field label="Note" className="span-2">{(id) => <Textarea id={id} rows={3} value={values.note ?? ''} onChange={(v) => set('note', v)} />}</Field>
+      </div>
+    </Modal>
+  );
+}
 function OverviewTab(props: { patient: PatientDetailDTO; onGoto: (t: ProfileTab) => void }) {
   const p = props.patient;
   return (
