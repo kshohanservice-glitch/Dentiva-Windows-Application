@@ -576,3 +576,383 @@
 }
 
 .sig-compact { margin-top: 12px; padding-top: 8px; border-top: 1px dotted var(--print-line); }
+
+
+/* Prescription stationery — two-column clinical layout matching the requested form. */
+.prescription-header {
+  display: grid;
+  grid-template-columns: minmax(0, 1.35fr) minmax(0, .85fr);
+  gap: 22px;
+  align-items: start;
+  padding-bottom: 13px;
+  border-bottom: 2px solid var(--print-ink);
+}
+
+.prescription-clinic {
+  display: flex;
+  gap: 13px;
+  min-width: 0;
+  align-items: flex-start;
+}
+
+.prescription-logo {
+  width: 58px;
+  height: 58px;
+  flex: none;
+  object-fit: contain;
+  border-radius: 8px;
+}
+
+.prescription-logo-fallback {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1.5px solid var(--print-ink);
+  font-size: 25px;
+  font-weight: 800;
+}
+
+.prescription-clinic-copy {
+  min-width: 0;
+  color: var(--print-muted);
+  font-size: 10.5px;
+  line-height: 1.45;
+}
+
+.prescription-clinic-name {
+  color: var(--print-ink);
+  font-size: 19px;
+  font-weight: 800;
+  line-height: 1.15;
+  letter-spacing: -.02em;
+}
+
+.prescription-clinic-bn {
+  color: var(--print-ink);
+  font-weight: 700;
+  margin-top: 2px;
+}
+
+.prescription-contact {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px 10px;
+}
+
+.prescription-dentist {
+  text-align: right;
+  color: var(--print-muted);
+  font-size: 10.5px;
+  line-height: 1.42;
+}
+
+.prescription-dentist-label {
+  color: var(--print-accent);
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: .16em;
+  margin-bottom: 2px;
+}
+
+.prescription-dentist-name {
+  color: var(--print-ink);
+  font-size: 16px;
+  font-weight: 800;
+  line-height: 1.2;
+}
+
+.prescription-dentist-designation {
+  color: var(--print-ink);
+  font-weight: 700;
+}
+
+.prescription-dentist-qualification {
+  font-size: 10px;
+}
+
+.prescription-dentist-other {
+  margin-top: 3px;
+  font-size: 9.5px;
+}
+
+.prescription-patient-strip {
+  display: grid;
+  grid-template-columns: minmax(0, 2.1fr) .55fr .8fr 1.05fr .95fr .9fr;
+  gap: 0;
+  margin-top: 12px;
+  border: 1px solid var(--print-ink);
+  border-radius: 5px;
+  overflow: hidden;
+}
+
+.prescription-patient-strip > div {
+  min-width: 0;
+  padding: 6px 8px;
+  border-right: 1px solid var(--print-line);
+}
+
+.prescription-patient-strip > div:last-child {
+  border-right: 0;
+}
+
+.prescription-patient-strip span {
+  display: block;
+  color: var(--print-muted);
+  font-size: 8px;
+  font-weight: 700;
+  letter-spacing: .05em;
+  text-transform: uppercase;
+  margin-bottom: 1px;
+}
+
+.prescription-patient-strip strong {
+  display: block;
+  min-width: 0;
+  color: var(--print-ink);
+  font-size: 10.5px;
+  overflow-wrap: anywhere;
+}
+
+.prescription-visiting-hours {
+  margin-top: 7px;
+  color: var(--print-muted);
+  font-size: 9.5px;
+  text-align: right;
+}
+
+.prescription-body {
+  display: grid;
+  grid-template-columns: minmax(0, .36fr) minmax(0, .64fr);
+  margin-top: 13px;
+  border: 1px solid var(--print-ink);
+  border-radius: 6px;
+  overflow: hidden;
+  min-height: 145mm;
+}
+
+.prescription-clinical {
+  min-width: 0;
+  padding: 11px 12px;
+  border-right: 1px solid var(--print-ink);
+}
+
+.prescription-column-title {
+  color: var(--print-ink);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  padding-bottom: 7px;
+  border-bottom: 1.5px solid var(--print-ink);
+}
+
+.clinical-field {
+  padding: 11px 0 12px;
+  border-bottom: 1px dotted var(--print-line);
+  min-height: 27mm;
+}
+
+.clinical-field:last-child {
+  border-bottom: 0;
+}
+
+.clinical-label {
+  color: var(--print-accent);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  margin-bottom: 4px;
+}
+
+.clinical-value {
+  color: var(--print-ink);
+  font-size: 11px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.prescription-medications {
+  min-width: 0;
+  padding: 11px 13px 10px;
+  display: flex;
+  flex-direction: column;
+}
+
+.rx-heading {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding-bottom: 7px;
+  border-bottom: 1.5px solid var(--print-ink);
+}
+
+.rx-symbol {
+  color: var(--print-ink);
+  font-family: Georgia, 'Times New Roman', serif;
+  font-size: 27px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.rx-heading-text {
+  color: var(--print-muted);
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+}
+
+.medication-list {
+  flex: 0 0 auto;
+}
+
+.prescription-medication {
+  display: grid;
+  grid-template-columns: 22px minmax(0, 1fr);
+  gap: 6px;
+  padding: 9px 0;
+  border-bottom: 1px dotted var(--print-line);
+  break-inside: avoid;
+}
+
+.medication-index {
+  color: var(--print-ink);
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.medication-content {
+  min-width: 0;
+}
+
+.medication-title {
+  color: var(--print-ink);
+  font-size: 11.5px;
+  font-weight: 800;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+.medication-strength {
+  font-weight: 700;
+}
+
+.medication-instructions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 10px;
+  margin-top: 2px;
+  color: var(--print-muted);
+  font-size: 9.5px;
+  line-height: 1.4;
+}
+
+.medication-instructions span:not(:last-child)::after {
+  content: ' ·';
+  color: var(--print-line);
+  margin-left: 7px;
+}
+
+.prescription-bottom {
+  margin-top: auto;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 10px;
+  padding-top: 12px;
+}
+
+.prescription-advice,
+.prescription-follow-up {
+  border-top: 1px solid var(--print-line);
+  padding-top: 7px;
+  min-height: 24mm;
+}
+
+.prescription-section-label {
+  color: var(--print-accent);
+  font-size: 9.5px;
+  font-weight: 800;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  margin-bottom: 4px;
+}
+
+.prescription-section-value {
+  color: var(--print-ink);
+  font-size: 10.5px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.prescription-signature {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 9px;
+  padding-top: 8px;
+  border-top: 1px solid var(--print-line);
+}
+
+.prescription-signature-box {
+  width: 62mm;
+  text-align: center;
+}
+
+.prescription-signature .sig-line {
+  width: 100%;
+  height: 28px;
+  margin-bottom: 4px;
+}
+
+.prescription-signature-name {
+  color: var(--print-ink);
+  font-size: 10.5px;
+  font-weight: 800;
+}
+
+@media screen {
+  .prescription-body {
+    min-height: 145mm;
+  }
+}
+
+@media print {
+  .prescription-header,
+  .prescription-patient-strip,
+  .prescription-body {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  .prescription-body {
+    min-height: 145mm;
+  }
+}
+
+@media (max-width: 800px) {
+  .prescription-header {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+
+  .prescription-dentist {
+    text-align: left;
+  }
+
+  .prescription-patient-strip {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .prescription-patient-strip > div:nth-child(2n) {
+    border-right: 0;
+  }
+
+  .prescription-body {
+    grid-template-columns: 1fr;
+  }
+
+  .prescription-clinical {
+    border-right: 0;
+    border-bottom: 1px solid var(--print-ink);
+  }
+}
