@@ -279,12 +279,5 @@ jobs:
           }
           if ($LASTEXITCODE -ne 0) { throw 'Release step failed' }
 
-          # Production policy: keep exactly one published release/tag — this build.
-          # GitHub CLI supports deleting a release and its associated tag together.
-          $oldTags = gh release list --limit 100 --json tagName,isDraft,isPrerelease | ConvertFrom-Json | Where-Object { $_.tagName -ne $tag -and -not $_.isDraft -and -not $_.isPrerelease } | ForEach-Object { $_.tagName }
-          if ($LASTEXITCODE -ne 0) { throw 'Could not enumerate previous releases' }
-          foreach ($oldTag in ($oldTags -split "`n" | Where-Object { $_.Trim() -ne '' })) {
-            Write-Host "Removing superseded release: $oldTag"
-            gh release delete $oldTag --yes --cleanup-tag
-            if ($LASTEXITCODE -ne 0) { throw "Failed to remove superseded release $oldTag" }
-          }
+          # Keep existing published releases/tags intact; each version gets its own release.
+          Write-Host "Published release $tag; previous releases are retained."
