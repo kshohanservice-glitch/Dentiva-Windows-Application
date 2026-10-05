@@ -1,0 +1,58 @@
+name: Real prescription PDF
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'tests/e2e/app.spec.ts'
+      - '.github/workflows/prescription-pdf.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  generate:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx electron-builder install-app-deps
+      - name: Inject real PDF export into the existing prescription E2E
+        shell: pwsh
+        run: |
+          $p = 'tests/e2e/app.spec.ts'
+          $s = Get-Content $p -Raw
+          $needle = '  await printWin.close();'
+          $insert = @'
+          const stamp = Date.now();
+          const pdfPath = path.resolve('artifacts', `dentiva-prescription-random-${stamp}.pdf`);
+          fs.mkdirSync(path.dirname(pdfPath), { recursive: true });
+          const pdfBytes = await app.evaluate(async ({ BrowserWindow }) => {
+            const win = BrowserWindow.getAllWindows().find((w) => w.getURL().includes('#print/prescription'));
+            if (!win) throw new Error('Prescription print window not found');
+            return await win.webContents.printToPDF({
+              printBackground: true,
+              preferCSSPageSize: true,
+            });
+          });
+          fs.writeFileSync(pdfPath, pdfBytes);
+          console.log(`REAL_PRESCRIPTION_PDF=${pdfPath}`);
+          await printWin.close();
+'@
+          if (-not $s.Contains($needle)) { throw 'Prescription print close marker not found' }
+          $s = $s.Replace($needle, $insert)
+          Set-Content -Path $p -Value $s -NoNewline
+      - name: Run real Electron prescription flow
+        run: npx playwright test tests/e2e/app.spec.ts
+      - name: Upload actual software-generated prescription PDF
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: real-prescription-pdf
+          path: artifacts/dentiva-prescription-random-*.pdf
+          if-no-files-found: error
+          retention-days: 7
