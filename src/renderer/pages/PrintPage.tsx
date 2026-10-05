@@ -266,76 +266,146 @@ function receiptDoc(data: any): React.ReactNode {
 }
 
 function prescriptionDoc(data: any): React.ReactNode {
-  const { rx, patient, clinic, visit, watermark, settings } = data;
-  const ageGender = `${patient.ageYears != null ? `${patient.ageYears}y ` : ''}${patient.gender || ''}`.trim() || '—';
+  const { rx, patient, clinic, visit, watermark, settings, dentist } = data;
   const diagnosisText = rx.diagnosis || visit?.diagnosis || null;
   const labels = settings?.prescription?.labels ?? {};
   const sigReserved = settings?.prescription?.signatureReserved !== false;
+  const dentistName = dentist?.name ?? rx.dentistName ?? 'Dentist';
+  const qualifications = credentialLines(dentist?.qualifications);
+  const designations = credentialLines(dentist?.designations);
+  const otherDentistInfo = [
+    dentist?.regNo ? `Reg. ${dentist.regNo}` : '',
+    dentist?.phone ? dentist.phone : '',
+    dentist?.email ? dentist.email : '',
+  ].filter(Boolean);
+
+  const clinicalFields = [
+    { label: labels.cc || 'C/C', value: rx.cC },
+    { label: labels.oe || 'O/E', value: rx.oE },
+    { label: labels.re || 'R/E', value: rx.rE },
+    ...(diagnosisText ? [{ label: labels.diagnosis || 'Diagnosis', value: diagnosisText }] : []),
+    ...(rx.treatment ? [{ label: labels.treatment || 'Treatment', value: rx.treatment }] : []),
+  ];
+
   return (
     <>
       {watermark && <div className="print-watermark"><span>Specimen</span></div>}
-      <Header clinic={clinic} right={<>
-        <div><b>Prescription</b></div>
-        <div className="mono">Rx {rx.rxNumber}</div>
-        <div>{formatDate(rx.rxDate)}</div>
-      </>} />
-      {settings?.prescription?.visitingHours && <div className="muted small" style={{ marginTop: -6, marginBottom: 8 }}>{settings.prescription.visitingHours}</div>}
-      <div className="print-kv">
-        <div><span className="k">Patient</span><span className="v">{patient.name}</span></div>
-        <div><span className="k">Age / Sex</span><span className="v">{ageGender}</span></div>
-        <div><span className="k">Phone</span><span className="v">{patient.phone || '—'}</span></div>
-        <div><span className="k">Patient ID</span><span className="v mono">{patient.patientCode}</span></div>
-        {diagnosisText && <div><span className="k">{labels.diagnosis || 'Diagnosis'}</span><span className="v">{diagnosisText}</span></div>}
-        {rx.cC && <div><span className="k">{labels.cc || 'C/C'}</span><span className="v">{rx.cC}</span></div>}
-        {rx.oE && <div><span className="k">{labels.oe || 'O/E'}</span><span className="v">{rx.oE}</span></div>}
-        {rx.rE && <div><span className="k">{labels.re || 'R/E'}</span><span className="v">{rx.rE}</span></div>}
-        {rx.treatment && <div><span className="k">{labels.treatment || 'Treatment'}</span><span className="v">{rx.treatment}</span></div>}
-      </div>
-      <h2>Medications</h2>
-      {rx.items.map((it: any, i: number) => (
-        <div className="rx-line" key={i}>
-          <span className="idx">{i + 1}.</span>
-          <span className="drug">{it.form ? `${it.form} ` : ''}{it.medicineName}</span>
-          {it.strength && <span className="muted">({it.strength})</span>}
-          {it.generic && <span className="muted">[{it.generic}]</span>}
-          <span>— {it.dosage}{it.frequency ? ` ${it.frequency}` : ''}{it.route ? ` (${it.route})` : ''}</span>
-          <span className="muted">
-            {it.duration ? `× ${it.duration}` : ''}
-            {it.qty ? ` (Qty: ${it.qty})` : ''}
-            {it.instruction ? ` · ${it.instruction}` : ''}
-          </span>
-        </div>
-      ))}
-      {rx.advice && <><h3>{labels.advice || 'Advice'}</h3><div>{rx.advice}</div></>}
-      {rx.followUp && <><h3>{labels.followUp || 'Follow-up'}</h3><div>{formatDate(rx.followUp)}</div></>}
-      {sigReserved ? (
-      <div className="sig-block">
-        <div className="muted small">
-          {watermark ? 'Duplicate copy — valid only with signature and seal.' : 'Please complete the full course as directed.'}
-        </div>
-        <div>
-          <div className="sig-line" />
-          <div><b>{data.dentist?.name ?? rx.dentistName}</b></div>
-          <div className="muted small">
-            {credentialLines(data.dentist?.qualifications).map((q, i) => <div key={i}>{q}</div>)}
-            {data.dentist?.regNo && <div>Reg. {data.dentist.regNo}</div>}
+
+      <div className="prescription-header">
+        <div className="prescription-clinic">
+          {clinic?.logoDataUrl ? (
+            <img className="prescription-logo" src={clinic.logoDataUrl} alt="" />
+          ) : (
+            <div className="prescription-logo prescription-logo-fallback">D</div>
+          )}
+          <div className="prescription-clinic-copy">
+            <div className="prescription-clinic-name">{clinic?.clinicName || 'Dental Clinic'}</div>
+            {clinic?.clinicNameBn && <div className="prescription-clinic-bn">{clinic.clinicNameBn}</div>}
+            {clinic?.address && <div>{clinic.address}</div>}
+            <div className="prescription-contact">
+              {clinic?.phone && <span>{clinic.phone}</span>}
+              {clinic?.email && <span>{clinic.email}</span>}
+              {clinic?.website && <span>{clinic.website}</span>}
+            </div>
           </div>
         </div>
-      </div>
-      ) : (
-        <div className="sig-compact">
-          <div><b>{data.dentist?.name ?? rx.dentistName}</b></div>
-          <div className="muted small">
-            {credentialLines(data.dentist?.qualifications).map((q, i) => <div key={i}>{q}</div>)}
-            {data.dentist?.regNo && <div>Reg. {data.dentist.regNo}</div>}
-          </div>
+
+        <div className="prescription-dentist">
+          <div className="prescription-dentist-label">DENTIST</div>
+          <div className="prescription-dentist-name">{dentistName}</div>
+          {designations.map((d, i) => <div key={`des-${i}`} className="prescription-dentist-designation">{d}</div>)}
+          {qualifications.map((q, i) => <div key={`qual-${i}`} className="prescription-dentist-qualification">{q}</div>)}
+          {otherDentistInfo.length > 0 && (
+            <div className="prescription-dentist-other">
+              {otherDentistInfo.map((v, i) => <div key={i}>{v}</div>)}
+            </div>
+          )}
         </div>
+      </div>
+
+      <div className="prescription-patient-strip">
+        <div><span>Patient Name</span><strong>{patient.name}</strong></div>
+        <div><span>Age</span><strong>{patient.ageYears != null ? `${patient.ageYears}` : '—'}</strong></div>
+        <div><span>Gender</span><strong>{patient.gender || '—'}</strong></div>
+        <div><span>Patient ID</span><strong className="mono">{patient.patientCode}</strong></div>
+        <div><span>Date</span><strong>{formatDate(rx.rxDate)}</strong></div>
+        <div><span>Rx No.</span><strong className="mono">{rx.rxNumber}</strong></div>
+      </div>
+
+      {settings?.prescription?.visitingHours && (
+        <div className="prescription-visiting-hours">{settings.prescription.visitingHours}</div>
       )}
+
+      <div className="prescription-body">
+        <aside className="prescription-clinical">
+          <div className="prescription-column-title">Clinical Notes</div>
+          {clinicalFields.map((field, i) => (
+            <div className={`clinical-field ${i < 3 ? 'clinical-primary' : ''}`} key={field.label}>
+              <div className="clinical-label">{field.label}</div>
+              <div className="clinical-value">{field.value || '—'}</div>
+            </div>
+          ))}
+        </aside>
+
+        <section className="prescription-medications">
+          <div className="rx-heading">
+            <span className="rx-symbol">Rx</span>
+            <span className="rx-heading-text">Prescription</span>
+          </div>
+
+          <div className="medication-list">
+            {rx.items.length > 0 ? rx.items.map((it: any, i: number) => (
+              <div className="prescription-medication" key={i}>
+                <div className="medication-index">{i + 1}</div>
+                <div className="medication-content">
+                  <div className="medication-title">
+                    {it.form ? `${it.form} ` : ''}{it.medicineName}
+                    {it.strength && <span className="medication-strength"> {it.strength}</span>}
+                  </div>
+                  <div className="medication-instructions">
+                    {it.dosage && <span>{it.dosage}</span>}
+                    {it.frequency && <span>{it.frequency}</span>}
+                    {it.duration && <span>{it.duration}</span>}
+                    {it.qty && <span>Qty: {it.qty}</span>}
+                    {it.instruction && <span>{it.instruction}</span>}
+                    {it.generic && <span className="muted">{it.generic}</span>}
+                  </div>
+                </div>
+              </div>
+            )) : (
+              <div className="muted">No medicines recorded.</div>
+            )}
+          </div>
+
+          <div className="prescription-bottom">
+            <div className="prescription-advice">
+              <div className="prescription-section-label">{labels.advice || 'Advice'}</div>
+              <div className="prescription-section-value">{rx.advice || '—'}</div>
+            </div>
+            <div className="prescription-follow-up">
+              <div className="prescription-section-label">{labels.followUp || 'Follow-up'}</div>
+              <div className="prescription-section-value">{rx.followUp ? formatDate(rx.followUp) : '—'}</div>
+            </div>
+          </div>
+
+          {sigReserved && (
+            <div className="prescription-signature">
+              <div className="prescription-signature-box">
+                <div className="sig-line" />
+                <div className="prescription-signature-name">{dentistName}</div>
+                {designations.map((d, i) => <div key={`sig-des-${i}`} className="muted small">{d}</div>)}
+                {qualifications.map((q, i) => <div key={`sig-qual-${i}`} className="muted small">{q}</div>)}
+                {dentist?.regNo && <div className="muted small">Reg. {dentist.regNo}</div>}
+              </div>
+            </div>
+          )}
+        </section>
+      </div>
+
       <Footer text={settings?.prescription?.footerMessage || clinic?.clinicName || ''} />
     </>
   );
 }
-
 function visitSummaryDoc(data: any): React.ReactNode {
   const { patient, visit, procedures, rx, clinic } = data;
   const ageGender = `${patient.ageYears != null ? `${patient.ageYears}y ` : ''}${patient.gender || ''}`.trim() || '—';
