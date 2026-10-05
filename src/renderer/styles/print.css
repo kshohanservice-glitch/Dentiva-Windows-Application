@@ -695,6 +695,12 @@
   border-right: 0;
 }
 
+.prescription-patient-phone {
+  grid-column: 1 / -1;
+  border-right: 0 !important;
+  border-top: 1px solid var(--print-line);
+}
+
 .prescription-patient-strip span {
   display: block;
   color: var(--print-muted);
@@ -887,10 +893,26 @@
 
 .prescription-signature {
   display: flex;
-  justify-content: flex-end;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 12px;
   margin-top: 9px;
   padding-top: 8px;
   border-top: 1px solid var(--print-line);
+}
+
+.prescription-signature-note {
+  flex: 1 1 auto;
+  align-self: flex-start;
+  padding-top: 2px;
+  max-width: 62%;
+}
+
+.prescription-signature-compact {
+  margin-top: 14px;
+  margin-left: auto;
+  width: 62mm;
+  text-align: center;
 }
 
 .prescription-signature-box {
