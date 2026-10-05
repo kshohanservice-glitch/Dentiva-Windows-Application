@@ -330,6 +330,7 @@ function prescriptionDoc(data: any): React.ReactNode {
         <div><span>Patient ID</span><strong className="mono">{patient.patientCode}</strong></div>
         <div><span>Date</span><strong>{formatDate(rx.rxDate)}</strong></div>
         <div><span>Rx No.</span><strong className="mono">{rx.rxNumber}</strong></div>
+        {patient.phone && <div className="prescription-patient-phone"><span>Phone</span><strong>{patient.phone}</strong></div>}
       </div>
 
       {settings?.prescription?.visitingHours && (
@@ -365,6 +366,7 @@ function prescriptionDoc(data: any): React.ReactNode {
                   <div className="medication-instructions">
                     {it.dosage && <span>{it.dosage}</span>}
                     {it.frequency && <span>{it.frequency}</span>}
+                    {it.route && <span>{it.route}</span>}
                     {it.duration && <span>{it.duration}</span>}
                     {it.qty && <span>Qty: {it.qty}</span>}
                     {it.instruction && <span>{it.instruction}</span>}
@@ -388,8 +390,11 @@ function prescriptionDoc(data: any): React.ReactNode {
             </div>
           </div>
 
-          {sigReserved && (
+          {sigReserved ? (
             <div className="prescription-signature">
+              <div className="prescription-signature-note muted small">
+                {watermark ? 'Duplicate copy — valid only with signature and seal.' : 'Please complete the full course as directed.'}
+              </div>
               <div className="prescription-signature-box">
                 <div className="sig-line" />
                 <div className="prescription-signature-name">{dentistName}</div>
@@ -397,6 +402,13 @@ function prescriptionDoc(data: any): React.ReactNode {
                 {qualifications.map((q, i) => <div key={`sig-qual-${i}`} className="muted small">{q}</div>)}
                 {dentist?.regNo && <div className="muted small">Reg. {dentist.regNo}</div>}
               </div>
+            </div>
+          ) : (
+            <div className="prescription-signature-compact">
+              <div><b>{dentistName}</b></div>
+              {designations.map((d, i) => <div key={`compact-des-${i}`} className="muted small">{d}</div>)}
+              {qualifications.map((q, i) => <div key={`compact-qual-${i}`} className="muted small">{q}</div>)}
+              {dentist?.regNo && <div className="muted small">Reg. {dentist.regNo}</div>}
             </div>
           )}
         </section>
