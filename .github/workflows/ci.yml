@@ -121,6 +121,15 @@ jobs:
           path: playwright-report/
           retention-days: 7
 
+      - name: Upload real prescription PDF
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: real-prescription-pdf
+          path: artifacts/dentiva-prescription-random-*.pdf
+          if-no-files-found: error
+          retention-days: 7
+
   package:
     name: NSIS installer + installed-artifact smoke test
     runs-on: windows-latest
