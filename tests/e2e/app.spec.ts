@@ -271,12 +271,13 @@ test('creates a prescription and opens the print window', async () => {
   const rxModal = page.locator('.modal[role="dialog"]', { hasText: 'Save prescription' });
   await expect(rxModal).toBeVisible();
   await page.getByLabel('Prescribing dentist').selectOption({ label: 'Dr. E2E Dentist' });
-  await page.getByPlaceholder('e.g. Amoxicillin').first().fill('Amoxicillin 500 mg');
+  const randomMedicine = `Amoxicillin ${500 + (Date.now() % 5) * 50} mg`;
+  await page.getByPlaceholder('e.g. Amoxicillin').first().fill(randomMedicine);
   await page.getByRole('button', { name: 'Save prescription' }).click();
-  await expect(page.getByText('Amoxicillin 500 mg').first()).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByText(randomMedicine).first()).toBeVisible({ timeout: 30_000 });
 
   // Open the saved prescription and print — a separate sandboxed print window must open.
-  await page.getByText('Amoxicillin 500 mg').first().click();
+  await page.getByText(randomMedicine).first().click();
   const detail = page.locator('.modal[role="dialog"]', { hasText: 'Patient' }).last();
   await expect(detail.getByRole('button', { name: 'Print', exact: true })).toBeVisible({ timeout: 30_000 });
   const [printWin] = await Promise.all([
@@ -285,7 +286,7 @@ test('creates a prescription and opens the print window', async () => {
   ]);
   await printWin.waitForLoadState('domcontentloaded');
   expect(printWin.url()).toContain('#print/prescription');
-  await expect(printWin.getByText('Amoxicillin 500 mg').first()).toBeVisible({ timeout: 60_000 });
+  await expect(printWin.getByText(randomMedicine).first()).toBeVisible({ timeout: 60_000 });
   await printWin.close();
   await detail.getByRole('button', { name: 'Close' }).click();
   await expect(detail).toBeHidden();
