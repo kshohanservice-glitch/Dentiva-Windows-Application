@@ -360,7 +360,6 @@ function SecurityTab(props: { form: any; set: (path: string[], v: unknown) => vo
 const PAPER_DEFAULT_MM: Record<string, [number, number]> = {
   a4: [210, 297],
   a5: [148, 210],
-  thermal: [80, 200],
   custom: [210, 297],
 };
 
