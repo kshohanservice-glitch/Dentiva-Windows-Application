@@ -294,7 +294,7 @@ export interface ClinicSettings {
 
 export interface PrintProfile {
   id: string; name: string; documentType: 'prescription' | 'invoice' | 'report' | 'receipt';
-  printerName: string; paperSize: 'a4' | 'a5' | 'thermal' | 'custom';
+  printerName: string; paperSize: 'a4' | 'a5' | 'custom';
   widthMm: number; heightMm: number; orientation: 'portrait' | 'landscape';
   margins: { top: number; right: number; bottom: number; left: number };
   scale: number; copies: number;
