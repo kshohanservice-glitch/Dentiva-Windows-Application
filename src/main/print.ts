@@ -188,12 +188,9 @@ export async function saveAsPdf(opts: PdfOptions): Promise<PdfResult> {
       pageSize: { width: widthIn, height: heightIn },
       landscape: Boolean(opts.landscape),
       scale: opts.scale ? Math.max(0.25, Math.min(2, opts.scale / 100)) : undefined,
-      margins: {
-        top: mmToInches(m.top),
-        right: mmToInches(m.right),
-        bottom: mmToInches(m.bottom),
-        left: mmToInches(m.left),
-      },
+      // The rendered document already contains its exact printable
+      // padding. Do not add another PDF margin layer.
+      margins: { top: 0, right: 0, bottom: 0, left: 0 },
       printBackground: true,
       preferCSSPageSize: true,
     });
