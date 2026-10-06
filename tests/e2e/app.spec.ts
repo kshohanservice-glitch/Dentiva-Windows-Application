@@ -291,7 +291,7 @@ test('creates a prescription and opens the print window', async () => {
   await expect(detail).toBeHidden();
 });
 
-test('invoice print window has no thermal profile and closes with Back', async () => {
+test('invoice print window uses standard profiles and closes with Back', async () => {
   await page.getByRole('link', { name: 'Invoice', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Invoices', level: 1 })).toBeVisible();
   const row = page.getByRole('cell', { name: 'INV-', exact: false }).first();
