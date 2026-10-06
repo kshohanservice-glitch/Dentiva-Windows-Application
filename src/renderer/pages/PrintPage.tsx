@@ -327,10 +327,10 @@ function prescriptionDoc(data: any): React.ReactNode {
         <div><span>Patient Name</span><strong>{patient.name}</strong></div>
         <div><span>Age</span><strong>{patient.ageYears != null ? `${patient.ageYears}` : '—'}</strong></div>
         <div><span>Gender</span><strong>{patient.gender || '—'}</strong></div>
-        <div><span>Patient ID</span><strong className="mono">{patient.patientCode}</strong></div>
+        <div className="prescription-patient-phone"><span>Phone</span><strong>{patient.phone || '—'}</strong></div>
         <div><span>Date</span><strong>{formatDate(rx.rxDate)}</strong></div>
+        <div><span>Patient ID</span><strong className="mono">{patient.patientCode}</strong></div>
         <div><span>Rx No.</span><strong className="mono">{rx.rxNumber}</strong></div>
-        {patient.phone && <div className="prescription-patient-phone"><span>Phone</span><strong>{patient.phone}</strong></div>}
       </div>
 
       {settings?.prescription?.visitingHours && (
@@ -397,10 +397,7 @@ function prescriptionDoc(data: any): React.ReactNode {
               </div>
               <div className="prescription-signature-box">
                 <div className="sig-line" />
-                <div className="prescription-signature-name">{dentistName}</div>
-                {designations.map((d, i) => <div key={`sig-des-${i}`} className="muted small">{d}</div>)}
-                {qualifications.map((q, i) => <div key={`sig-qual-${i}`} className="muted small">{q}</div>)}
-                {dentist?.regNo && <div className="muted small">Reg. {dentist.regNo}</div>}
+                <div className="prescription-signature-name">Signature</div>
               </div>
             </div>
           ) : (
