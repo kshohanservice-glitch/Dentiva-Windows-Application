@@ -131,7 +131,10 @@ export async function executePrint(opts: PrintExecuteOptions): Promise<PrintResu
           landscape: !!opts.landscape,
           color: opts.color !== false,
           duplexMode: opts.duplex,
-          margins: marginsMmToPrintMargins(opts.marginsMm),
+          // CSS owns the complete page geometry. Keeping native print margins at
+          // "none" prevents Chromium from adding a second margin layer that
+          // makes the physical output differ from the on-screen print preview.
+          margins: { marginType: 'none' },
           pagesPerSheet: 1,
           scaleFactor: opts.scale ? Math.max(25, Math.min(200, Math.round(opts.scale))) : 100,
           ...(opts.widthMm && opts.heightMm
