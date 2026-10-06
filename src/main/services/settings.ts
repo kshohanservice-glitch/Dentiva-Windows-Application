@@ -55,7 +55,7 @@ export function getSettings(ctx: Ctx): SettingsDTO {
   const appearance = readSetting<SettingsDTO['appearance']>(ctx, 'appearance', { theme: 'light', density: 'comfortable', animations: true, sidebarCollapsed: false });
   const notifications = readSetting(ctx, 'notifications', { appointments: true, lowStock: true, dues: true, backup: true });
   const paymentMethods = readSetting(ctx, 'paymentMethods', ['cash', 'bank', 'card', 'bkash', 'nagad', 'rocket', 'upay', 'other']);
-  const printProfiles = readSetting<PrintProfile[]>(ctx, 'printProfiles', []);
+  const printProfiles = readSetting<PrintProfile[]>(ctx, 'printProfiles', []).filter((p) => String(p.paperSize).toLowerCase() !== 'thermal');
   return {
     clinic: { ...clinic, currency: 'BDT' as const, logoDataUrl },
     prescription,
@@ -177,7 +177,9 @@ export function saveSettings(ctx: Ctx, patch: Partial<SettingsDTO>): SettingsDTO
     }
 
     if (patch.printProfiles) {
-      const profiles = (Array.isArray(patch.printProfiles) ? patch.printProfiles : []).slice(0, 30).map((p, i) => {
+      const profiles = (Array.isArray(patch.printProfiles) ? patch.printProfiles : [])
+        .filter((p) => String(p.paperSize).toLowerCase() !== 'thermal')
+        .slice(0, 30).map((p, i) => {
         const id = reqString(p.id, `Printer profile #${i + 1} id`, { max: 60 });
         const name = reqString(p.name, `Printer profile name`, { max: 80 });
         const width = Number(p.widthMm); const height = Number(p.heightMm);
@@ -187,7 +189,7 @@ export function saveSettings(ctx: Ctx, patch: Partial<SettingsDTO>): SettingsDTO
           id, name,
           documentType: (['prescription', 'invoice', 'report', 'receipt'] as const).includes(p.documentType as any) ? p.documentType : 'invoice',
           printerName: String(p.printerName ?? ''),
-          paperSize: (['a4', 'a5', 'thermal', 'custom'] as const).includes(p.paperSize as any) ? p.paperSize : 'custom',
+          paperSize: (['a4', 'a5', 'custom'] as const).includes(p.paperSize as any) ? p.paperSize : 'custom',
           widthMm: width, heightMm: height,
           orientation: p.orientation === 'landscape' ? 'landscape' : 'portrait',
           margins: {
