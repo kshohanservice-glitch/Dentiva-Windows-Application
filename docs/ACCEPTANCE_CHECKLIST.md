@@ -35,7 +35,7 @@ Status values: `[x]` evidenced · `[ ]` pending.
 - [x] Prescription create validation & print layout (items, dentist, dates `ISS-013`, clinical fields `ISS-021`, age guard `ISS-028`)
 - [x] Appointment lifecycle matrix (conflict, override on create & reschedule `ISS-030`, no-show guard `ISS-017`)
 - [x] Queue state machine matrix incl. 120+ entries (`tests/integration/scale.test.ts`, `pause` on waiting `ISS-035`)
-- [x] Prescription & document print/PDF matrix (A4/A5/thermal, `mmToInches` & `marginsMmToPrintMargins` unit conversions `ISS-036`, E2E print window verification; physical printer hardware = environment-unavailable)
+- [x] Prescription & document print/PDF matrix (A4/A5/custom, `mmToInches` & `marginsMmToPrintMargins` unit conversions `ISS-036`, E2E print window verification; physical printer hardware = environment-unavailable)
 
 ## E. Financial
 
