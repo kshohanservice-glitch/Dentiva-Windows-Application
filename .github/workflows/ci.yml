@@ -42,6 +42,8 @@ jobs:
           test -f package.json
           test -f package-lock.json
       - run: npm ci
+      - name: Production dependency security audit
+        run: npm audit --omit=dev --audit-level=moderate
       - name: Typecheck (main process)
         run: npx tsc -p tsconfig.node.json --noEmit
       - name: Typecheck (renderer + tests)
