@@ -286,6 +286,29 @@ test('creates a prescription and opens the print window', async () => {
   await printWin.waitForLoadState('domcontentloaded');
   expect(printWin.url()).toContain('#print/prescription');
   await expect(printWin.getByText('Amoxicillin 500 mg').first()).toBeVisible({ timeout: 60_000 });
+
+  const geometry = await printWin.locator('.print-doc').evaluate((el) => {
+    const style = getComputedStyle(el as HTMLElement);
+    const pageRule = [...document.styleSheets].flatMap((sheet) => {
+      try { return [...sheet.cssRules]; } catch { return []; }
+    }).find((rule) => rule.cssText.startsWith('@page'));
+    return {
+      width: style.width,
+      minHeight: style.minHeight,
+      paddingTop: style.paddingTop,
+      paddingRight: style.paddingRight,
+      paddingBottom: style.paddingBottom,
+      paddingLeft: style.paddingLeft,
+      pageRule: pageRule?.cssText ?? '',
+    };
+  });
+  expect(geometry.width).toBe('793.700787px');
+  expect(geometry.minHeight).toBe('1122.51965px');
+  expect(geometry.paddingTop).toBe('45.3543px');
+  expect(geometry.paddingRight).toBe('45.3543px');
+  expect(geometry.paddingBottom).toBe('45.3543px');
+  expect(geometry.paddingLeft).toBe('45.3543px');
+  expect(geometry.pageRule).toContain('margin: 0px');
   await printWin.close();
   await detail.getByRole('button', { name: 'Close' }).click();
   await expect(detail).toBeHidden();
