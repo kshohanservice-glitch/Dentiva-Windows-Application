@@ -553,9 +553,12 @@ export function PrintPage() {
     setError(null);
     const settingsOf = async () => {
       const s = await api['settings/get']();
-      const loadedProfiles = 'printProfiles' in s && Array.isArray(s.printProfiles) && s.printProfiles.length > 0
-        ? s.printProfiles
-        : DEFAULT_PRINT_PROFILES;
+      const storedProfiles = 'printProfiles' in s && Array.isArray(s.printProfiles) ? s.printProfiles : [];
+      const loadedProfiles = storedProfiles.length > 0 ? [...storedProfiles] : [...DEFAULT_PRINT_PROFILES];
+      if (!loadedProfiles.some((p: PrintProfile) => p.documentType === 'receipt')) {
+        const receiptFallback = DEFAULT_PRINT_PROFILES.find((p) => p.documentType === 'receipt');
+        if (receiptFallback) loadedProfiles.push(receiptFallback);
+      }
       if (!cancelled) {
         setProfiles(loadedProfiles);
         setSelectedProfileId((cur) => {
