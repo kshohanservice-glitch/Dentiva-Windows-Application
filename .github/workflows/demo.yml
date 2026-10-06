@@ -11,6 +11,8 @@ permissions:
 jobs:
   demo:
     runs-on: windows-latest
+    env:
+      DEMO_BUILD: '3.0.1-demo.1'
     timeout-minutes: 45
     steps:
       - name: Checkout
