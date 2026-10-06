@@ -231,5 +231,8 @@ export function profilePageCss(profile: PrintProfile): string {
   const width = portrait ? w : h;
   const height = portrait ? h : w;
   const m = profile.margins;
-  return `@page { size: ${width}mm ${height}mm; margin: ${m.top}mm ${m.right}mm ${m.bottom}mm ${m.left}mm; }`;
+  // The document element carries the profile margins as padding. The page
+  // itself must have zero native margin so screen and physical geometry share
+  // one coordinate system.
+  return `@page { size: ${width}mm ${height}mm; margin: 0; }`;
 }
