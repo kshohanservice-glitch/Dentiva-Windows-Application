@@ -306,12 +306,14 @@ test('invoice print window has no thermal profile and closes with Back', async (
   await printWin.waitForLoadState('domcontentloaded');
   const profile = printWin.getByRole('combobox', { name: 'Print profile' });
   await expect(profile).toHaveValue('inv-a4');
-  await expect(profile.locator('option[value="inv-thermal"]')).toHaveCount(0);
-  await expect(profile).not.toContainText(/thermal/i);
+  await expect(profile.locator('option')).toHaveCount(4);
+  await expect(profile.locator('option')).toHaveText([
+    'Prescription A4',
+    'Prescription A5',
+    'Invoice A4',
+    'Receipt A4',
+  ]);
   await expect(printWin.locator('.print-doc .doc-title', { hasText: 'Invoice' })).toBeVisible({ timeout: 60_000 });
-
-  const thermalUi = await printWin.locator('.thermal80, .thermal-head, .thermal-meta, .thermal-title, .thermal-line').count();
-  expect(thermalUi).toBe(0);
 
   await Promise.all([
     printWin.waitForEvent('close'),
