@@ -99,6 +99,7 @@ export async function seedDemoDatabase(db: DB): Promise<void> {
     vt.run(v1,tid('FILL-001'),'Composite Filling — 16',1,180000,180000); vt.run(v1,tid('XRAY-001'),'IOPA X-Ray — 16',1,50000,50000);
     vt.run(v2,tid('CLN-001'),'Scaling & Polishing',1,250000,250000); vt.run(v3,tid('FILL-001'),'Composite build-up — 45',1,180000,180000); vt.run(v4,tid('RCT-001'),'Root Canal Treatment — 36',1,650000,650000);
 
+
     // Complete showcase records for the remaining patients.
     const extraCases = [
       { code:'P-1004', dentist:d1, complaint:'Routine cleaning and preventive review', history:'Annual check-up; no current pain.', exam:'Light plaque and localized calculus.', diagnosis:'Mild gingivitis.', plan:'Scaling and preventive review.', advice:'Continue twice-daily brushing and flossing.', tooth:'24', condition:'calculus', severity:'mild', treatment:'CLN-001', rx:'Fluoride Mouthwash', generic:'Sodium fluoride', form:'Mouthwash', strength:'0.05%', dosage:'10 mL rinse', frequency:'Once daily', duration:'14 days', qty:'1 bottle' },
