@@ -49,8 +49,8 @@ jobs:
       - name: Publish demo release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: demo-v1.1.2
-          name: Dentiva Pro Demo v1.1.2
+          tag_name: demo-v3.0.1
+          name: Dentiva Pro Demo v3.0.1
           prerelease: true
           generate_release_notes: false
           body: |
@@ -60,4 +60,5 @@ jobs:
             - Includes populated demo patients, visits, prescriptions, invoices, payments, appointments, queue, inventory, accounting and reports.
             - Demo data is read-only; mutation IPC operations are blocked in the main process.
             - Demo data is stored separately from a normal Dentiva Pro installation.
-          files: dist-demo/DentivaPro-Demo-Setup-1.1.2-demo.1.exe
+            - Base application: Dentiva Pro v3.0.1; this demo tag is independent of the normal release history.
+          files: dist-demo/DentivaPro-Demo-Setup-3.0.1-demo.1.exe
