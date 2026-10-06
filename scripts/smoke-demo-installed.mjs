@@ -16,7 +16,9 @@ try {
   console.log('DEMO PAGE TITLE:', await page.title());
   console.log('DEMO BODY:', (await page.locator('body').innerText()).slice(0, 4000));
   await page.getByText('BrightSmile Dental Clinic — Demo').first().waitFor({ state: 'visible', timeout: 90_000 });
-  await page.getByText('Arif Hossain').first().waitFor({ state: 'visible', timeout: 30_000 });
+  for (const name of ['Arif Hossain','Nabila Sultana','Tanvir Ahmed','Samia Karim','Mahin Chowdhury','Ishrat Jahan','Sabbir Rahman','Moumita Das','Faisal Kabir','Jannatul Ferdous']) {
+    await page.getByText(name).first().waitFor({ state: 'visible', timeout: 30_000 });
+  }
   await page.evaluate(() => { window.location.hash = '#/patients'; });
   await page.getByText('Nabila Sultana').first().waitFor({ state: 'visible', timeout: 30_000 });
   const mutation = await page.evaluate(async () => {
