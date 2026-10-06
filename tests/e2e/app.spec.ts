@@ -302,12 +302,17 @@ test('creates a prescription and opens the print window', async () => {
       pageRule: pageRule?.cssText ?? '',
     };
   });
-  expect(geometry.width).toBeCloseTo(210 * 96 / 25.4, 2);
-  expect(geometry.minHeight).toBeCloseTo(297 * 96 / 25.4, 2);
-  expect(geometry.paddingTop).toBeCloseTo(12 * 96 / 25.4, 2);
-  expect(geometry.paddingRight).toBeCloseTo(12 * 96 / 25.4, 2);
-  expect(geometry.paddingBottom).toBeCloseTo(12 * 96 / 25.4, 2);
-  expect(geometry.paddingLeft).toBeCloseTo(12 * 96 / 25.4, 2);
+  // Chromium exposes CSS mm as fractional CSS pixels and may round computed
+  // dimensions slightly. Keep the WYSIWYG contract strict at sub-pixel level
+  // without making the test depend on a particular rounding implementation.
+  const mmToCssPx = (mm: number) => mm * 96 / 25.4;
+  const expectNearCssMm = (actual: number, mm: number) => expect(Math.abs(actual - mmToCssPx(mm))).toBeLessThan(0.1);
+  expectNearCssMm(geometry.width, 210);
+  expectNearCssMm(geometry.minHeight, 297);
+  expectNearCssMm(geometry.paddingTop, 12);
+  expectNearCssMm(geometry.paddingRight, 12);
+  expectNearCssMm(geometry.paddingBottom, 12);
+  expectNearCssMm(geometry.paddingLeft, 12);
   expect(geometry.pageRule).toContain('margin: 0px');
   await printWin.close();
   await detail.getByRole('button', { name: 'Close' }).click();
