@@ -3,7 +3,7 @@ name: Demo Windows Build
 on:
   push:
     branches:
-      - demo-build
+      - demo-v3.0.1-build
 
 permissions:
   contents: write
