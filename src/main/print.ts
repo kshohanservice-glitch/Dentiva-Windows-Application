@@ -128,7 +128,9 @@ export async function executePrint(opts: PrintExecuteOptions): Promise<PrintResu
           printBackground: true,
           deviceName: opts.printerName ?? '',
           copies: Math.max(1, Math.min(99, Number(opts.copies) || 1)),
-          landscape: !!opts.landscape,
+          // widthMm/heightMm are already the final oriented page dimensions.
+          // Do not rotate a second time; CSS @page and native pageSize use the same geometry.
+          landscape: false,
           color: opts.color !== false,
           duplexMode: opts.duplex,
           // CSS owns the complete page geometry. Keeping native print margins at
@@ -185,7 +187,8 @@ export async function saveAsPdf(opts: PdfOptions): Promise<PdfResult> {
     const heightIn = Math.max(2.0, mmToInches(opts.heightMm || 297));
     const data = await win.webContents.printToPDF({
       pageSize: { width: widthIn, height: heightIn },
-      landscape: Boolean(opts.landscape),
+      // width/height already include the selected orientation; CSS @page is the source of truth.
+      landscape: false,
       scale: opts.scale ? Math.max(0.25, Math.min(2, opts.scale / 100)) : undefined,
       // The rendered document already contains its exact printable
       // padding. Do not add another PDF margin layer.
