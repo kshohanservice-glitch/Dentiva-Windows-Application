@@ -24,10 +24,10 @@ function profile(patch: Partial<PrintProfile>): PrintProfile {
 }
 
 describe('profilePageCss (@page geometry)', () => {
-  it('A4 portrait → 210×297 mm with profile margins', () => {
+  it('A4 portrait → 210×297 mm with zero native page margin', () => {
     const css = profilePageCss(profile({ paperSize: 'a4' }));
     expect(css).toContain('size: 210mm 297mm');
-    expect(css).toContain('margin: 10mm 8mm 10mm 8mm');
+    expect(css).toContain('margin: 0;');
   });
 
   it('A4 landscape swaps to 297×210 mm', () => {
@@ -46,7 +46,7 @@ describe('profilePageCss (@page geometry)', () => {
       margins: { top: 5, right: 5, bottom: 5, left: 5 },
     }));
     expect(css).toContain('size: 100mm 150mm');
-    expect(css).toContain('margin: 5mm 5mm 5mm 5mm');
+    expect(css).toContain('margin: 0;');
   });
 
   it('converts mm to inches for Electron printToPDF (ISS-036)', () => {
