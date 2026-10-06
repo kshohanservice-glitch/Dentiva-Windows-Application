@@ -3,7 +3,7 @@ import { hashPassword } from './core/passwords';
 import { tx } from './core/context';
 import { ALL_PERMISSIONS } from '../shared/permissions';
 
-const DEMO_SEED_VERSION = 1;
+const DEMO_SEED_VERSION = 2;
 export const DEMO_USERNAME = 'demo';
 export const DEMO_PASSWORD = 'DentivaDemo2026!';
 
@@ -68,6 +68,10 @@ export async function seedDemoDatabase(db: DB): Promise<void> {
       ['P-1004','Samia Karim','সামিয়া করিম','1995-08-17',31,'female','AB+','+880 1844-100008',null,'Mahmud Karim','+880 1844-100009','Banani, Dhaka','Dhaka','Routine cleaning and preventive check-up','Existing patient',d1],
       ['P-1005','Mahin Chowdhury','মাহিন চৌধুরী','1978-03-09',48,'male','A-','+880 1855-100010',null,'Rumana Chowdhury','+880 1855-100011','Gulshan, Dhaka','Dhaka','Persistent pain in lower left first molar','Referral',d2],
       ['P-1006','Ishrat Jahan','ইশরাত জাহান','2012-06-26',14,'female','O+','+880 1866-100012',null,'Fahim Jahan','+880 1866-100013','Mohammadpur, Dhaka','Dhaka','Orthodontic screening and oral hygiene advice','School camp',d1],
+      ['P-1007','Sabbir Rahman','সাব্বির রহমান','1983-09-21',43,'male','B+','+880 1877-100014',null,'Tania Rahman','+880 1877-100015','Bashundhara, Dhaka','Dhaka','Chipped front tooth and cosmetic concern','Referral',d1],
+      ['P-1008','Moumita Das','মৌমিতা দাস','1990-12-11',35,'female','A+','+880 1888-100016',null,'Sourav Das','+880 1888-100017','Wari, Dhaka','Dhaka','Jaw discomfort and occasional clicking','Google',d2],
+      ['P-1009','Faisal Kabir','ফয়সাল কবির','1969-04-28',57,'male','O-','+880 1899-100018',null,'Nadia Kabir','+880 1899-100019','Gulshan, Dhaka','Dhaka','Loose tooth and gum recession','Existing patient',d2],
+      ['P-1010','Jannatul Ferdous','জান্নাতুল ফেরদৌস','1998-07-05',28,'female','AB+','+880 1800-100020',null,'Raihan Ferdous','+880 1800-100021','Badda, Dhaka','Dhaka','Whitening consultation and routine cleaning','Instagram',d1],
     ];
     for(const p of patients) addPatient.run(...p,day(-120),at(-120,10),at(-120,10));
     const pats=db.prepare('SELECT id,code FROM patients ORDER BY id').all<{id:number;code:string}>(); const pid=(c:string)=>pats.find(x=>x.code===c)!.id;
@@ -80,6 +84,10 @@ export async function seedDemoDatabase(db: DB): Promise<void> {
       ['P-1004','medical','No significant medical history.'],['P-1004','dental','Good oral hygiene; annual scaling recommended.'],
       ['P-1005','medical','Type 2 diabetes, controlled with metformin.'],['P-1005','allergies','No known drug allergies.'],['P-1005','dental','Large old amalgam restoration on 36; recurrent caries suspected.'],
       ['P-1006','medical','No significant medical history.'],['P-1006','dental','Mixed dentition; early crowding noted.'],
+      ['P-1007','medical','Mild seasonal allergy; otherwise healthy.'],['P-1007','dental','Old composite on 11; cosmetic concern after minor trauma.'],
+      ['P-1008','medical','No significant medical history.'],['P-1008','dental','Occasional bruxism symptoms; TMJ clicking reported.'],
+      ['P-1009','medical','Controlled type 2 diabetes and hyperlipidemia.'],['P-1009','allergies','No known drug allergies.'],['P-1009','dental','Generalized gingival recession with mobility on 31.'],
+      ['P-1010','medical','No significant medical history.'],['P-1010','dental','Mild extrinsic staining; regular brushing routine.'],
     ]) hist.run(pid(h[0]),h[1],h[2],now,userId);
 
     const addVisit=db.prepare("INSERT INTO visits(patient_id,dentist_id,datetime,chief_complaint,history,examination,diagnosis,treatment_plan,advice,notes,follow_up_date,status,created_by,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,'closed',?,?,?)");
@@ -90,6 +98,34 @@ export async function seedDemoDatabase(db: DB): Promise<void> {
     const vt=db.prepare('INSERT INTO visit_treatments(visit_id,treatment_id,description,qty,unit_price_paisa,total_paisa) VALUES(?,?,?,?,?,?)');
     vt.run(v1,tid('FILL-001'),'Composite Filling — 16',1,180000,180000); vt.run(v1,tid('XRAY-001'),'IOPA X-Ray — 16',1,50000,50000);
     vt.run(v2,tid('CLN-001'),'Scaling & Polishing',1,250000,250000); vt.run(v3,tid('FILL-001'),'Composite build-up — 45',1,180000,180000); vt.run(v4,tid('RCT-001'),'Root Canal Treatment — 36',1,650000,650000);
+
+    // Complete showcase records for the remaining patients.
+    const extraCases = [
+      { code:'P-1004', dentist:d1, complaint:'Routine cleaning and preventive review', history:'Annual check-up; no current pain.', exam:'Light plaque and localized calculus.', diagnosis:'Mild gingivitis.', plan:'Scaling and preventive review.', advice:'Continue twice-daily brushing and flossing.', tooth:'24', condition:'calculus', severity:'mild', treatment:'CLN-001', rx:'Fluoride Mouthwash', generic:'Sodium fluoride', form:'Mouthwash', strength:'0.05%', dosage:'10 mL rinse', frequency:'Once daily', duration:'14 days', qty:'1 bottle' },
+      { code:'P-1006', dentist:d1, complaint:'Orthodontic screening', history:'Parent reports mild crowding.', exam:'Early crowding in upper anterior region.', diagnosis:'Developing malocclusion.', plan:'Orthodontic assessment and hygiene monitoring.', advice:'Brush carefully around crowded teeth.', tooth:'12', condition:'crowding', severity:'mild', treatment:'CONS-001', rx:'Fluoride Gel', generic:'Sodium fluoride', form:'Gel', strength:'1.1%', dosage:'Pea-sized application', frequency:'Once nightly', duration:'14 days', qty:'1 tube' },
+      { code:'P-1007', dentist:d1, complaint:'Chipped front tooth', history:'Small chip after accidental impact.', exam:'Enamel-dentin chip on 11; pulp vital.', diagnosis:'Uncomplicated crown fracture 11.', plan:'Composite cosmetic restoration.', advice:'Avoid biting hard objects with front teeth.', tooth:'11', condition:'fracture', severity:'mild', treatment:'FILL-001', rx:'Ibuprofen', generic:'Ibuprofen', form:'Tablet', strength:'400 mg', dosage:'1 tablet', frequency:'After pain', duration:'3 days', qty:'6 tablets' },
+      { code:'P-1008', dentist:d2, complaint:'Jaw discomfort and clicking', history:'Clicking while chewing for 4 months.', exam:'Mild right TMJ click without locking.', diagnosis:'TMJ dysfunction symptoms.', plan:'Conservative management and review.', advice:'Avoid gum chewing and wide opening.', tooth:'46', condition:'other', severity:'mild', treatment:'CONS-001', rx:'Paracetamol', generic:'Paracetamol', form:'Tablet', strength:'500 mg', dosage:'1 tablet', frequency:'As needed', duration:'5 days', qty:'10 tablets' },
+      { code:'P-1009', dentist:d2, complaint:'Loose tooth and gum recession', history:'Gradual mobility of lower incisor.', exam:'Gingival recession and mobility on 31.', diagnosis:'Localized periodontal disease.', plan:'Scaling and periodontal review.', advice:'Use a soft brush and maintain daily interdental cleaning.', tooth:'31', condition:'mobility', severity:'moderate', treatment:'CLN-001', rx:'Chlorhexidine Mouthwash', generic:'Chlorhexidine', form:'Mouthwash', strength:'0.12%', dosage:'10 mL rinse', frequency:'Twice daily', duration:'7 days', qty:'1 bottle' },
+      { code:'P-1010', dentist:d1, complaint:'Whitening consultation', history:'Wants cosmetic whitening before an event.', exam:'Mild extrinsic staining; healthy gingiva.', diagnosis:'Extrinsic tooth staining.', plan:'Professional cleaning followed by whitening discussion.', advice:'Reduce tea/coffee staining and maintain hygiene.', tooth:'21', condition:'staining', severity:'mild', treatment:'CLN-001', rx:'Fluoride Mouthwash', generic:'Sodium fluoride', form:'Mouthwash', strength:'0.05%', dosage:'10 mL rinse', frequency:'Once daily', duration:'14 days', qty:'1 bottle' },
+    ];
+    const extraRxItems = db.prepare('INSERT INTO prescription_items(prescription_id,seq,medicine_name,generic,form,strength,dosage,frequency,morning,afternoon,night,timing,duration,qty,instruction,instruction_bn,note) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)');
+    const extraInvoice = db.prepare('INSERT INTO invoices(number,patient_id,visit_id,date,status,subtotal_paisa,discount_paisa,total_paisa,note,created_by,created_at) VALUES(?,?,?,?,?,?,?,?,?,?,?)');
+    const extraInvoiceItem = db.prepare('INSERT INTO invoice_items(invoice_id,description,treatment_id,qty,unit_price_paisa,discount_paisa,total_paisa) VALUES(?,?,?,?,?,?,?)');
+    const extraPayment = db.prepare("INSERT INTO payments(invoice_id,patient_id,amount_paisa,method,reference,type,received_by,paid_at,note,created_at) VALUES(?,?,?,?,?,'payment',?,?,?,?)");
+    for (let i = 0; i < extraCases.length; i += 1) {
+      const x = extraCases[i];
+      const visit = Number(addVisit.run(pid(x.code),x.dentist,at(-(20+i),10+i),x.complaint,x.history,x.exam,x.diagnosis,x.plan,x.advice,'Demo showcase visit '+(i+1)+'.',day(21+i),userId,at(-(20+i),10+i),at(-(20+i),11+i)).lastInsertRowid);
+      const price = x.treatment === 'CLN-001' ? 250000 : x.treatment === 'CONS-001' ? 80000 : 180000;
+      vt.run(visit,tid(x.treatment),x.treatment === 'CLN-001' ? 'Scaling & Polishing' : x.treatment === 'CONS-001' ? 'Dental Consultation' : 'Composite restoration',1,price,price);
+      chart.run(pid(x.code),x.tooth,x.condition,x.severity,visit,'Demo clinical finding for '+x.code+'.',at(-(20+i),11),userId);
+      const rxId = Number(rx.run('RX-2026-'+String(45+i).padStart(4,'0'),pid(x.code),visit,x.dentist,day(-(20+i)),x.complaint,x.exam,'Clinical review completed',x.diagnosis,x.plan,x.advice,day(21+i),userId,at(-(20+i),11,15)).lastInsertRowid);
+      extraRxItems.run(rxId,1,x.rx,x.generic,x.form,x.strength,x.dosage,x.frequency,1,0,1,'after',x.duration,x.qty,'Use exactly as directed.','নির্দেশনা অনুযায়ী ব্যবহার করুন।','Demo medicine');
+      const invoiceTotal = price;
+      const invId = Number(extraInvoice.run('INV-2026-'+String(105+i).padStart(4,'0'),pid(x.code),visit,day(-(20+i)),i % 3 === 0 ? 'paid' : 'partial',invoiceTotal,0,invoiceTotal,'Demo invoice for '+x.code,userId,at(-(20+i),11,30)).lastInsertRowid);
+      extraInvoiceItem.run(invId,x.treatment === 'CLN-001' ? 'Scaling & Polishing' : x.treatment === 'CONS-001' ? 'Dental Consultation' : 'Composite restoration',tid(x.treatment),1,invoiceTotal,0,invoiceTotal);
+      const paid = i % 3 === 0 ? invoiceTotal : Math.round(invoiceTotal * 0.6);
+      extraPayment.run(invId,pid(x.code),paid,i % 2 === 0 ? 'cash' : 'bkash','DEMO-PAY-'+(105+i),userId,at(-(20+i),11,35),'Demo payment for '+x.code,at(-(20+i),11,35));
+    }
 
     const chart=db.prepare('INSERT INTO tooth_conditions(patient_id,tooth,condition,severity,visit_id,note,recorded_at,recorded_by) VALUES(?,?,?,?,?,?,?,?)');
     chart.run(pid('P-1001'),'16','caries','moderate',v1,'Recurrent caries around old restoration',at(-2,11),userId);
