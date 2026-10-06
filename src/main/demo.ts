@@ -100,6 +100,9 @@ export async function seedDemoDatabase(db: DB): Promise<void> {
     vt.run(v2,tid('CLN-001'),'Scaling & Polishing',1,250000,250000); vt.run(v3,tid('FILL-001'),'Composite build-up — 45',1,180000,180000); vt.run(v4,tid('RCT-001'),'Root Canal Treatment — 36',1,650000,650000);
 
 
+    const chart=db.prepare('INSERT INTO tooth_conditions(patient_id,tooth,condition,severity,visit_id,note,recorded_at,recorded_by) VALUES(?,?,?,?,?,?,?,?)');
+    const rx=db.prepare('INSERT INTO prescriptions(number,patient_id,visit_id,dentist_id,date,c_c,o_e,r_e,diagnosis,treatment,advice,follow_up,created_by,created_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)');
+
     // Complete showcase records for the remaining patients.
     const extraCases = [
       { code:'P-1004', dentist:d1, complaint:'Routine cleaning and preventive review', history:'Annual check-up; no current pain.', exam:'Light plaque and localized calculus.', diagnosis:'Mild gingivitis.', plan:'Scaling and preventive review.', advice:'Continue twice-daily brushing and flossing.', tooth:'24', condition:'calculus', severity:'mild', treatment:'CLN-001', rx:'Fluoride Mouthwash', generic:'Sodium fluoride', form:'Mouthwash', strength:'0.05%', dosage:'10 mL rinse', frequency:'Once daily', duration:'14 days', qty:'1 bottle' },
@@ -128,7 +131,6 @@ export async function seedDemoDatabase(db: DB): Promise<void> {
       extraPayment.run(invId,pid(x.code),paid,i % 2 === 0 ? 'cash' : 'bkash','DEMO-PAY-'+(105+i),userId,at(-(20+i),11,35),'Demo payment for '+x.code,at(-(20+i),11,35));
     }
 
-    const chart=db.prepare('INSERT INTO tooth_conditions(patient_id,tooth,condition,severity,visit_id,note,recorded_at,recorded_by) VALUES(?,?,?,?,?,?,?,?)');
     chart.run(pid('P-1001'),'16','caries','moderate',v1,'Recurrent caries around old restoration',at(-2,11),userId);
     chart.run(pid('P-1001'),'26','filling','mild',null,'Existing composite restoration',at(-120,10),userId);
     chart.run(pid('P-1002'),'11','calculus','mild',v2,'Supragingival calculus',at(-5,12,30),userId);
@@ -145,7 +147,6 @@ export async function seedDemoDatabase(db: DB): Promise<void> {
     const qe=db.prepare('INSERT INTO queue_entries(day,queue_no,patient_id,appointment_id,dentist_id,arrived_at,status,priority,created_by) VALUES(?,?,?,?,?,?,?,?,?)');
     qe.run(today,1,pid('P-1005'),arrived,d2,at(0,14,40),'in_treatment',1,userId); qe.run(today,2,pid('P-1002'),null,d1,at(0,11,10),'waiting',0,userId);
 
-    const rx=db.prepare('INSERT INTO prescriptions(number,patient_id,visit_id,dentist_id,date,c_c,o_e,r_e,diagnosis,treatment,advice,follow_up,created_by,created_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)');
     const rx1=Number(rx.run('RX-2026-0042',pid('P-1001'),v1,d1,day(-2),'Sensitivity in upper right molar','Old restoration with recurrent caries','IOPA taken','Recurrent caries 16','Composite restoration','Use desensitizing toothpaste twice daily.',day(14),userId,at(-2,11,15)).lastInsertRowid);
     const rx2=Number(rx.run('RX-2026-0043',pid('P-1002'),v2,d1,day(-5),'Bleeding gums','Generalized calculus','No pocket > 4 mm','Generalized gingivitis','Scaling + chlorhexidine rinse','Improve flossing and return for review.',day(42),userId,at(-5,12,50)).lastInsertRowid);
     const rx3=Number(rx.run('RX-2026-0044',pid('P-1005'),v4,d2,day(-10),'Molar pain','Deep caries 36','Percussion positive','Irreversible pulpitis','RCT planned','Avoid chewing on affected side.',day(7),userId,at(-10,12)).lastInsertRowid);
