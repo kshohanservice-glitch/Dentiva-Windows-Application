@@ -73,16 +73,16 @@ export function DashboardPage() {
       <div className="grid stats-grid">
         <StatCard label="Patients today" value={String(data.todayPatients)} foot="registered & revisits" onClick={() => navigate('/patients')} />
         <StatCard label="Appointments today" value={String(data.todayAppointments)} foot="scheduled" onClick={() => navigate('/appointments')} />
-        <StatCard label="Waiting in queue" value={String(data.waitingQueue)} tone="warning" foot="in queue now" onClick={() => navigate('/queue')} />
-        <StatCard label="Completed visits" value={String(data.completedVisits)} tone="success" foot="closed today" onClick={() => navigate('/reports')} />
+        <StatCard label="Waiting in queue" value={String(data.waitingQueue)} foot="in queue now" onClick={() => navigate('/queue')} />
+        <StatCard label="Completed visits" value={String(data.completedVisits)} foot="closed today" onClick={() => navigate('/reports')} />
       </div>
 
       {data.financial && canFinance && (
         <div className="grid stats-grid">
-          <StatCard label="Paid Today" value={bdt(data.financial.todayRevenuePaisa)} tone="success" foot="Net payments received" onClick={() => navigate('/payments')} />
-          <StatCard label="Outstanding dues" value={bdt(data.financial.outstandingDuePaisa)} tone="danger" foot="across invoices" onClick={() => navigate('/invoices')} />
-          <StatCard label="Low-stock items" value={String(data.inventory?.lowStock ?? 0)} tone={data.inventory && data.inventory.lowStock > 0 ? 'warning' : undefined} foot="at or below minimum" onClick={() => navigate('/inventory')} />
-          <StatCard label="Expiring ≤30 days" value={String(data.inventory?.expiringSoon ?? 0)} tone={data.inventory && data.inventory.expiringSoon > 0 ? 'warning' : undefined} foot="batches" onClick={() => navigate('/inventory')} />
+          <StatCard label="Paid Today" value={bdt(data.financial.todayRevenuePaisa)} foot="Net payments received" onClick={() => navigate('/payments')} />
+          <StatCard label="Outstanding dues" value={bdt(data.financial.outstandingDuePaisa)} foot="across invoices" onClick={() => navigate('/invoices')} />
+          <StatCard label="Low-stock items" value={String(data.inventory?.lowStock ?? 0)} foot="at or below minimum" onClick={() => navigate('/inventory')} />
+          <StatCard label="Expiring ≤30 days" value={String(data.inventory?.expiringSoon ?? 0)} foot="batches" onClick={() => navigate('/inventory')} />
         </div>
       )}
 
