@@ -3,7 +3,7 @@
    produces clean clinic stationery. Screen mode provides editable context. */
 
 @page {
-  margin: 14mm;
+  margin: 0;
 }
 
 :root {
@@ -36,9 +36,9 @@
     box-shadow: none !important;
     border: none !important;
     margin: 0 !important;
-    width: auto !important;
-    min-height: 0 !important;
-    padding: 0 !important;
+    /* Width, height and padding are set inline from the selected profile so
+       physical output uses the exact same geometry as the screen preview. */
+    border-radius: 0 !important;
   }
   .page-break {
     break-after: page;
