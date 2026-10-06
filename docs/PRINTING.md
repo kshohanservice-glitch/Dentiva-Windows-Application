@@ -23,21 +23,18 @@ print engine (interactive print dialog or printToPDF).
 |---|---|
 | A4 | 210 × 297 mm |
 | A5 | 148 × 210 mm |
-| Thermal / mini | custom width (58/80 mm configurable) × auto height |
 | Custom | user-defined width × height (mm) |
 
 Implemented with per-template `@page { size: W H; margin: … }` CSS injected from the
 selected **printer profile**; layout **reflows** (flex/grid + container-driven), it is not
-simply scaled — thermal templates use a single-column compact variant of the same document
-model (invoice total block, line items, footer), prescriptions fall back to A5-class layout
-for widths < 110 mm.
+simply scaled. Prescriptions fall back to A5-class layout for widths < 110 mm.
 
 ## Printer profiles (stored in settings)
 
 Fields: name, documentType (prescription|invoice|report|receipt), printerName (or
-`default`), paperSize (a4|a5|thermal|custom), widthMm, heightMm, orientation, marginsMm
+`default`), paperSize (a4|a5|custom), widthMm, heightMm, orientation, marginsMm
 {t,r,b,l}, scale (fit/100%), copies, color. Seeded defaults: Prescription-A4, Prescription-A5,
-Invoice-A4, Invoice-A5, Receipt-Thermal80.
+Invoice-A4, Receipt-A4.
 
 ## Document templates
 
