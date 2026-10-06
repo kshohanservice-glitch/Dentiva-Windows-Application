@@ -790,7 +790,7 @@ export function PrintPage() {
         )}
         {!loading && error == null && (
           <div className="print-doc" style={docStyle}>
-            {renderedDoc}
+            {state?.doc}
           </div>
         )}
       </div>
