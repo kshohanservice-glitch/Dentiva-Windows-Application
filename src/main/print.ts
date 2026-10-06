@@ -180,8 +180,7 @@ export async function saveAsPdf(opts: PdfOptions): Promise<PdfResult> {
   if (save.canceled || !save.filePath) return { ok: false, cancelled: true, error: 'Save cancelled.' };
 
   try {
-    // Electron printToPDF uses inches (1 inch = 25.4 mm) for pageSize and margins.
-    const m = opts.marginsMm ?? { top: 10, right: 10, bottom: 10, left: 10 };
+    // Electron printToPDF uses inches (1 inch = 25.4 mm) for pageSize.
     const widthIn = Math.max(1.5, mmToInches(opts.widthMm || 210));
     const heightIn = Math.max(2.0, mmToInches(opts.heightMm || 297));
     const data = await win.webContents.printToPDF({
