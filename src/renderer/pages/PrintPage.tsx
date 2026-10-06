@@ -720,10 +720,9 @@ export function PrintPage() {
       if (res.ok || res.cancelled) return;
       toast.error('Print failed', res.error || 'The document could not be printed.');
       return;
-    } catch {
-      /* fall through to the browser-style dialog */
+    } catch (err) {
+      toast.error('Print failed', err instanceof Error ? err.message : 'The document could not be printed.');
     }
-    window.print();
   };
 
   const savePdf = async () => {
