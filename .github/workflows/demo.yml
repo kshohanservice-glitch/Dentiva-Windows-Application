@@ -13,6 +13,7 @@ jobs:
     runs-on: windows-latest
     env:
       DEMO_BUILD: '3.0.1-demo.1'
+      DEMO_COMPILE_FIX: '2'
     timeout-minutes: 45
     steps:
       - name: Checkout
