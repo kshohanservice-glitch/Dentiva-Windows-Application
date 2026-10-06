@@ -1,7 +1,5 @@
 node_modules/
-dist/*
-!dist/*.exe
-!dist/SHA256SUMS.txt
+dist/
 release/
 coverage/
 *.log
