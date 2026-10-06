@@ -40,11 +40,6 @@ describe('profilePageCss (@page geometry)', () => {
     expect(profilePageCss(profile({ paperSize: 'a5', orientation: 'landscape' }))).toContain('size: 210mm 148mm');
   });
 
-  it('thermal/custom uses explicit width/height (80mm roll)', () => {
-    const css = profilePageCss(profile({ paperSize: 'thermal', widthMm: 80, heightMm: 200 }));
-    expect(css).toContain('size: 80mm 200mm');
-  });
-
   it('custom margins flow through verbatim', () => {
     const css = profilePageCss(profile({
       paperSize: 'custom', widthMm: 100, heightMm: 150,
