@@ -740,13 +740,17 @@ export function PrintPage() {
     }
   };
 
-  const docClass = 'print-doc';
-  const renderedDoc = state?.doc;
   const pageW = activeProfile.orientation === 'landscape' ? dims.heightMm : dims.widthMm;
   const pageH = activeProfile.orientation === 'landscape' ? dims.widthMm : dims.heightMm;
-  const profilePrintCss = '@page { size: ' + pageW + 'mm ' + pageH + 'mm; margin: ' +
-    activeProfile.margins.top + 'mm ' + activeProfile.margins.right + 'mm ' +
-    activeProfile.margins.bottom + 'mm ' + activeProfile.margins.left + 'mm; }';
+  // WYSIWYG contract: the preview page and the physical page share the same
+  // dimensions. Profile margins are document padding, not a second @page margin.
+  const profilePrintCss = '@page { size: ' + pageW + 'mm ' + pageH + 'mm; margin: 0; }';
+  const docStyle: React.CSSProperties = {
+    width: pageW + 'mm',
+    minHeight: pageH + 'mm',
+    padding: activeProfile.margins.top + 'mm ' + activeProfile.margins.right + 'mm ' +
+      activeProfile.margins.bottom + 'mm ' + activeProfile.margins.left + 'mm',
+  };
 
   return (
     <div className="print-root">
@@ -782,7 +786,11 @@ export function PrintPage() {
             <ErrorState error={error} onRetry={() => { setState(null); setError(null); window.location.reload(); }} />
           </div>
         )}
-        {!loading && error == null && <div className={docClass}>{renderedDoc}</div>}
+        {!loading && error == null && (
+          <div className="print-doc" style={docStyle}>
+            {renderedDoc}
+          </div>
+        )}
       </div>
     </div>
   );
