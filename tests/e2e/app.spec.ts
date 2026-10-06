@@ -293,21 +293,21 @@ test('creates a prescription and opens the print window', async () => {
       try { return [...sheet.cssRules]; } catch { return []; }
     }).find((rule) => rule.cssText.startsWith('@page'));
     return {
-      width: style.width,
-      minHeight: style.minHeight,
-      paddingTop: style.paddingTop,
-      paddingRight: style.paddingRight,
-      paddingBottom: style.paddingBottom,
-      paddingLeft: style.paddingLeft,
+      width: parseFloat(style.width),
+      minHeight: parseFloat(style.minHeight),
+      paddingTop: parseFloat(style.paddingTop),
+      paddingRight: parseFloat(style.paddingRight),
+      paddingBottom: parseFloat(style.paddingBottom),
+      paddingLeft: parseFloat(style.paddingLeft),
       pageRule: pageRule?.cssText ?? '',
     };
   });
-  expect(geometry.width).toBe('793.700787px');
-  expect(geometry.minHeight).toBe('1122.51965px');
-  expect(geometry.paddingTop).toBe('45.3543px');
-  expect(geometry.paddingRight).toBe('45.3543px');
-  expect(geometry.paddingBottom).toBe('45.3543px');
-  expect(geometry.paddingLeft).toBe('45.3543px');
+  expect(geometry.width).toBeCloseTo(210 * 96 / 25.4, 2);
+  expect(geometry.minHeight).toBeCloseTo(297 * 96 / 25.4, 2);
+  expect(geometry.paddingTop).toBeCloseTo(12 * 96 / 25.4, 2);
+  expect(geometry.paddingRight).toBeCloseTo(12 * 96 / 25.4, 2);
+  expect(geometry.paddingBottom).toBeCloseTo(12 * 96 / 25.4, 2);
+  expect(geometry.paddingLeft).toBeCloseTo(12 * 96 / 25.4, 2);
   expect(geometry.pageRule).toContain('margin: 0px');
   await printWin.close();
   await detail.getByRole('button', { name: 'Close' }).click();
