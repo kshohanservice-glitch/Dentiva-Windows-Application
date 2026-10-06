@@ -677,7 +677,7 @@
 
 .prescription-patient-strip {
   display: grid;
-  grid-template-columns: minmax(0, 2.1fr) .55fr .8fr 1.05fr .95fr .9fr;
+  grid-template-columns: minmax(0, 2.1fr) .55fr .8fr 1.2fr;
   gap: 0;
   margin-top: 12px;
   border: 1px solid var(--print-ink);
@@ -696,9 +696,7 @@
 }
 
 .prescription-patient-phone {
-  grid-column: 1 / -1;
-  border-right: 0 !important;
-  border-top: 1px solid var(--print-line);
+  border-right: 1px solid var(--print-line) !important;
 }
 
 .prescription-patient-strip span {
