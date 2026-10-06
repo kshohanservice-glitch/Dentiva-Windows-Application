@@ -710,13 +710,16 @@ export function PrintPage() {
       const res = await api['print/execute']({
         printerName: activeProfile.printerName || undefined,
         copies: activeProfile.copies,
-        landscape: activeProfile.orientation === 'landscape',
-        widthMm: dims.widthMm,
-        heightMm: dims.heightMm,
+        // Send the exact on-screen page dimensions; main process must not rotate them again.
+        landscape: false,
+        widthMm: pageW,
+        heightMm: pageH,
         marginsMm: activeProfile.margins,
         scale: activeProfile.scale,
       });
       if (res.ok || res.cancelled) return;
+      toast.error('Print failed', res.error || 'The document could not be printed.');
+      return;
     } catch {
       /* fall through to the browser-style dialog */
     }
@@ -727,9 +730,9 @@ export function PrintPage() {
     try {
       const res = await api['print/pdf']({
         suggestedName: (state?.title ?? 'dentiva-document').replace(/[^A-Za-z0-9-_ ]+/g, '').trim() || 'dentiva-document',
-        widthMm: dims.widthMm,
-        heightMm: dims.heightMm,
-        landscape: activeProfile.orientation === 'landscape',
+        widthMm: pageW,
+        heightMm: pageH,
+        landscape: false,
         marginsMm: activeProfile.margins,
         scale: activeProfile.scale,
       });
