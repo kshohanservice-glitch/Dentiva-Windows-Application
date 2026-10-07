@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { cleanupEnv, createTestEnv, ownerCtx, sessionWith, type TestEnv } from '../helpers';
 import { createPatient } from '../../src/main/services/patients';
-import { createInvoice, getInvoice, listInvoices, voidInvoice, createPayment, listPayments, paidNetFor } from '../../src/main/services/billing';
+import { createInvoice, getInvoice, listInvoices, voidInvoice, createPayment, deletePayment, listPayments, paidNetFor } from '../../src/main/services/billing';
 import type { Ctx } from '../../src/main/core/context';
 
 let env: TestEnv;
@@ -92,18 +92,19 @@ describe('invoice lifecycle', () => {
     expect(listPayments(ctx, { invoiceId: inv.id }).total).toBe(2);
   });
 
-  it('payment history is append-only (no update/delete at service level)', () => {
+  it('payment records can be explicitly deleted with permission', () => {
     const ctx = ownerCtx(env);
     const p = patient(ctx, '01700000004');
     const inv = createInvoice(ctx, {
       patientId: p.id, date: '2026-09-27',
       items: [{ description: 'Consultation', qty: 1, unitPricePaisa: 30000 }],
     });
-    createPayment(ctx, { invoiceId: inv.id, patientId: p.id, amountPaisa: 30000, method: 'cash' });
-    // Direct tamper attempts below the service layer must fail
-    expect(() => env.db.prepare('UPDATE payments SET amount_paisa = 1 WHERE invoice_id = ?').run(inv.id)).toThrow();
-    expect(() => env.db.prepare('DELETE FROM payments WHERE invoice_id = ?').run(inv.id)).toThrow();
+    const payment = createPayment(ctx, { invoiceId: inv.id, patientId: p.id, amountPaisa: 30000, method: 'cash' });
     expect(listPayments(ctx, { invoiceId: inv.id }).total).toBe(1);
+    expect(deletePayment(ctx, payment.payment.id).ok).toBe(true);
+    expect(listPayments(ctx, { invoiceId: inv.id }).total).toBe(0);
+    expect(getInvoice(ctx, inv.id).paidPaisa).toBe(0);
+    expect(getInvoice(ctx, inv.id).duePaisa).toBe(30000);
   });
 
   it('voiding keeps history and removes invoice from active totals', () => {
