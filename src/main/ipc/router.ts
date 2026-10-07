@@ -277,6 +277,7 @@ export function registerRouter(deps: RouterDeps): void {
   handle(IPC.accountingDeleteIncome, { auth: true, fn: (p, ctx) => accounting.deleteIncome(ctx!, Number(p)) });
   handle(IPC.accountingCategories, { auth: true, fn: (_p, ctx) => accounting.listCategories(ctx!) });
   handle(IPC.accountingSaveCategory, { auth: true, fn: (p, ctx) => accounting.saveCategory(ctx!, p) });
+  handle(IPC.accountingDeleteCategory, { auth: true, fn: (p, ctx) => accounting.deleteCategory(ctx!, Number(p)) });
 
   /* --------------------------- staff & dentists -------------------------- */
   handle(IPC.staffList, { auth: true, fn: (_p, ctx) => staffSvc.listStaff(ctx!) });
