@@ -95,6 +95,10 @@ export async function seedDemoDatabase(db: DB): Promise<void> {
     const v2=Number(addVisit.run(pid('P-1002'),d1,at(-5,12),'Bleeding gums','Bleeding during brushing for 2 months.','Generalized plaque and calculus, mild gingival inflammation.','Generalized gingivitis.','Scaling and oral hygiene instruction.','Floss daily; review in 6 weeks.','Demo completed visit.',day(42),userId,at(-5,12),at(-5,12,45)).lastInsertRowid);
     const v3=Number(addVisit.run(pid('P-1003'),d2,at(-1,15),'Fractured lower premolar','Sports injury yesterday.','Fracture of 45 involving enamel and dentin; pulp vital.','Uncomplicated crown fracture 45.','Composite build-up and review.','Avoid biting hard foods on right side.','Demo trauma visit.',day(30),userId,at(-1,15),at(-1,15,40)).lastInsertRowid);
     const v4=Number(addVisit.run(pid('P-1005'),d2,at(-10,11),'Persistent molar pain','Pain worsens at night; thermal lingering.','Deep caries 36; percussion positive.','Irreversible pulpitis 36.','Root canal treatment planned.','Return for next RCT stage.','Demo endodontic visit.',day(7),userId,at(-10,11),at(-10,11,50)).lastInsertRowid);
+    const v5=Number(addVisit.run(pid('P-1007'),d2,at(-8,14),'Pain on chewing','Pain when chewing for 10 days.','Caries on 46 with fractured cusp.','Caries with cracked cusp 46.','Composite restoration after caries removal.','Avoid hard foods until restored.','Demo restorative visit.',day(21),userId,at(-8,14),at(-8,14,40)).lastInsertRowid);
+    const v6=Number(addVisit.run(pid('P-1008'),d1,at(-15,10),'Cosmetic concern','Wants improved appearance of upper incisors.','Minor enamel discoloration on 11 and 21.','Localized enamel discoloration.','Cosmetic composite bonding consultation.','Discuss shade and maintenance.',day(30),userId,at(-15,10),at(-15,10,30)).lastInsertRowid);
+    const v7=Number(addVisit.run(pid('P-1009'),d2,at(-20,16),'Loose tooth','Mobility noticed for 2 months.','Generalized calculus and grade I mobility 41.','Chronic periodontal disease.','Scaling and periodontal review.','Improve oral hygiene and return in 4 weeks.',day(28),userId,at(-20,16),at(-20,16,50)).lastInsertRowid);
+    const v8=Number(addVisit.run(pid('P-1010'),d1,at(-25,11),'Wisdom tooth discomfort','Food trapping around lower wisdom tooth.','Partially erupted 48 with inflamed operculum.','Pericoronitis 48.','Irrigation and review; extraction if recurrent.','Keep area clean; return if swelling worsens.',day(10),userId,at(-25,11),at(-25,11,30)).lastInsertRowid);
     const vt=db.prepare('INSERT INTO visit_treatments(visit_id,treatment_id,description,qty,unit_price_paisa,total_paisa) VALUES(?,?,?,?,?,?)');
     vt.run(v1,tid('FILL-001'),'Composite Filling — 16',1,180000,180000); vt.run(v1,tid('XRAY-001'),'IOPA X-Ray — 16',1,50000,50000);
     vt.run(v2,tid('CLN-001'),'Scaling & Polishing',1,250000,250000); vt.run(v3,tid('FILL-001'),'Composite build-up — 45',1,180000,180000); vt.run(v4,tid('RCT-001'),'Root Canal Treatment — 36',1,650000,650000);
@@ -106,12 +110,20 @@ export async function seedDemoDatabase(db: DB): Promise<void> {
     chart.run(pid('P-1003'),'45','fracture','moderate',v3,'Enamel-dentin crown fracture',at(-1,15,30),userId);
     chart.run(pid('P-1005'),'36','caries','severe',v4,'Deep caries approaching pulp',at(-10,11,30),userId);
     chart.run(pid('P-1006'),'12','crowding','mild',null,'Early orthodontic crowding',at(-30,10),userId);
+    chart.run(pid('P-1007'),'46','caries','moderate',v5,'Caries with fractured cusp',at(-8,14,20),userId);
+    chart.run(pid('P-1008'),'11','discoloration','mild',v6,'Enamel discoloration',at(-15,10,20),userId);
+    chart.run(pid('P-1009'),'41','mobility','mild',v7,'Grade I mobility',at(-20,16,20),userId);
+    chart.run(pid('P-1010'),'48','pericoronitis','moderate',v8,'Inflamed operculum',at(-25,11,20),userId);
 
     const ap=db.prepare('INSERT INTO appointments(patient_id,dentist_id,date,time,duration_min,type,status,notes,created_by,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?)');
     ap.run(pid('P-1001'),d1,today,'10:30',30,'Follow-up','confirmed','Demo follow-up appointment',userId,now,now);
     ap.run(pid('P-1002'),d1,today,'11:30',45,'Scaling','scheduled','Demo hygiene appointment',userId,now,now);
     ap.run(pid('P-1005'),d2,today,'15:00',90,'Root Canal','arrived','Demo RCT appointment',userId,now,now);
     ap.run(pid('P-1006'),d1,day(1),'16:00',30,'Consultation','scheduled','Demo orthodontic screening',userId,now,now);
+    ap.run(pid('P-1007'),d2,day(2),'10:00',45,'Restoration','scheduled','Demo restoration review',userId,now,now);
+    ap.run(pid('P-1008'),d1,day(3),'12:00',30,'Cosmetic consultation','confirmed','Demo cosmetic consultation',userId,now,now);
+    ap.run(pid('P-1009'),d2,day(4),'14:00',45,'Periodontal review','scheduled','Demo periodontal review',userId,now,now);
+    ap.run(pid('P-1010'),d1,day(5),'17:00',30,'Wisdom tooth review','scheduled','Demo pericoronitis follow-up',userId,now,now);
     const arrived=db.prepare("SELECT id FROM appointments WHERE patient_id=? AND date=?").get<{id:number}>(pid('P-1005'),today)!.id;
     const qe=db.prepare('INSERT INTO queue_entries(day,queue_no,patient_id,appointment_id,dentist_id,arrived_at,status,priority,created_by) VALUES(?,?,?,?,?,?,?,?,?)');
     qe.run(today,1,pid('P-1005'),arrived,d2,at(0,14,40),'in_treatment',1,userId); qe.run(today,2,pid('P-1002'),null,d1,at(0,11,10),'waiting',0,userId);
