@@ -5,7 +5,7 @@ import { seedDemoDatabase } from '../../src/main/demo';
 let env: TestEnv;
 
 beforeEach(() => {
-  env = createTestEnv('demo-seed');
+  env = createTestEnv('demo-seed', { seedOwner: false });
 });
 
 afterEach(() => {
