@@ -50,6 +50,17 @@ export interface ChartInput {
  * Chart edits are append/supersede only: existing observations get superseded_at
  * stamped instead of being updated or deleted, so per-visit history is preserved.
  */
+export function deleteChartCondition(ctx: Ctx, id: number): { ok: boolean } {
+  requirePermission(ctx, 'data.delete');
+  const row = ctx.db.prepare('SELECT id, patient_id, tooth, condition, severity, visit_id, recorded_at FROM tooth_conditions WHERE id = ?').get(id) as any;
+  if (!row) throw notFound('Chart record not found.');
+  tx(ctx.db, () => {
+    ctx.db.prepare('DELETE FROM tooth_conditions WHERE id = ?').run(id);
+    audit(ctx, { action: 'chart.delete', entityType: 'tooth_condition', entityId: id, summary: `Deleted chart record ${row.tooth} / ${conditionLabel(row.condition)}`, before: row });
+  });
+  return { ok: true };
+}
+
 export function setChart(ctx: Ctx, patientId: number, input: ChartInput): ChartState {
   requirePermission(ctx, 'clinical.chart.edit');
   const patient = ctx.db.prepare('SELECT id, code FROM patients WHERE id = ? AND deleted_at IS NULL').get(patientId) as { id: number; code: string } | undefined;
