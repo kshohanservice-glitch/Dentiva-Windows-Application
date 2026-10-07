@@ -294,19 +294,20 @@ export function AppointmentsPage() {
   const { can } = useApp();
   const toast = useToast();
   const today = new Date();
-  const [view, setView] = useState<'day' | 'list'>('day');
+  const [view, setView] = useState<'day' | 'list' | 'month'>('day');
   const [date, setDate] = useState(params.get('date') ?? isoDate(today));
   const [dentistId, setDentistId] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const [formOpen, setFormOpen] = useState(params.get('new') === '1');
   const [editing, setEditing] = useState<AppointmentDTO | null>(null);
   const [cancelTarget, setCancelTarget] = useState<AppointmentDTO | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<AppointmentDTO | null>(null);
   const [selected, setSelected] = useState<AppointmentDTO | null>(null);
 
   const { data: dentists } = useAsync(() => api['dentists/list'](), []);
 
-  const from = view === 'day' ? date : isoDate(addDays(new Date(date), -7));
-  const to = view === 'day' ? date : isoDate(addDays(new Date(date), 7));
+  const from = view === 'day' ? date : isoDate(addDays(new Date(date), view === 'month' ? -29 : -7));
+  const to = view === 'day' ? date : isoDate(addDays(new Date(date), view === 'month' ? 30 : 7));
   const filter = useMemo(
     () => ({ from, to, dentistId: dentistId ? Number(dentistId) : undefined, status: statusFilter || undefined }),
     [from, to, dentistId, statusFilter],
@@ -380,6 +381,9 @@ export function AppointmentsPage() {
           {can('appointments.manage') && (r.status === 'scheduled' || r.status === 'confirmed' || r.status === 'arrived') && (
             <Button size="sm" variant="ghost" onClick={() => setEditing(r)}>Edit</Button>
           )}
+          {can('data.delete') && r.status !== 'completed' && (
+            <Button size="sm" variant="danger" onClick={() => setDeleteTarget(r)}>Delete</Button>
+          )}
           {can('appointments.manage') && (r.status === 'scheduled' || r.status === 'confirmed') && (
             <>
               <Button size="sm" variant="ghost" onClick={() => void statusAction(r, 'confirm')}>Confirm</Button>
@@ -433,9 +437,10 @@ export function AppointmentsPage() {
         <TableToolbar>
           <div className="seg">
             <button className={view === 'day' ? 'active' : ''} onClick={() => setView('day')} type="button">Day</button>
-            <button className={view === 'list' ? 'active' : ''} onClick={() => setView('list')} type="button">±7 days</button>
+            <button className={view === 'list' ? 'active' : ''} onClick={() => setView('list')} type="button">7 days</button>
+            <button className={view === 'month' ? 'active' : ''} onClick={() => setView('month')} type="button">30 days</button>
           </div>
-          <input className="input" style={{ width: 160 }} type="date" value={date} onChange={(e) => setDate(e.target.value)} aria-label="Date" />
+          <input className="input" style={{ width: 160 }} type="date" lang="en-GB" value={date} onChange={(e) => setDate(e.target.value)} aria-label="Date" />
           <Select
             value={dentistId}
             onChange={setDentistId}
@@ -480,6 +485,26 @@ export function AppointmentsPage() {
         onClose={() => { setFormOpen(false); setEditing(null); params.delete('patient'); setParams(params, { replace: true }); }}
         onSaved={() => reload()}
       />
+
+      {deleteTarget && (
+        <ConfirmDialog
+          title="Delete appointment?"
+          body={`${deleteTarget.patientName} · ${deleteTarget.date} ${deleteTarget.time}. This appointment will be removed from the appointment records.`}
+          confirmLabel="Delete appointment"
+          danger
+          onConfirm={async () => {
+            try {
+              await api['appointments/delete'](deleteTarget.id);
+              toast.success('Appointment deleted');
+              setDeleteTarget(null);
+              reload();
+            } catch (err) {
+              toast.fromError(err, 'Delete failed');
+            }
+          }}
+          onCancel={() => setDeleteTarget(null)}
+        />
+      )}
 
       {cancelTarget && (
         <ConfirmDialog
