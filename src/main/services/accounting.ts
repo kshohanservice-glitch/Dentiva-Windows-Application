@@ -1,6 +1,6 @@
 import type { Ctx } from '../core/context';
 import type { AccountEntryInput, ExpenseDTO, IncomeDTO, Paged } from '../../shared/types';
-import { notFound, validation } from '../errors';
+import { conflict, notFound, validation } from '../errors';
 import { audit, requirePermission, tx } from '../core/context';
 import { nowISO, dateRangeFor } from '../../shared/currency';
 import { optString, pageParams, reqDate, reqInt } from '../core/validate';
