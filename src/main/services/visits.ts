@@ -135,6 +135,18 @@ export function createVisit(ctx: Ctx, raw: unknown): VisitDTO {
   return getVisit(ctx, id);
 }
 
+export function deleteVisit(ctx: Ctx, id: number): { ok: boolean } {
+  requirePermission(ctx, 'data.delete');
+  const row = ctx.db.prepare('SELECT id, patient_id, datetime, status, invoice_id FROM visits WHERE id = ? AND deleted_at IS NULL').get(id) as any;
+  if (!row) throw notFound('Visit not found.');
+  tx(ctx.db, () => {
+    ctx.db.prepare('UPDATE prescriptions SET visit_id = NULL WHERE visit_id = ?').run(id);
+    ctx.db.prepare('UPDATE visits SET invoice_id = NULL, deleted_at = ?, updated_at = ? WHERE id = ?').run(nowISO(), nowISO(), id);
+    audit(ctx, { action: 'visit.delete', entityType: 'visit', entityId: id, summary: `Visit #${id} deleted manually`, before: { patientId: row.patient_id, datetime: row.datetime, status: row.status, invoiceId: row.invoice_id } });
+  });
+  return { ok: true };
+}
+
 export function updateVisit(ctx: Ctx, id: number, raw: unknown): VisitDTO {
   requirePermission(ctx, 'clinical.visit.edit');
   const existing = ctx.db.prepare('SELECT * FROM visits WHERE id = ? AND deleted_at IS NULL').get(id) as any | undefined;
