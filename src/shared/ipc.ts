@@ -127,6 +127,7 @@ export interface DentivaApi {
   'accounting/delete-income'(id: number): Promise<{ ok: boolean }>;
   'accounting/categories'(): Promise<{ id: number; name: string; kind: 'expense' | 'income' }[]>;
   'accounting/save-category'(input: { kind: 'expense' | 'income'; name: string; id?: number }): Promise<{ id: number }>;
+  'accounting/delete-category'(id: number): Promise<{ ok: boolean }>;
 
   /* staff + dentists */
   'staff/list'(): Promise<StaffDTO[]>;
@@ -384,6 +385,7 @@ export const IPC = {
   accountingDeleteIncome: 'accounting/delete-income',
   accountingCategories: 'accounting/categories',
   accountingSaveCategory: 'accounting/save-category',
+  accountingDeleteCategory: 'accounting/delete-category',
 
   staffList: 'staff/list',
   staffSave: 'staff/save',
