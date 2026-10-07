@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { api, useAsync, useInterval } from '../api';
 import { useApp } from '../state/app-context';
-import { Badge, Button, Card, EmptyState, ErrorState, Modal, Spinner, useToast } from '../components/primitives';
+import { Badge, Button, Card, ConfirmDialog, EmptyState, ErrorState, Modal, Spinner, useToast } from '../components/primitives';
 import { Field, Input, Select } from '../components/forms';
 import { Icon } from '../components/shell';
 import { isoDate } from '../format';
@@ -118,6 +118,7 @@ export function QueuePage() {
   const [date, setDate] = useState(isoDate(new Date()));
   const [addOpen, setAddOpen] = useState(false);
   const [selected, setSelected] = useState<QueueEntryDTO | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<QueueEntryDTO | null>(null);
 
   const { data, loading, error, reload } = useAsync(() => api['queue/list'](date), [date]);
   useInterval(() => reload(), 20_000);
@@ -175,6 +176,8 @@ export function QueuePage() {
             <>
               <Button size="sm" variant="ghost" onClick={() => void action(e, 'pause')}>Pause</Button>
               <Button size="sm" variant="ghost" onClick={() => void action(e, 'cancel')}>Remove</Button>
+              {can('data.delete') && <Button size="sm" variant="danger" onClick={() => setDeleteTarget(e)}>Delete</Button>}
+              {can('data.delete') && <Button size="sm" variant="danger" onClick={() => setDeleteTarget(e)}>Delete</Button>}
             </>
           )}
           {can('queue.manage') && e.status === 'paused' && (
@@ -250,6 +253,18 @@ export function QueuePage() {
       )}
 
       <AddToQueueModal open={addOpen} onClose={() => setAddOpen(false)} onAdded={reload} />
+
+      {deleteTarget && <ConfirmDialog
+        title="Delete queue entry?"
+        body={`Token #${deleteTarget.queueNo} for ${deleteTarget.patientName} will be permanently deleted from the queue records. The linked appointment, if any, will remain.`}
+        confirmLabel="Delete queue entry"
+        danger
+        onConfirm={async () => {
+          try { await api['queue/delete'](deleteTarget.id); toast.success('Queue entry deleted'); setDeleteTarget(null); setSelected(null); reload(); }
+          catch (err) { toast.fromError(err, 'Delete failed'); }
+        }}
+        onCancel={() => setDeleteTarget(null)}
+      />}
 
       {selected && (
         <Modal
