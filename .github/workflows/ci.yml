@@ -96,6 +96,8 @@ jobs:
         run: |
           $pkg = Get-Content package.json -Raw | ConvertFrom-Json
           if ($pkg.dentivaBuildMode -eq 'demo') {
+            npm run build 2>&1 | Tee-Object -FilePath e2e-build.log
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
             $env:DENTIVA_DEMO = '1'
             npx playwright test tests/e2e/demo.spec.ts 2>&1 | Tee-Object -FilePath e2e-output.log
           } else {
