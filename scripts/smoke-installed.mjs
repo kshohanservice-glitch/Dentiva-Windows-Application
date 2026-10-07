@@ -22,7 +22,7 @@ if (!exePath || !fs.existsSync(exePath)) {
 }
 
 // Fresh machine profile so first-run (activation/setup) state is guaranteed.
-for (const dirName of ['Dentiva Pro', 'dentiva-pro']) {
+for (const dirName of ['Dentiva Pro Demo', 'Dentiva Pro', 'dentiva-pro']) {
   fs.rmSync(path.join(os.homedir(), 'AppData', 'Roaming', dirName), { recursive: true, force: true });
 }
 
