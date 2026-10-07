@@ -177,16 +177,33 @@ export function deleteInvoice(ctx: Ctx, id: number): { ok: boolean } {
   requirePermission(ctx, 'data.delete');
   const row = ctx.db.prepare('SELECT id, number, patient_id, status FROM invoices WHERE id = ? AND deleted_at IS NULL').get(id) as { id: number; number: string; patient_id: number; status: string } | undefined;
   if (!row) throw notFound('Invoice not found.');
-  const payment = ctx.db.prepare('SELECT 1 FROM payments WHERE invoice_id = ? LIMIT 1').get(id);
-  if (payment) throw conflict('This invoice has payment history. Void/refund it instead of deleting it.');
   tx(ctx.db, () => {
-    ctx.db.prepare('UPDATE invoices SET deleted_at = ? WHERE id = ?').run(nowISO(), id);
+    ctx.db.prepare('DELETE FROM payments WHERE invoice_id = ?').run(id);
+    ctx.db.prepare('DELETE FROM invoices WHERE id = ?').run(id);
     ctx.db.prepare('UPDATE visits SET invoice_id = NULL WHERE invoice_id = ?').run(id);
     audit(ctx, {
       action: 'invoice.delete', entityType: 'invoice', entityId: id,
       summary: `Invoice ${row.number} deleted manually`,
       before: { number: row.number, patientId: row.patient_id, status: row.status },
     });
+  });
+  return { ok: true };
+}
+
+export function deletePayment(ctx: Ctx, id: number): { ok: boolean } {
+  requirePermission(ctx, 'data.delete');
+  const row = ctx.db.prepare('SELECT id, invoice_id, amount_paisa, type FROM payments WHERE id = ?').get(id) as any;
+  if (!row) throw notFound('Payment not found.');
+  tx(ctx.db, () => {
+    ctx.db.prepare('DELETE FROM payments WHERE id = ?').run(id);
+    if (row.invoice_id) {
+      const inv = ctx.db.prepare('SELECT total_paisa, voided_at FROM invoices WHERE id = ?').get(row.invoice_id) as any;
+      if (inv) {
+        const net = paidNetFor(ctx.db, row.invoice_id);
+        ctx.db.prepare('UPDATE invoices SET status = ? WHERE id = ?').run(computeStatus(inv.total_paisa, net, inv.voided_at), row.invoice_id);
+      }
+    }
+    audit(ctx, { action: 'payment.delete', entityType: 'payment', entityId: id, summary: `Payment #${id} deleted manually`, before: { invoiceId: row.invoice_id, amount: row.amount_paisa, type: row.type } });
   });
   return { ok: true };
 }
