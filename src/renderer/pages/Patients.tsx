@@ -715,7 +715,7 @@ function VisitsTab(props: { patientId: number; refreshKey?: number; onCreate: ()
                   }}>Complete visit</Button>
                 )}
                 <Button size="sm" variant="ghost" onClick={() => void printSummary(v.id)}>Print summary</Button>
-                {can('data.delete') && <Button size="sm" variant="danger" onClick={() => setDeleteVisit(v)}>Delete</Button>}
+                {can('data.delete') && <Button size="sm" variant="danger" onClick={() => setDeleteVisit(v)}>Delete visit</Button>}
               </div>
             </div>
             {v.diagnosis && <div className="small mt-2"><strong>Diagnosis:</strong> {v.diagnosis}</div>}
