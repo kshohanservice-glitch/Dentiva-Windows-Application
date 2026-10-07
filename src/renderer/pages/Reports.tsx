@@ -136,10 +136,10 @@ export function ReportsPage() {
                 {selected.needsRange && (
                   <>
                     <label className="row gap-2 xsmall">From
-                      <input className="input" style={{ width: 150 }} type="date" value={from} onChange={(e) => setFrom(e.target.value)} />
+                      <input className="input" style={{ width: 150 }} type="date" lang="en-GB" value={from} onChange={(e) => setFrom(e.target.value)} />
                     </label>
                     <label className="row gap-2 xsmall">To
-                      <input className="input" style={{ width: 150 }} type="date" value={to} onChange={(e) => setTo(e.target.value)} />
+                      <input className="input" style={{ width: 150 }} type="date" lang="en-GB" value={to} onChange={(e) => setTo(e.target.value)} />
                     </label>
                   </>
                 )}

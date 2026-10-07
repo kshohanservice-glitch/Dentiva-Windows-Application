@@ -62,6 +62,20 @@ export function addQueueEntry(ctx: Ctx, input: { patientId: number; dentistId?: 
   return toQueueDTO(ctx, row);
 }
 
+export function deleteQueueEntry(ctx: Ctx, id: number): { ok: boolean } {
+  requirePermission(ctx, 'data.delete');
+  const row = ctx.db.prepare('SELECT id, day, queue_no, patient_id, appointment_id, status FROM queue_entries WHERE id = ?').get(id) as any;
+  if (!row) throw notFound('Queue entry not found.');
+  tx(ctx.db, () => {
+    if (row.appointment_id) {
+      ctx.db.prepare("UPDATE appointments SET status = CASE WHEN status = 'in_queue' THEN 'arrived' WHEN status = 'in_treatment' THEN 'arrived' ELSE status END, updated_at = ? WHERE id = ?").run(nowISO(), row.appointment_id);
+    }
+    ctx.db.prepare('DELETE FROM queue_entries WHERE id = ?').run(id);
+    audit(ctx, { action: 'queue.delete', entityType: 'queue', entityId: id, summary: `Deleted queue #${row.queue_no} for ${row.day}`, before: row });
+  });
+  return { ok: true };
+}
+
 const ALLOWED_ACTIONS = ['call', 'call_next', 'start', 'pause', 'resume', 'complete', 'cancel', 'transfer', 'priority'] as const;
 export type QueueAction = (typeof ALLOWED_ACTIONS)[number];
 

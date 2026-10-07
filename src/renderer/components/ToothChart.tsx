@@ -1,7 +1,9 @@
 import { useEffect, useMemo, useState } from 'react';
 import { api } from '../api';
 import type { ChartState, ToothConditionDTO } from '../../shared/types';
-import { Button, Spinner, useToast } from './primitives';
+import { Button, ConfirmDialog, Spinner, useToast } from './primitives';
+import { formatDate } from '../format';
+import { useApp } from '../state/app-context';
 import { CONDITION_KEYS, conditionLabel } from '../../shared/clinical';
 
 /* FDI notation charts. Adult: 32 permanent teeth, pediatric: 20 primary. */
@@ -43,6 +45,8 @@ export function ToothChart(props: {
   height?: number;
 }) {
   const { patientId, editable = false } = props;
+  const { can } = useApp();
+  const [deleteTarget, setDeleteTarget] = useState<ToothConditionDTO | null>(null);
   const [chart, setChart] = useState<ChartState | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -256,15 +260,16 @@ export function ToothChart(props: {
           <summary className="small muted">Chart history ({chart!.history.length} records)</summary>
           <div className="table-wrap" style={{ maxHeight: 220 }}>
             <table className="table">
-              <thead><tr><th>When</th><th>Tooth</th><th>Condition</th><th>Severity</th><th>Note</th></tr></thead>
+              <thead><tr><th>When</th><th>Tooth</th><th>Condition</th><th>Severity</th><th>Note</th><th></th></tr></thead>
               <tbody>
                 {chart!.history.slice(0, 60).map((h) => (
                   <tr key={h.id} className={h.supersededAt ? 'row-muted' : ''}>
-                    <td className="xsmall">{new Date(h.recordedAt).toLocaleString()}</td>
+                    <td className="xsmall">{formatDate(h.recordedAt)} {new Date(h.recordedAt).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}</td>
                     <td className="mono">{h.tooth}</td>
                     <td>{h.label}{h.supersededAt && <Badge2 text="superseded" />}</td>
                     <td>{h.severity ?? '—'}</td>
                     <td className="xsmall">{h.note ?? '—'}</td>
+                    <td>{can('data.delete') && <Button size="sm" variant="danger" onClick={() => setDeleteTarget(h)}>Delete</Button>}</td>
                   </tr>
                 ))}
               </tbody>
@@ -272,6 +277,23 @@ export function ToothChart(props: {
           </div>
         </details>
       )}
+      {deleteTarget && <ConfirmDialog
+        title="Delete dental chart record?"
+        body={`Tooth ${deleteTarget.tooth} — ${deleteTarget.label} recorded on ${formatDate(deleteTarget.recordedAt)} will be permanently deleted from chart history.`}
+        confirmLabel="Delete chart record"
+        danger
+        onConfirm={async () => {
+          try {
+            await api['chart/delete'](deleteTarget.id);
+            toast.success('Chart record deleted');
+            setDeleteTarget(null);
+            load();
+          } catch (err) {
+            toast.fromError(err, 'Delete failed');
+          }
+        }}
+        onCancel={() => setDeleteTarget(null)}
+      />}
     </div>
   );
 }

@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { api, useAsync, useInterval } from '../api';
 import { useApp } from '../state/app-context';
-import { Badge, Button, Card, EmptyState, ErrorState, Modal, Spinner, useToast } from '../components/primitives';
+import { Badge, Button, Card, ConfirmDialog, EmptyState, ErrorState, Modal, Spinner, useToast } from '../components/primitives';
 import { Field, Input, Select } from '../components/forms';
 import { Icon } from '../components/shell';
 import { isoDate } from '../format';
@@ -118,6 +118,7 @@ export function QueuePage() {
   const [date, setDate] = useState(isoDate(new Date()));
   const [addOpen, setAddOpen] = useState(false);
   const [selected, setSelected] = useState<QueueEntryDTO | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<QueueEntryDTO | null>(null);
 
   const { data, loading, error, reload } = useAsync(() => api['queue/list'](date), [date]);
   useInterval(() => reload(), 20_000);
@@ -183,6 +184,7 @@ export function QueuePage() {
               <Button size="sm" variant="ghost" onClick={() => void action(e, 'cancel')}>Remove</Button>
             </>
           )}
+          {can('data.delete') && <Button size="sm" variant="danger" onClick={() => setDeleteTarget(e)}>Delete</Button>}
         </div>
       </div>
     );
@@ -198,7 +200,7 @@ export function QueuePage() {
           </p>
         </div>
         <div className="page-actions">
-          <input className="input" style={{ width: 160 }} type="date" value={date} onChange={(e) => setDate(e.target.value)} aria-label="Queue date" />
+          <input className="input" style={{ width: 160 }} type="date" lang="en-GB" value={date} onChange={(e) => setDate(e.target.value)} aria-label="Queue date" />
           <Button variant="ghost" icon={Icon.refresh} onClick={reload}>Refresh</Button>
           {can('queue.manage') && <Button variant="primary" icon={Icon.plus} onClick={() => setAddOpen(true)}>Add to queue</Button>}
         </div>
@@ -251,6 +253,18 @@ export function QueuePage() {
 
       <AddToQueueModal open={addOpen} onClose={() => setAddOpen(false)} onAdded={reload} />
 
+      {deleteTarget && <ConfirmDialog
+        title="Delete queue entry?"
+        body={`Token #${deleteTarget.queueNo} for ${deleteTarget.patientName} will be permanently deleted from the queue records. The linked appointment, if any, will remain.`}
+        confirmLabel="Delete queue entry"
+        danger
+        onConfirm={async () => {
+          try { await api['queue/delete'](deleteTarget.id); toast.success('Queue entry deleted'); setDeleteTarget(null); setSelected(null); reload(); }
+          catch (err) { toast.fromError(err, 'Delete failed'); }
+        }}
+        onCancel={() => setDeleteTarget(null)}
+      />}
+
       {selected && (
         <Modal
           title={`Token #${selected.queueNo} — ${selected.patientName}`}
@@ -266,7 +280,7 @@ export function QueuePage() {
         >
           <div className="kv-list">
             <div className="kv"><span className="k">Patient</span><span className="v">{selected.patientName} ({selected.patientCode})</span></div>
-            <div className="kv"><span className="k">Arrived</span><span className="v">{new Date(selected.arrivedAt).toLocaleTimeString()}</span></div>
+            <div className="kv"><span className="k">Arrived</span><span className="v">{new Date(selected.arrivedAt).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}</span></div>
             <div className="kv"><span className="k">Waiting</span><span className="v">{selected.waitingMin} min</span></div>
             <div className="kv"><span className="k">Dentist</span><span className="v">{selected.dentistName ?? 'unassigned'}</span></div>
             <div className="kv"><span className="k">Status</span><span className="v">{STATUS_LABEL[selected.status]}</span></div>

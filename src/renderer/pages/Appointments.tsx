@@ -306,8 +306,9 @@ export function AppointmentsPage() {
 
   const { data: dentists } = useAsync(() => api['dentists/list'](), []);
 
-  const from = view === 'day' ? date : isoDate(addDays(new Date(date), view === 'month' ? -29 : -7));
-  const to = view === 'day' ? date : isoDate(addDays(new Date(date), view === 'month' ? 30 : 7));
+  // Range views are inclusive: 7 days = selected date + next 6 days; 30 days = selected date + next 29 days.
+  const from = date;
+  const to = view === 'day' ? date : isoDate(addDays(new Date(date), view === 'month' ? 29 : 6));
   const filter = useMemo(
     () => ({ from, to, dentistId: dentistId ? Number(dentistId) : undefined, status: statusFilter || undefined }),
     [from, to, dentistId, statusFilter],
@@ -381,7 +382,7 @@ export function AppointmentsPage() {
           {can('appointments.manage') && (r.status === 'scheduled' || r.status === 'confirmed' || r.status === 'arrived') && (
             <Button size="sm" variant="ghost" onClick={() => setEditing(r)}>Edit</Button>
           )}
-          {can('data.delete') && r.status !== 'completed' && (
+          {can('data.delete') && (
             <Button size="sm" variant="danger" onClick={() => setDeleteTarget(r)}>Delete</Button>
           )}
           {can('appointments.manage') && (r.status === 'scheduled' || r.status === 'confirmed') && (
@@ -426,9 +427,9 @@ export function AppointmentsPage() {
             const key = isoDate(d);
             return (
               <button key={key} className={`cal-day ${key === date ? 'active' : ''}`} onClick={() => { setDate(key); setView('day'); }} type="button">
-                <div className="dow">{d.toLocaleDateString(undefined, { weekday: 'short' })}</div>
+                <div className="dow">{d.toLocaleDateString('en-GB', { weekday: 'short' })}</div>
                 <div className="dnum">{d.getDate()}</div>
-                <div className="cnt">{d.getMonth() === new Date(date).getMonth() ? '' : d.toLocaleDateString(undefined, { month: 'short' })}</div>
+                <div className="cnt">{d.getMonth() === new Date(date).getMonth() ? '' : d.toLocaleDateString('en-GB', { month: 'short' })}</div>
               </button>
             );
           })}

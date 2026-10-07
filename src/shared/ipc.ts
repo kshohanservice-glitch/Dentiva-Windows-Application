@@ -64,6 +64,7 @@ export interface DentivaApi {
   /* chart */
   'chart/get'(patientId: number): Promise<ChartState>;
   'chart/set'(payload: { patientId: number; visitId?: number | null; changes: { tooth: string; condition: string; note?: string | null; severity?: string | null; action: 'set' | 'clear' }[] }): Promise<ChartState>;
+  'chart/delete'(id: number): Promise<{ ok: boolean }>;
 
   /* treatments */
   'treatments/list'(includeInactive?: boolean): Promise<TreatmentDTO[]>;
@@ -93,6 +94,7 @@ export interface DentivaApi {
   'queue/list'(date: string): Promise<QueueEntryDTO[]>;
   'queue/add'(input: { patientId: number; dentistId?: number | null; priority?: number; appointmentId?: number }): Promise<QueueEntryDTO>;
   'queue/action'(payload: { id: number | null; action: string; payload?: { dentistId?: number; priority?: number } }): Promise<QueueEntryDTO>;
+  'queue/delete'(id: number): Promise<{ ok: boolean }>;
   'queue/reorder'(orderedIds: number[]): Promise<{ ok: true }>;
 
   /* billing */
@@ -125,6 +127,7 @@ export interface DentivaApi {
   'accounting/delete-income'(id: number): Promise<{ ok: boolean }>;
   'accounting/categories'(): Promise<{ id: number; name: string; kind: 'expense' | 'income' }[]>;
   'accounting/save-category'(input: { kind: 'expense' | 'income'; name: string; id?: number }): Promise<{ id: number }>;
+  'accounting/delete-category'(id: number): Promise<{ ok: boolean }>;
 
   /* staff + dentists */
   'staff/list'(): Promise<StaffDTO[]>;
@@ -326,6 +329,7 @@ export const IPC = {
 
   chartGet: 'chart/get',
   chartSet: 'chart/set',
+  chartDelete: 'chart/delete',
 
   treatmentsList: 'treatments/list',
   treatmentsSave: 'treatments/save',
@@ -351,6 +355,7 @@ export const IPC = {
   queueList: 'queue/list',
   queueAdd: 'queue/add',
   queueAction: 'queue/action',
+  queueDelete: 'queue/delete',
   queueReorder: 'queue/reorder',
 
   invoicesList: 'invoices/list',
@@ -380,6 +385,7 @@ export const IPC = {
   accountingDeleteIncome: 'accounting/delete-income',
   accountingCategories: 'accounting/categories',
   accountingSaveCategory: 'accounting/save-category',
+  accountingDeleteCategory: 'accounting/delete-category',
 
   staffList: 'staff/list',
   staffSave: 'staff/save',
