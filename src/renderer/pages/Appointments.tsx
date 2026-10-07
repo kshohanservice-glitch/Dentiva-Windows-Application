@@ -306,8 +306,9 @@ export function AppointmentsPage() {
 
   const { data: dentists } = useAsync(() => api['dentists/list'](), []);
 
-  const from = view === 'day' ? date : isoDate(addDays(new Date(date), view === 'month' ? -29 : -7));
-  const to = view === 'day' ? date : isoDate(addDays(new Date(date), view === 'month' ? 30 : 7));
+  // Range views are inclusive: 7 days = selected date + next 6 days; 30 days = selected date + next 29 days.
+  const from = date;
+  const to = view === 'day' ? date : isoDate(addDays(new Date(date), view === 'month' ? 29 : 6));
   const filter = useMemo(
     () => ({ from, to, dentistId: dentistId ? Number(dentistId) : undefined, status: statusFilter || undefined }),
     [from, to, dentistId, statusFilter],
