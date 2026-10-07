@@ -1,7 +1,7 @@
 import type { Ctx } from '../core/context';
 import type { TreatmentDTO } from '../../shared/types';
 import { conflict, notFound, validation } from '../errors';
-import { audit, requirePermission } from '../core/context';
+import { audit, requirePermission, tx } from '../core/context';
 import { nowISO } from '../../shared/currency';
 import { optString, reqInt, reqString } from '../core/validate';
 
@@ -80,6 +80,17 @@ export function saveTreatment(ctx: Ctx, raw: Partial<TreatmentDTO>): TreatmentDT
   const id = Number(info.lastInsertRowid);
   audit(ctx, { action: 'treatment.create', entityType: 'treatment', entityId: id, summary: `Created treatment ${name} (${code})`, after: { price } });
   return toDTO(ctx.db.prepare('SELECT * FROM treatments WHERE id = ?').get(id) as Row);
+}
+
+export function deleteTreatment(ctx: Ctx, id: number): { ok: boolean } {
+  requirePermission(ctx, 'data.delete');
+  const row = ctx.db.prepare('SELECT id, name, code FROM treatments WHERE id = ?').get(id) as any;
+  if (!row) throw new Error('Treatment not found.');
+  tx(ctx.db, () => {
+    ctx.db.prepare('DELETE FROM treatments WHERE id = ?').run(id);
+    audit(ctx, { action: 'treatment.delete', entityType: 'treatment', entityId: id, summary: `Treatment ${row.name} deleted manually`, before: row });
+  });
+  return { ok: true };
 }
 
 export function setTreatmentActive(ctx: Ctx, id: number, active: boolean): TreatmentDTO {

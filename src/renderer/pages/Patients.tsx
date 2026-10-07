@@ -560,8 +560,11 @@ export function PatientProfilePage() {
 }
 
 function ReferralsTab(props: { patientId: number; canManage: boolean; onCreate: () => void }) {
+  const { can } = useApp();
+  const toast = useToast();
   const { data, loading, error, reload } = useAsync(() => api['referrals/list'](props.patientId), [props.patientId]);
   const [editing, setEditing] = useState<ReferralRecord | null>(null);
+  const [deleting, setDeleting] = useState<ReferralRecord | null>(null);
   if (loading && !data) return <Card title="Referrals"><Spinner label="Loading referrals…" /></Card>;
   if (error) return <Card title="Referrals"><ErrorState error={error} onRetry={reload} /></Card>;
   const rows = data ?? [];
@@ -577,13 +580,21 @@ function ReferralsTab(props: { patientId: number; canManage: boolean; onCreate: 
                   <div className="small">{r.person || r.clinic || 'Referral'}{r.specialty ? ' · ' + r.specialty : ''}</div>
                   <div className="xsmall muted">{formatDate(r.date)}{r.reason ? ' · ' + r.reason : ''}{r.follow_up ? ' · Follow-up ' + formatDate(r.follow_up) : ''}</div>
                 </div>
-                {props.canManage && <Button size="sm" variant="ghost" onClick={() => setEditing(r)}>Edit</Button>}
+                <div className="row gap-2 end">{props.canManage && <Button size="sm" variant="ghost" onClick={() => setEditing(r)}>Edit</Button>}{can('data.delete') && <Button size="sm" variant="danger" onClick={() => setDeleting(r)}>Delete</Button>}</div>
               </div>
             ))}
           </div>
         )}
       </Card>
       {editing && <ReferralFormModal patientId={props.patientId} initial={editing} onClose={() => setEditing(null)} onSaved={() => { setEditing(null); reload(); }} />}
+      {deleting && <ConfirmDialog
+        title="Delete referral?"
+        body={`Referral dated ${formatDate(deleting.date)} will be permanently deleted.`}
+        confirmLabel="Delete referral"
+        danger
+        onConfirm={async () => { try { await api['referrals/delete'](deleting.id); toast.success('Referral deleted'); setDeleting(null); reload(); } catch (err) { toast.fromError(err, 'Delete failed'); } }}
+        onCancel={() => setDeleting(null)}
+      />}
     </>
   );
 }
@@ -665,6 +676,7 @@ function VisitsTab(props: { patientId: number; refreshKey?: number; onCreate: ()
   const { can } = useApp();
   const { data, loading, error, reload } = useAsync(() => api['visits/list']({ patientId: props.patientId, pageSize: 100 }), [props.patientId, props.refreshKey]);
   const toast = useToast();
+  const [deleteVisit, setDeleteVisit] = useState<VisitDTO | null>(null);
 
   const printSummary = async (visitId: number) => {
     try {
@@ -690,7 +702,7 @@ function VisitsTab(props: { patientId: number; refreshKey?: number; onCreate: ()
           <div className="mini-visit" key={v.id}>
             <div className="row between wrap">
               <div>
-                <strong>{new Date(v.datetime).toLocaleString()}</strong>{' '}
+                <strong>{formatDate(v.datetime)} {new Date(v.datetime).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}</strong>{' '}
                 <Badge tone={v.status === 'open' ? 'warning' : 'neutral'}>{v.status}</Badge>
                 <div className="small muted">{v.dentistName ?? 'Any dentist'} · {v.chiefComplaint || 'no complaint recorded'}</div>
               </div>
@@ -703,6 +715,7 @@ function VisitsTab(props: { patientId: number; refreshKey?: number; onCreate: ()
                   }}>Complete visit</Button>
                 )}
                 <Button size="sm" variant="ghost" onClick={() => void printSummary(v.id)}>Print summary</Button>
+                {can('data.delete') && <Button size="sm" variant="danger" onClick={() => setDeleteVisit(v)}>Delete</Button>}
               </div>
             </div>
             {v.diagnosis && <div className="small mt-2"><strong>Diagnosis:</strong> {v.diagnosis}</div>}
@@ -712,6 +725,18 @@ function VisitsTab(props: { patientId: number; refreshKey?: number; onCreate: ()
           </div>
         ))
       )}
+
+      {deleteVisit && <ConfirmDialog
+        title="Delete visit?"
+        body={`Visit on ${formatDate(deleteVisit.datetime)} will be removed from this patient's visit history. Linked prescription references will be detached.`}
+        confirmLabel="Delete visit"
+        danger
+        onConfirm={async () => {
+          try { await api['visits/delete'](deleteVisit.id); toast.success('Visit deleted'); setDeleteVisit(null); reload(); }
+          catch (err) { toast.fromError(err, 'Delete failed'); }
+        }}
+        onCancel={() => setDeleteVisit(null)}
+      />}
     </>
   );
 }
@@ -882,7 +907,7 @@ function AttachmentsTab(props: { entityType: string; entityId: number }) {
             <div className="list-row" key={a.id}>
               <span className="flex-1">
                 <strong>{a.originalName}</strong>
-                <div className="xsmall muted">{a.mime} · {(a.size / 1024).toFixed(0)} KB · {new Date(a.uploadedAt).toLocaleString()} · by {a.uploadedByName}</div>
+                <div className="xsmall muted">{a.mime} · {(a.size / 1024).toFixed(0)} KB · {`${formatDate(a.uploadedAt)} ${new Date(a.uploadedAt).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}`} · by {a.uploadedByName}</div>
               </span>
               <Button size="sm" variant="ghost" onClick={() => void api['attachments/open'](a.id).catch(() => undefined)}>Open</Button>
               <Button size="sm" variant="ghost" onClick={() => void api['attachments/export'](a.id).catch(() => undefined)}>Save a copy</Button>
@@ -913,7 +938,7 @@ function TimelineTab(props: { patientId: number; refreshKey?: number }) {
           <div className="timeline-card">
             <div className="timeline-head">
               <span className="timeline-title">{ev.title}</span>
-              <span className="timeline-time">{new Date(ev.at).toLocaleString()}</span>
+              <span className="timeline-time">{`${formatDate(ev.at)} ${new Date(ev.at).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}`}</span>
             </div>
             {ev.summary && <div className="timeline-summary">{ev.summary}</div>}
           </div>
@@ -1112,6 +1137,7 @@ export function VisitFormModal(props: { patientId: number; onClose: () => void; 
 }
 
 export function RxFormModal(props: { patientId: number; visitId?: number | null; onClose: () => void; onSaved: (id: number) => void }) {
+  const { can } = useApp();
   const patientId = props.patientId;
   const { values, set, validate, errors } = useForm({
     dentistId: '', date: isoDate(new Date()), cC: '', oE: '', rE: '', diagnosis: '', treatment: '', advice: '', followUp: '',
@@ -1122,7 +1148,8 @@ export function RxFormModal(props: { patientId: number; visitId?: number | null;
     saveAsTemplate: '',
   });
   const { data: dentists } = useAsync(() => api['dentists/list'](), []);
-  const { data: templates } = useAsync(() => api['prescriptions/templates'](), []);
+  const { data: templates, reload: reloadTemplates } = useAsync(() => api['prescriptions/templates'](), []);
+  const [deleteTemplate, setDeleteTemplate] = useState<{ id: number; name: string } | null>(null);
   const [pending, setPending] = useState(false);
   const toast = useToast();
   const [patientQuery, setPatientQuery] = useState('');
@@ -1233,8 +1260,16 @@ export function RxFormModal(props: { patientId: number; visitId?: number | null;
         </Field>
         <Field label="Apply saved template" className="span-2">
           {(id) => (
-            <Select id={id} value="" onChange={applyTemplate} placeholder="Choose a template…"
-              options={(templates ?? []).map((t) => ({ value: String(t.id), label: t.name }))} />
+            <div className="col gap-2">
+              <Select id={id} value="" onChange={applyTemplate} placeholder="Choose a template…"
+                options={(templates ?? []).map((t) => ({ value: String(t.id), label: t.name }))} />
+              {(templates ?? []).map((t) => (
+                <div key={t.id} className="row between small" style={{ padding: '6px 8px', border: '1px solid var(--line)', borderRadius: 6 }}>
+                  <span>{t.name}</span>
+                  {can('data.delete') && <Button size="sm" variant="danger" onClick={() => setDeleteTemplate({ id: t.id, name: t.name })}>Delete</Button>}
+                </div>
+              ))}
+            </div>
           )}
         </Field>
         <Field label={<>C/C <span className="muted">(chief complaint)</span></>} className="span-2">
@@ -1351,6 +1386,18 @@ export function RxFormModal(props: { patientId: number; visitId?: number | null;
           {(id) => <Input id={id} value={values.saveAsTemplate} onChange={(v) => set('saveAsTemplate', v)} placeholder="e.g. Standard post-extraction" />}
         </Field>
       </div>
+
+      {deleteTemplate && <ConfirmDialog
+        title="Delete medicine template?"
+        body={`${deleteTemplate.name} will be permanently deleted from saved prescription templates.`}
+        confirmLabel="Delete template"
+        danger
+        onConfirm={async () => {
+          try { await api['prescriptions/delete-template'](deleteTemplate.id); toast.success('Template deleted'); setDeleteTemplate(null); reloadTemplates(); }
+          catch (err) { toast.fromError(err, 'Delete failed'); }
+        }}
+        onCancel={() => setDeleteTemplate(null)}
+      />}
     </Modal>
   );
 }

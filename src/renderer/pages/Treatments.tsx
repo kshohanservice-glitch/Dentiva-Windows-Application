@@ -180,6 +180,7 @@ export function TreatmentsPage() {
           <div className="row gap-2 end">
             <Button size="sm" variant="ghost" onClick={() => { setEditing(t); setModalOpen(true); }}>Edit</Button>
             <Button size="sm" variant="ghost" onClick={() => void toggleActive(t)}>{t.active ? 'Deactivate' : 'Activate'}</Button>
+            {can('data.delete') && <Button size="sm" variant="danger" onClick={() => setDeleting(t)}>Delete</Button>}
           </div>
         ) : null,
     },
@@ -238,17 +239,17 @@ export function TreatmentsPage() {
 
       {deleting && (
         <ConfirmDialog
-          title="Deactivate treatment?"
-          body={`${deleting.name} will no longer appear when building invoices. Existing invoices are unaffected.`}
-          confirmLabel="Deactivate"
+          title="Delete treatment?"
+          body={`${deleting.name} will be permanently deleted from the treatment catalog. Existing invoice/visit history will keep its stored description and price.`}
+          confirmLabel="Delete treatment"
           danger
           onConfirm={async () => {
             try {
-              await api['treatments/set-active']({ id: deleting.id, active: false });
+              await api['treatments/delete'](deleting.id);
               setDeleting(null);
               reload();
             } catch (err) {
-              toast.fromError(err);
+              toast.fromError(err, 'Delete failed');
             }
           }}
           onCancel={() => setDeleting(null)}

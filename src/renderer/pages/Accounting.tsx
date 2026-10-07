@@ -156,6 +156,7 @@ export function AccountingPage() {
   const [entryOpen, setEntryOpen] = useState<'expense' | 'income' | null>(null);
   const [catOpen, setCatOpen] = useState<'expense' | 'income' | null>(null);
   const [deleting, setDeleting] = useState<ExpenseDTO | null>(null);
+  const [deletingIncome, setDeletingIncome] = useState<IncomeDTO | null>(null);
 
   const filter = { from, to, page, pageSize: 25 };
   const expQ = useAsync(() => api['accounting/expenses'](filter), [from, to, page]);
@@ -170,7 +171,7 @@ export function AccountingPage() {
   }, [expQ.data, incQ.data]);
 
   const expenseColumns: Column<ExpenseDTO>[] = [
-    { key: 'date', label: 'Date', sortValue: (e) => e.date, render: (e) => new Date(e.date).toLocaleDateString() },
+    { key: 'date', label: 'Date', sortValue: (e) => e.date, render: (e) => formatDate(e.date) },
     { key: 'category', label: 'Category', render: (e) => e.categoryName },
     { key: 'amount', label: 'Amount', align: 'right', sortValue: (e) => e.amountPaisa, render: (e) => <span className="num danger-text">{bdt(e.amountPaisa)}</span> },
     { key: 'method', label: 'Method', render: (e) => <Badge tone="neutral">{e.method}</Badge> },
@@ -188,13 +189,14 @@ export function AccountingPage() {
   ];
 
   const incomeColumns: Column<IncomeDTO>[] = [
-    { key: 'date', label: 'Date', sortValue: (i) => i.date, render: (i) => new Date(i.date).toLocaleDateString() },
+    { key: 'date', label: 'Date', sortValue: (i) => i.date, render: (i) => formatDate(i.date) },
     { key: 'category', label: 'Category', render: (i) => i.categoryName },
     { key: 'amount', label: 'Amount', align: 'right', sortValue: (i) => i.amountPaisa, render: (i) => <span className="num success-text">{bdt(i.amountPaisa)}</span> },
     { key: 'method', label: 'Method', render: (i) => <Badge tone="neutral">{i.method}</Badge> },
     { key: 'reference', label: 'Reference', render: (i) => <span className="mono">{i.reference ?? '—'}</span> },
     { key: 'note', label: 'Note', clip: true, render: (i) => i.note ?? '—' },
     { key: 'by', label: 'Entered by', render: (i) => i.enteredByName },
+    { key: 'actions', label: '', align: 'right', render: (i) => can('data.delete') ? <Button size="sm" variant="danger" onClick={() => setDeletingIncome(i)}>Delete</Button> : null },
   ];
 
   return (
@@ -271,12 +273,26 @@ export function AccountingPage() {
       <EntryModal kind={tab === 'expenses' ? 'expense' : 'income'} open={!!entryOpen} onClose={() => setEntryOpen(null)} onSaved={() => { expQ.reload(); incQ.reload(); }} />
       {catOpen && <CategoryModal open kind={catOpen} onClose={() => setCatOpen(null)} onSaved={reloadCats} />}
 
+      {deletingIncome && (
+        <ConfirmDialog
+          title="Delete income entry?"
+          body={<> <strong>{deletingIncome.categoryName}</strong> · {bdt(deletingIncome.amountPaisa)} · {formatDate(deletingIncome.date)}.<br />This removes the income entry entirely and is recorded in the audit log.</>}
+          confirmLabel="Delete permanently"
+          danger
+          onConfirm={async () => {
+            try { await api['accounting/delete-income'](deletingIncome.id); toast.success('Income deleted'); setDeletingIncome(null); incQ.reload(); }
+            catch (err) { toast.fromError(err, 'Delete failed'); }
+          }}
+          onCancel={() => setDeletingIncome(null)}
+        />
+      )}
+
       {deleting && (
         <ConfirmDialog
           title="Delete expense entry?"
           body={
             <>
-              <strong>{deleting.categoryName}</strong> · {bdt(deleting.amountPaisa)} · {new Date(deleting.date).toLocaleDateString()}.
+              <strong>{deleting.categoryName}</strong> · {bdt(deleting.amountPaisa)} · {formatDate(deleting.date)}.
               <br />This removes the entry entirely and is recorded in the audit log. Prefer adding a contra entry for reversals.
             </>
           }

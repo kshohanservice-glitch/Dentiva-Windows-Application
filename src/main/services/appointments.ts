@@ -192,6 +192,18 @@ export function updateAppointment(ctx: Ctx, id: number, input: AppointmentUpdate
   return getOne(ctx, id);
 }
 
+export function deleteAppointment(ctx: Ctx, id: number): { ok: boolean } {
+  requirePermission(ctx, 'data.delete');
+  const row = ctx.db.prepare('SELECT id, patient_id, date, time, status FROM appointments WHERE id = ? AND deleted_at IS NULL').get(id) as any;
+  if (!row) throw notFound('Appointment not found.');
+  tx(ctx.db, () => {
+    ctx.db.prepare("UPDATE queue_entries SET status = 'cancelled', finished_at = COALESCE(finished_at, ?) WHERE appointment_id = ? AND status IN ('waiting','called','paused','in_treatment')").run(nowISO(), id);
+    ctx.db.prepare('UPDATE appointments SET deleted_at = ?, updated_at = ? WHERE id = ?').run(nowISO(), nowISO(), id);
+    audit(ctx, { action: 'appointment.delete', entityType: 'appointment', entityId: id, summary: `Appointment ${row.date} ${row.time} deleted manually`, before: { patientId: row.patient_id, status: row.status } });
+  });
+  return { ok: true };
+}
+
 export function cancelAppointment(ctx: Ctx, id: number, reason?: string): AppointmentDTO {
   requirePermission(ctx, 'appointments.manage');
   const existing = ctx.db.prepare('SELECT status FROM appointments WHERE id = ? AND deleted_at IS NULL').get(id) as { status: string } | undefined;

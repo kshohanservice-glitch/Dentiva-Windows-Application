@@ -4,7 +4,7 @@ import { useApp } from '../state/app-context';
 import { Badge, Button, Card, EmptyState, ErrorState, Modal, Spinner, TypedConfirmDialog, useToast } from '../components/primitives';
 import { Field, Input, Select } from '../components/forms';
 import { Icon } from '../components/shell';
-import { formatBytes } from '../format';
+import { formatBytes, formatDate } from '../format';
 import type { BackupRecordDTO } from '../../shared/ipc';
 
 function RestoreDialog(props: { record: BackupRecordDTO | null; externalPath?: string | null; onClose: () => void; onDone: () => void }) {
@@ -155,7 +155,7 @@ export function BackupPage() {
                 <span className="flex-1">
                   <strong className="mono">{b.path.split(/[\\/]/).pop()}</strong>
                   <div className="xsmall muted">
-                    {new Date(b.createdAt).toLocaleString()} · {formatBytes(b.sizeBytes)} · schema v{b.schemaVersion}
+                    {`${formatDate(b.createdAt)} ${new Date(b.createdAt).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}`} · {formatBytes(b.sizeBytes)} · schema v{b.schemaVersion}
                   </div>
                   {b.checksum && <div className="xsmall muted mono truncate" style={{ maxWidth: 520 }}>sha256: {b.checksum.slice(0, 24)}…</div>}
                 </span>

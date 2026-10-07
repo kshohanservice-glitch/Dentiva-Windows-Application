@@ -5,6 +5,7 @@ import { useApp } from '../state/app-context';
 import { Badge, Button, ErrorState, IconButton, Kbd, Spinner, useToast } from './primitives';
 import { Input } from './forms';
 import type { NotificationDTO, SearchHit } from '../../shared/types';
+import { formatDate } from '../format';
 
 /* ------------------------------ Icons ------------------------------ */
 /* Minimal line icons drawn inline (no external icon assets, offline-safe). */
@@ -251,7 +252,7 @@ function NotificationBell() {
               <div className="flex-1">
                 <div className="title">{n.title}</div>
                 <div className="body">{n.body}</div>
-                <div className="time">{new Date(n.createdAt).toLocaleString()}</div>
+                <div className="time">{`${formatDate(n.createdAt)} ${new Date(n.createdAt).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}`}</div>
               </div>
             </div>
           ))}
@@ -412,7 +413,7 @@ export function AppShell() {
 
         <div className="header-right">
           <div className="header-date">
-            <div>{now.toLocaleDateString(undefined, { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' })}</div>
+            <div>{`${now.toLocaleDateString('en-GB', { weekday: 'short' }).replace(',', '')} ${formatDate(now)}`}</div>
             <div className="num">{now.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })}</div>
           </div>
           <NotificationBell />

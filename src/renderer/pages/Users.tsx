@@ -5,6 +5,7 @@ import { Badge, Button, Card, EmptyState, ErrorState, Modal, Spinner, Tabs, useT
 import { Field, Input, Select } from '../components/forms';
 import { DataTable, TableToolbar, type Column } from '../components/table';
 import { Icon } from '../components/shell';
+import { formatDate } from '../format';
 import { ALL_PERMISSIONS, PERMISSION_GROUPS, type PermissionKey } from '../../shared/permissions';
 import type { RoleDTO, UserDTO } from '../../shared/types';
 
@@ -318,6 +319,7 @@ export function UsersPage() {
   const [roleModal, setRoleModal] = useState<{ open: boolean; initial: RoleDTO | null }>({ open: false, initial: null });
   const [resetTarget, setResetTarget] = useState<UserDTO | null>(null);
   const [query, setQuery] = useState('');
+  const [deleteTarget, setDeleteTarget] = useState<UserDTO | null>(null);
 
   const usersQ = useAsync(() => api['users/list'](), []);
   const rolesQ = useAsync(() => api['roles/list'](), []);
@@ -330,7 +332,7 @@ export function UsersPage() {
     { key: 'display', label: 'Display name', render: (u) => u.displayName },
     { key: 'role', label: 'Role', render: (u) => <Badge tone="brand">{u.roleName}</Badge> },
     { key: 'status', label: 'Status', render: (u) => <Badge tone={u.status === 'active' ? 'success' : u.status === 'locked' ? 'warning' : 'danger'}>{u.status}</Badge> },
-    { key: 'lastLogin', label: 'Last sign-in', render: (u) => (u.lastLoginAt ? new Date(u.lastLoginAt).toLocaleString() : <span className="muted">never</span>) },
+    { key: 'lastLogin', label: 'Last sign-in', render: (u) => (u.lastLoginAt ? `${formatDate(u.lastLoginAt)} ${new Date(u.lastLoginAt).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}` : <span className="muted">never</span>) },
     { key: 'mustPw', label: 'Flags', render: (u) => (u.mustChangePassword ? <Badge tone="warning">must change password</Badge> : null) },
     {
       key: 'actions', label: '', align: 'right',
@@ -338,6 +340,7 @@ export function UsersPage() {
         <div className="row gap-2 end">
           <Button size="sm" variant="ghost" onClick={() => setUserModal({ open: true, initial: u })}>Edit</Button>
           <Button size="sm" variant="ghost" onClick={() => setResetTarget(u)}>Reset password</Button>
+          {can('data.delete') && u.id !== user?.userId && <Button size="sm" variant="danger" onClick={() => setDeleteTarget(u)}>Delete</Button>}
         </div>
       ) : null),
     },
@@ -423,6 +426,14 @@ export function UsersPage() {
 
       <UserModal open={userModal.open} initial={userModal.initial} onClose={() => setUserModal({ open: false, initial: null })} onSaved={usersQ.reload} />
       <RoleModal open={roleModal.open} initial={roleModal.initial} onClose={() => setRoleModal({ open: false, initial: null })} onSaved={rolesQ.reload} />
+      {deleteTarget && <ConfirmDialog
+        title="Delete user account?"
+        body={`${deleteTarget.username} (${deleteTarget.displayName}) will be disabled and removed from active user records. You cannot delete your own signed-in account.`}
+        confirmLabel="Delete user"
+        danger
+        onConfirm={async () => { try { await api['users/delete'](deleteTarget.id); toast.success('User deleted'); setDeleteTarget(null); usersQ.reload(); } catch (err) { toast.fromError(err, 'Delete failed'); } }}
+        onCancel={() => setDeleteTarget(null)}
+      />}
       {resetTarget && <ResetPasswordModal user={resetTarget} onClose={() => setResetTarget(null)} onSaved={usersQ.reload} />}
       {can('audit.view') && (
         <div className="mt-4">

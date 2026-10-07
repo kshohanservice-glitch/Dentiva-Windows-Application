@@ -183,6 +183,15 @@ export function listTemplates(ctx: Ctx): { id: number; name: string; items: any[
     .map((t) => ({ id: t.id, name: t.name, items: JSON.parse(t.items_json) }));
 }
 
+export function deleteTemplate(ctx: Ctx, id: number): { ok: boolean } {
+  requirePermission(ctx, 'data.delete');
+  const row = ctx.db.prepare('SELECT id, name FROM medicine_templates WHERE id = ?').get(id) as any;
+  if (!row) throw new Error('Medicine template not found.');
+  ctx.db.prepare('DELETE FROM medicine_templates WHERE id = ?').run(id);
+  audit(ctx, { action: 'prescription.template_delete', entityType: 'medicine_template', entityId: id, summary: `Deleted medicine template "${row.name}"` });
+  return { ok: true };
+}
+
 export function saveTemplate(ctx: Ctx, name: string, items: any[]): { id: number } {
   requirePermission(ctx, 'clinical.prescription.create');
   const tName = reqString(name, 'Template name', { max: 120 });

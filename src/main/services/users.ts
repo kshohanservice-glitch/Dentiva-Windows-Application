@@ -133,6 +133,17 @@ export async function saveUser(ctx: Ctx, input: UserSaveInput): Promise<UserDTO>
   return userDTO(row, loadPermissions(ctx.db, id, roleId));
 }
 
+export function deleteUser(ctx: Ctx, id: number): { ok: boolean } {
+  requirePermission(ctx, 'data.delete');
+  const row = ctx.db.prepare('SELECT id, username, display_name FROM users WHERE id = ? AND deleted_at IS NULL').get(id) as any;
+  if (!row) throw new Error('User not found.');
+  if (row.id === ctx.session.userId) throw new Error('You cannot delete your own signed-in account.');
+  const at = new Date().toISOString();
+  ctx.db.prepare("UPDATE users SET deleted_at = ?, status = 'disabled', updated_at = ? WHERE id = ?").run(at, at, id);
+  audit(ctx, { action: 'user.delete', entityType: 'user', entityId: id, summary: `Deleted user ${row.username}` });
+  return { ok: true };
+}
+
 export async function resetPassword(ctx: Ctx, userId: number, newPassword: string): Promise<{ ok: boolean }> {
   requirePermission(ctx, 'users.manage');
   const row = ctx.db

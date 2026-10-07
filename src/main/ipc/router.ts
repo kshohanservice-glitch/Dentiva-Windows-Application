@@ -78,19 +78,19 @@ export function registerRouter(deps: RouterDeps): void {
     const demoBlocked: Set<string> = new Set([
     IPC.activationVerify, IPC.authLogout, IPC.authChangePassword, IPC.authUnlock, IPC.setupComplete, IPC.systemLock,
     IPC.patientsCreate, IPC.patientsUpdate, IPC.patientsArchive, IPC.patientsDelete,
-    IPC.visitsCreate, IPC.visitsUpdate, IPC.chartSet,
-    IPC.treatmentsSave, IPC.treatmentsSetActive,
-    IPC.prescriptionsCreate, IPC.prescriptionsDelete, IPC.prescriptionsSaveTemplate,
-    IPC.appointmentsCreate, IPC.appointmentsUpdate, IPC.appointmentsCancel, IPC.appointmentsNoShow, IPC.appointmentsArrive,
+    IPC.visitsCreate, IPC.visitsUpdate, IPC.visitsDelete, IPC.chartSet,
+    IPC.treatmentsSave, IPC.treatmentsSetActive, IPC.treatmentsDelete,
+    IPC.prescriptionsCreate, IPC.prescriptionsDelete, IPC.prescriptionsSaveTemplate, IPC.prescriptionsDeleteTemplate,
+    IPC.appointmentsCreate, IPC.appointmentsUpdate, IPC.appointmentsCancel, IPC.appointmentsDelete, IPC.appointmentsNoShow, IPC.appointmentsArrive,
     IPC.queueAdd, IPC.queueAction, IPC.queueReorder,
-    IPC.invoicesCreate, IPC.invoicesVoid, IPC.invoicesDelete, IPC.paymentsCreate,
-    IPC.inventorySaveItem, IPC.inventoryStock, IPC.inventorySaveSupplier,
-    IPC.accountingAddExpense, IPC.accountingDeleteExpense, IPC.accountingAddIncome, IPC.accountingSaveCategory,
-    IPC.staffSave, IPC.dentistsSave,
-    IPC.usersSave, IPC.usersResetPassword, IPC.rolesSave, IPC.rolesRemove,
+    IPC.invoicesCreate, IPC.invoicesVoid, IPC.invoicesDelete, IPC.paymentsCreate, IPC.paymentsDelete,
+    IPC.inventorySaveItem, IPC.inventoryDeleteItem, IPC.inventoryDeleteBatch, IPC.inventoryStock, IPC.inventorySaveSupplier, IPC.inventoryDeleteSupplier,
+    IPC.accountingAddExpense, IPC.accountingDeleteExpense, IPC.accountingAddIncome, IPC.accountingDeleteIncome, IPC.accountingSaveCategory,
+    IPC.staffSave, IPC.staffDelete, IPC.dentistsSave, IPC.dentistsDelete,
+    IPC.usersSave, IPC.usersResetPassword, IPC.usersDelete, IPC.rolesSave, IPC.rolesRemove,
     IPC.attachmentsAdd, IPC.attachmentsRename, IPC.attachmentsRemove,
     IPC.backupRun, IPC.backupRestore, IPC.backupSetAuto,
-    IPC.settingsSave, IPC.settingsUploadLogo, IPC.settingsResetBusiness,
+    IPC.settingsSave, IPC.settingsUploadLogo, IPC.settingsResetBusiness, IPC.referralsDelete,
     IPC.notificationsMarkRead, IPC.referralsSave,
   ]);
   const handle = (channel: string, opts: { auth: boolean; fn: (payload: any, ctx: Ctx | null) => any | Promise<any> }) => {
@@ -210,6 +210,7 @@ export function registerRouter(deps: RouterDeps): void {
   handle(IPC.visitsGet, { auth: true, fn: (p, ctx) => visits.getVisit(ctx!, Number(p)) });
   handle(IPC.visitsCreate, { auth: true, fn: (p, ctx) => visits.createVisit(ctx!, p) });
   handle(IPC.visitsUpdate, { auth: true, fn: (p, ctx) => visits.updateVisit(ctx!, Number(p?.id), p) });
+  handle(IPC.visitsDelete, { auth: true, fn: (p, ctx) => visits.deleteVisit(ctx!, Number(p)) });
 
   handle(IPC.chartGet, { auth: true, fn: (p, ctx) => chart.getChart(ctx!, Number(p)) });
   handle(IPC.chartSet, { auth: true, fn: (p, ctx) => chart.setChart(ctx!, Number(p?.patientId), p) });
@@ -218,6 +219,7 @@ export function registerRouter(deps: RouterDeps): void {
   handle(IPC.treatmentsList, { auth: true, fn: (p, ctx) => treatments.listTreatments(ctx!, !!p) });
   handle(IPC.treatmentsSave, { auth: true, fn: (p, ctx) => treatments.saveTreatment(ctx!, p) });
   handle(IPC.treatmentsSetActive, { auth: true, fn: (p, ctx) => treatments.setTreatmentActive(ctx!, Number(p?.id), !!p?.active) });
+  handle(IPC.treatmentsDelete, { auth: true, fn: (p, ctx) => treatments.deleteTreatment(ctx!, Number(p)) });
 
   /* -------------------------- prescriptions ---------------------------- */
   handle(IPC.prescriptionsList, { auth: true, fn: (p, ctx) => prescriptions.listPrescriptions(ctx!, p) });
@@ -226,12 +228,14 @@ export function registerRouter(deps: RouterDeps): void {
   handle(IPC.prescriptionsDelete, { auth: true, fn: (p, ctx) => prescriptions.deletePrescription(ctx!, Number(p)) });
   handle(IPC.prescriptionsTemplates, { auth: true, fn: (_p, ctx) => prescriptions.listTemplates(ctx!) });
   handle(IPC.prescriptionsSaveTemplate, { auth: true, fn: (p, ctx) => prescriptions.saveTemplate(ctx!, String(p?.name), p?.items) });
+  handle(IPC.prescriptionsDeleteTemplate, { auth: true, fn: (p, ctx) => prescriptions.deleteTemplate(ctx!, Number(p)) });
 
   /* -------------------------- appointments ----------------------------- */
   handle(IPC.appointmentsList, { auth: true, fn: (p, ctx) => appointments.listAppointments(ctx!, p) });
   handle(IPC.appointmentsCreate, { auth: true, fn: (p, ctx) => appointments.createAppointment(ctx!, p) });
   handle(IPC.appointmentsUpdate, { auth: true, fn: (p, ctx) => appointments.updateAppointment(ctx!, Number(p?.id), p) });
   handle(IPC.appointmentsCancel, { auth: true, fn: (p, ctx) => appointments.cancelAppointment(ctx!, Number(p?.id), p?.reason) });
+  handle(IPC.appointmentsDelete, { auth: true, fn: (p, ctx) => appointments.deleteAppointment(ctx!, Number(p)) });
   handle(IPC.appointmentsNoShow, { auth: true, fn: (p, ctx) => appointments.markNoShow(ctx!, Number(p)) });
   handle(IPC.appointmentsArrive, { auth: true, fn: (p, ctx) => appointments.arriveAppointment(ctx!, Number(p)) });
 
@@ -249,14 +253,18 @@ export function registerRouter(deps: RouterDeps): void {
   handle(IPC.invoicesDelete, { auth: true, fn: (p, ctx) => billing.deleteInvoice(ctx!, Number(p)) });
   handle(IPC.paymentsList, { auth: true, fn: (p, ctx) => billing.listPayments(ctx!, p) });
   handle(IPC.paymentsCreate, { auth: true, fn: (p, ctx) => billing.createPayment(ctx!, p) });
+  handle(IPC.paymentsDelete, { auth: true, fn: (p, ctx) => billing.deletePayment(ctx!, Number(p)) });
 
   /* ----------------------------- inventory ------------------------------ */
   handle(IPC.inventoryItems, { auth: true, fn: (p, ctx) => inventory.listItems(ctx!, p ?? {}) });
   handle(IPC.inventoryBatches, { auth: true, fn: (p, ctx) => inventory.listBatches(ctx!, p ?? {}) });
   handle(IPC.inventorySaveItem, { auth: true, fn: (p, ctx) => inventory.saveItem(ctx!, p) });
+  handle(IPC.inventoryDeleteItem, { auth: true, fn: (p, ctx) => inventory.deleteItem(ctx!, Number(p)) });
+  handle(IPC.inventoryDeleteBatch, { auth: true, fn: (p, ctx) => inventory.deleteBatch(ctx!, Number(p)) });
   handle(IPC.inventoryStock, { auth: true, fn: (p, ctx) => inventory.stockOperation(ctx!, p) });
   handle(IPC.inventorySuppliers, { auth: true, fn: (_p, ctx) => inventory.listSuppliers(ctx!) });
   handle(IPC.inventorySaveSupplier, { auth: true, fn: (p, ctx) => inventory.saveSupplier(ctx!, p) });
+  handle(IPC.inventoryDeleteSupplier, { auth: true, fn: (p, ctx) => inventory.deleteSupplier(ctx!, Number(p)) });
 
   /* ----------------------------- accounting ----------------------------- */
   handle(IPC.accountingExpenses, { auth: true, fn: (p, ctx) => accounting.listExpenses(ctx!, p ?? {}) });
@@ -264,22 +272,27 @@ export function registerRouter(deps: RouterDeps): void {
   handle(IPC.accountingDeleteExpense, { auth: true, fn: (p, ctx) => accounting.deleteExpense(ctx!, Number(p)) });
   handle(IPC.accountingIncomes, { auth: true, fn: (p, ctx) => accounting.listIncomes(ctx!, p ?? {}) });
   handle(IPC.accountingAddIncome, { auth: true, fn: (p, ctx) => accounting.addIncome(ctx!, p) });
+  handle(IPC.accountingDeleteIncome, { auth: true, fn: (p, ctx) => accounting.deleteIncome(ctx!, Number(p)) });
   handle(IPC.accountingCategories, { auth: true, fn: (_p, ctx) => accounting.listCategories(ctx!) });
   handle(IPC.accountingSaveCategory, { auth: true, fn: (p, ctx) => accounting.saveCategory(ctx!, p) });
 
   /* --------------------------- staff & dentists -------------------------- */
   handle(IPC.staffList, { auth: true, fn: (_p, ctx) => staffSvc.listStaff(ctx!) });
   handle(IPC.staffSave, { auth: true, fn: (p, ctx) => staffSvc.saveStaff(ctx!, p) });
+  handle(IPC.staffDelete, { auth: true, fn: (p, ctx) => staffSvc.deleteStaff(ctx!, Number(p)) });
   handle(IPC.dentistsList, { auth: true, fn: (p, ctx) => staffSvc.listDentists(ctx!, !!p) });
   handle(IPC.dentistsSave, { auth: true, fn: (p, ctx) => staffSvc.saveDentist(ctx!, p) });
+  handle(IPC.dentistsDelete, { auth: true, fn: (p, ctx) => staffSvc.deleteDentist(ctx!, Number(p)) });
 
   /* ------------------------ users, roles, audit -------------------------- */
   handle(IPC.usersList, { auth: true, fn: (_p, ctx) => usersSvc.listUsers(ctx!) });
   handle(IPC.usersSave, { auth: true, fn: (p, ctx) => usersSvc.saveUser(ctx!, p) });
   handle(IPC.usersResetPassword, { auth: true, fn: (p, ctx) => usersSvc.resetPassword(ctx!, Number(p?.id), p?.password) });
+  handle(IPC.usersDelete, { auth: true, fn: (p, ctx) => usersSvc.deleteUser(ctx!, Number(p)) });
   handle(IPC.rolesList, { auth: true, fn: (_p, ctx) => usersSvc.listRoles(ctx!) });
   handle(IPC.rolesSave, { auth: true, fn: (p, ctx) => usersSvc.saveRole(ctx!, p) });
   handle(IPC.rolesRemove, { auth: true, fn: (p, ctx) => usersSvc.removeRole(ctx!, Number(p)) });
+  handle(IPC.referralsDelete, { auth: true, fn: (p, ctx) => referralsSvc.deleteReferral(ctx!, Number(p)) });
   handle(IPC.auditList, { auth: true, fn: (p, ctx) => usersSvc.listAudit(ctx!, p ?? {}) });
 
   /* ---------------------------- attachments ------------------------------ */

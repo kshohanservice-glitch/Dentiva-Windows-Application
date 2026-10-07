@@ -1,11 +1,11 @@
 import { useEffect, useState } from 'react';
 import { api, useAsync } from '../api';
 import { useApp } from '../state/app-context';
-import { Badge, Button, Card, EmptyState, Modal, Tabs, useToast } from '../components/primitives';
+import { Badge, Button, Card, ConfirmDialog, EmptyState, Modal, Tabs, useToast } from '../components/primitives';
 import { Field, Input, Select, Textarea } from '../components/forms';
 import { DataTable, TableToolbar, type Column } from '../components/table';
 import { Icon } from '../components/shell';
-import { bdt, daysUntil } from '../format';
+import { bdt, daysUntil, formatDate } from '../format';
 import type { InventoryBatchDTO, InventoryItemDTO, InventoryTxnType } from '../../shared/types';
 
 function ItemModal(props: { open: boolean; initial?: InventoryItemDTO | null; onClose: () => void; onSaved: () => void }) {
@@ -261,6 +261,9 @@ export function InventoryPage() {
   const [stockItem, setStockItem] = useState<InventoryItemDTO | null>(null);
   const [supplierOpen, setSupplierOpen] = useState(false);
   const [expiringDays, setExpiringDays] = useState('30');
+  const [deleteItem, setDeleteItem] = useState<InventoryItemDTO | null>(null);
+  const [deleteBatch, setDeleteBatch] = useState<InventoryBatchDTO | null>(null);
+  const [deleteSupplier, setDeleteSupplier] = useState<{ id: number; name: string } | null>(null);
 
   const { data: items, loading, error, reload } = useAsync(
     () => api['inventory/items']({ query: query || undefined, lowOnly: lowOnly || undefined }),
@@ -300,7 +303,7 @@ export function InventoryPage() {
         if (d === null) return <span className="muted">—</span>;
         if (d < 0) return <Badge tone="danger">expired {i.nearestExpiry}</Badge>;
         if (d <= 30) return <Badge tone="warning">{d}d left</Badge>;
-        return <span className="muted">{new Date(i.nearestExpiry!).toLocaleDateString()}</span>;
+        return <span className="muted">{formatDate(i.nearestExpiry!)}</span>;
       },
     },
     {
@@ -310,6 +313,7 @@ export function InventoryPage() {
           <div className="row gap-2 end" onClick={(e) => e.stopPropagation()}>
             <Button size="sm" variant="secondary" onClick={() => setStockItem(i)}>Stock</Button>
             <Button size="sm" variant="ghost" onClick={() => setItemModal({ open: true, initial: i })}>Edit</Button>
+            {can('data.delete') && <Button size="sm" variant="danger" onClick={() => setDeleteItem(i)}>Delete</Button>}
           </div>
         ) : null,
     },
@@ -318,7 +322,7 @@ export function InventoryPage() {
   const batchColumns: Column<InventoryBatchDTO>[] = [
     { key: 'itemName', label: 'Item', sortValue: (b) => b.itemName, render: (b) => <strong>{b.itemName}</strong> },
     { key: 'batchNo', label: 'Batch', render: (b) => <span className="mono">{b.batchNo ?? '—'}</span> },
-    { key: 'expiry', label: 'Expiry', sortValue: (b) => b.expiryDate ?? '', render: (b) => (b.expiryDate ? new Date(b.expiryDate).toLocaleDateString() : '—') },
+    { key: 'expiry', label: 'Expiry', sortValue: (b) => b.expiryDate ?? '', render: (b) => (b.expiryDate ? formatDate(b.expiryDate) : '—') },
     { key: 'qty', label: 'Qty left', align: 'right', render: (b) => <span className="num">{b.qtyAvailable}/{b.qtyInitial}</span> },
     { key: 'price', label: 'Cost', align: 'right', render: (b) => <span className="num">{bdt(b.purchasePricePaisa)}</span> },
     { key: 'supplier', label: 'Supplier', render: (b) => b.supplierName ?? '—' },
@@ -420,6 +424,7 @@ export function InventoryPage() {
                   <div className="list-row" key={s.id}>
                     <strong className="flex-1">{s.name}</strong>
                     <span className="mono small">{s.phone ?? ''}</span>
+                    {can('data.delete') && <Button size="sm" variant="danger" onClick={() => setDeleteSupplier({ id: s.id, name: s.name })}>Delete</Button>}
                   </div>
                 ))}
               </div>
@@ -431,6 +436,42 @@ export function InventoryPage() {
       <ItemModal open={itemModal.open} initial={itemModal.initial} onClose={() => setItemModal({ open: false, initial: null })} onSaved={() => { reload(); reloadBatches(); }} />
       <StockModal open={!!stockItem} item={stockItem} onClose={() => setStockItem(null)} onSaved={() => { reload(); reloadBatches(); }} />
       <SupplierModal open={supplierOpen} onClose={() => setSupplierOpen(false)} onSaved={reloadSuppliers} />
+
+      {deleteItem && <ConfirmDialog
+        title="Delete inventory item?"
+        body={`${deleteItem.name} will be removed from the active inventory list. Existing stock history remains stored.`}
+        confirmLabel="Delete item"
+        danger
+        onConfirm={async () => {
+          try { await api['inventory/delete-item'](deleteItem.id); toast.success('Inventory item deleted'); setDeleteItem(null); reload(); reloadBatches(); }
+          catch (err) { toast.fromError(err, 'Delete failed'); }
+        }}
+        onCancel={() => setDeleteItem(null)}
+      />}
+
+      {deleteBatch && <ConfirmDialog
+        title="Delete inventory batch?"
+        body={`Batch ${deleteBatch.batchNo ?? deleteBatch.id} will be deleted. A batch must have zero available stock before it can be deleted.`}
+        confirmLabel="Delete batch"
+        danger
+        onConfirm={async () => {
+          try { await api['inventory/delete-batch'](deleteBatch.id); toast.success('Batch deleted'); setDeleteBatch(null); reloadBatches(); reload(); }
+          catch (err) { toast.fromError(err, 'Delete failed'); }
+        }}
+        onCancel={() => setDeleteBatch(null)}
+      />}
+
+      {deleteSupplier && <ConfirmDialog
+        title="Delete supplier?"
+        body={`${deleteSupplier.name} will be removed from suppliers. Existing stock batches will keep their stored stock data without the supplier link.`}
+        confirmLabel="Delete supplier"
+        danger
+        onConfirm={async () => {
+          try { await api['inventory/delete-supplier'](deleteSupplier.id); toast.success('Supplier deleted'); setDeleteSupplier(null); reloadSuppliers(); reloadBatches(); }
+          catch (err) { toast.fromError(err, 'Delete failed'); }
+        }}
+        onCancel={() => setDeleteSupplier(null)}
+      />}
     </div>
   );
 }

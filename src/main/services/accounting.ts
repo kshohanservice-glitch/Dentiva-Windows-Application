@@ -119,6 +119,17 @@ export function addIncome(ctx: Ctx, raw: AccountEntryInput): IncomeDTO {
   return incDTO(row);
 }
 
+export function deleteIncome(ctx: Ctx, id: number): { ok: boolean } {
+  requirePermission(ctx, 'data.delete');
+  const row = ctx.db.prepare('SELECT * FROM incomes WHERE id = ? AND deleted_at IS NULL').get(id) as any;
+  if (!row) throw new Error('Income entry not found.');
+  tx(ctx.db, () => {
+    ctx.db.prepare('UPDATE incomes SET deleted_at = ? WHERE id = ?').run(nowISO(), id);
+    audit(ctx, { action: 'accounting.income_delete', entityType: 'income', entityId: id, summary: `Deleted income entry #${id}`, before: { amount: row.amount_paisa, date: row.date } });
+  });
+  return { ok: true };
+}
+
 export function listCategories(ctx: Ctx): { id: number; name: string; kind: 'expense' | 'income' }[] {
   requirePermission(ctx, 'accounting.view');
   return ctx.db.prepare('SELECT id, name, kind FROM account_categories ORDER BY kind, name').all() as any;

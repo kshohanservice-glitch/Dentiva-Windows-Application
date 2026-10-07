@@ -115,6 +115,35 @@ export function saveItem(ctx: Ctx, raw: Partial<InventoryItemDTO>): InventoryIte
   return getItemById(ctx, id);
 }
 
+export function deleteItem(ctx: Ctx, id: number): { ok: boolean } {
+  requirePermission(ctx, 'data.delete');
+  const row = ctx.db.prepare('SELECT id, name FROM inventory_items WHERE id = ? AND deleted_at IS NULL').get(id) as any;
+  if (!row) throw new Error('Inventory item not found.');
+  const at = new Date().toISOString();
+  ctx.db.prepare('UPDATE inventory_items SET deleted_at = ?, active = 0, updated_at = ? WHERE id = ?').run(at, at, id);
+  audit(ctx, { action: 'inventory.item_delete', entityType: 'inventory_item', entityId: id, summary: `Deleted inventory item ${row.name}` });
+  return { ok: true };
+}
+
+export function deleteBatch(ctx: Ctx, id: number): { ok: boolean } {
+  requirePermission(ctx, 'data.delete');
+  const row = ctx.db.prepare('SELECT id, item_id, qty_available, batch_no FROM inventory_batches WHERE id = ?').get(id) as any;
+  if (!row) throw new Error('Inventory batch not found.');
+  if (Number(row.qty_available) > 0) throw new Error('A batch with available stock cannot be deleted. Use stock-out or expiry adjustment first.');
+  ctx.db.prepare('DELETE FROM inventory_batches WHERE id = ?').run(id);
+  audit(ctx, { action: 'inventory.batch_delete', entityType: 'inventory_batch', entityId: id, summary: `Deleted inventory batch ${row.batch_no ?? row.id}` });
+  return { ok: true };
+}
+
+export function deleteSupplier(ctx: Ctx, id: number): { ok: boolean } {
+  requirePermission(ctx, 'data.delete');
+  const row = ctx.db.prepare('SELECT id, name FROM suppliers WHERE id = ?').get(id) as any;
+  if (!row) throw new Error('Supplier not found.');
+  ctx.db.prepare('DELETE FROM suppliers WHERE id = ?').run(id);
+  audit(ctx, { action: 'inventory.supplier_delete', entityType: 'supplier', entityId: id, summary: `Deleted supplier ${row.name}` });
+  return { ok: true };
+}
+
 export function stockOperation(ctx: Ctx, raw: StockInput): { item: InventoryItemDTO; batches: InventoryBatchDTO[] } {
   requirePermission(ctx, 'inventory.manage');
   const itemId = reqInt(raw?.itemId, 'Item', { min: 1 });
