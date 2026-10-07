@@ -254,7 +254,7 @@ function InvoiceDetailModal(props: { invoice: InvoiceDTO; onClose: () => void; o
       {deleteOpen && (
         <ConfirmDialog
           title="Delete invoice?"
-          body={`Invoice ${invoice.number} will be hidden from invoice records. Invoices with payment history cannot be deleted.`}
+          body={`Invoice ${invoice.number} and its stored payment history will be permanently deleted. This cannot be undone.`}
           confirmLabel="Delete invoice"
           danger
           onCancel={() => setDeleteOpen(false)}
@@ -457,6 +457,7 @@ export function PaymentsPage() {
   const [refundAmount, setRefundAmount] = useState('');
   const [refundReason, setRefundReason] = useState('');
   const [refundPending, setRefundPending] = useState(false);
+  const [deletePaymentTarget, setDeletePaymentTarget] = useState<PaymentDTO | null>(null);
 
   const filter = { method: method || undefined, range: range === 'all' ? undefined : range, page, pageSize: 25 };
   const { data, loading, error, reload } = useAsync(() => api['payments/list'](filter), [method, range, page]);
@@ -465,7 +466,7 @@ export function PaymentsPage() {
   const totalRef = (data?.items ?? []).filter((p) => p.type === 'refund').reduce((s, p) => s + p.amountPaisa, 0);
 
   const columns: Column<PaymentDTO>[] = [
-    { key: 'paidAt', label: 'Date', sortValue: (p) => p.paidAt, render: (p) => new Date(p.paidAt).toLocaleString() },
+    { key: 'paidAt', label: 'Date', sortValue: (p) => p.paidAt, render: (p) => `${formatDate(p.paidAt)} ${new Date(p.paidAt).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}` },
     {
       key: 'patient', label: 'Patient',
       render: (p) => (<div><strong>{p.patientName}</strong><div className="xsmall muted mono">{p.invoiceNumber ?? 'no invoice'}</div></div>),
@@ -480,10 +481,14 @@ export function PaymentsPage() {
     { key: 'type', label: 'Type', render: (p) => <Badge tone={p.type === 'refund' ? 'danger' : 'success'}>{p.type}</Badge> },
     {
       key: 'actions', label: '', align: 'right',
-      render: (p) =>
-        can('billing.payment.refund') && p.type === 'payment' ? (
-          <Button size="sm" variant="ghost" onClick={() => { setRefundTarget(p); setRefundAmount(String(p.amountPaisa / 100)); setRefundReason(''); }}>Refund</Button>
-        ) : null,
+      render: (p) => (
+        <div className="row gap-2 end">
+          {can('billing.payment.refund') && p.type === 'payment' && (
+            <Button size="sm" variant="ghost" onClick={() => { setRefundTarget(p); setRefundAmount(String(p.amountPaisa / 100)); setRefundReason(''); }}>Refund</Button>
+          )}
+          {can('data.delete') && <Button size="sm" variant="danger" onClick={() => setDeletePaymentTarget(p)}>Delete</Button>}
+        </div>
+      ),
     },
   ];
 
@@ -535,7 +540,27 @@ export function PaymentsPage() {
         {data && <Pagination page={page} pageSize={data.pageSize} total={data.total} onPage={setPage} />}
       </Card>
 
-      {refundTarget && (
+      {deletePaymentTarget && (
+    <ConfirmDialog
+      title="Delete payment?"
+      body={`Payment of ${bdt(deletePaymentTarget.amountPaisa)} for ${deletePaymentTarget.patientName} will be permanently deleted and the related invoice balance will be recalculated.`}
+      confirmLabel="Delete payment"
+      danger
+      onConfirm={async () => {
+        try {
+          await api['payments/delete'](deletePaymentTarget.id);
+          toast.success('Payment deleted');
+          setDeletePaymentTarget(null);
+          reload();
+        } catch (err) {
+          toast.fromError(err, 'Could not delete payment');
+        }
+      }}
+      onCancel={() => setDeletePaymentTarget(null)}
+    />
+  )}
+
+  {refundTarget && (
         <Modal
           title={`Refund payment — ${refundTarget.invoiceNumber ?? 'no invoice'}`}
           onClose={() => setRefundTarget(null)}
