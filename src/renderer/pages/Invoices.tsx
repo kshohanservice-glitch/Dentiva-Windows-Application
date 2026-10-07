@@ -599,7 +599,7 @@ export function PaymentsPage() {
         >
           <p className="small">
             Refunding <strong className="num">{bdt(refundTarget.amountPaisa)}</strong> received via {refundTarget.method} on{' '}
-            {new Date(refundTarget.paidAt).toLocaleString()}. The original payment row stays untouched.
+            {formatDate(refundTarget.paidAt)} {new Date(refundTarget.paidAt).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}. The original payment row stays untouched.
           </p>
           <div className="form-grid mt-4">
             <Field label="Refund amount (৳)" required>
