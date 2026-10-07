@@ -64,6 +64,7 @@ export interface DentivaApi {
   /* chart */
   'chart/get'(patientId: number): Promise<ChartState>;
   'chart/set'(payload: { patientId: number; visitId?: number | null; changes: { tooth: string; condition: string; note?: string | null; severity?: string | null; action: 'set' | 'clear' }[] }): Promise<ChartState>;
+  'chart/delete'(id: number): Promise<{ ok: boolean }>;
 
   /* treatments */
   'treatments/list'(includeInactive?: boolean): Promise<TreatmentDTO[]>;
@@ -326,6 +327,7 @@ export const IPC = {
 
   chartGet: 'chart/get',
   chartSet: 'chart/set',
+  chartDelete: 'chart/delete',
 
   treatmentsList: 'treatments/list',
   treatmentsSave: 'treatments/save',
