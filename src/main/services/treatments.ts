@@ -1,7 +1,7 @@
 import type { Ctx } from '../core/context';
 import type { TreatmentDTO } from '../../shared/types';
 import { conflict, notFound, validation } from '../errors';
-import { audit, requirePermission } from '../core/context';
+import { audit, requirePermission, tx } from '../core/context';
 import { nowISO } from '../../shared/currency';
 import { optString, reqInt, reqString } from '../core/validate';
 
