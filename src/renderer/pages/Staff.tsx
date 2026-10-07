@@ -2,11 +2,11 @@ import React, { useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { api, useAsync } from '../api';
 import { useApp } from '../state/app-context';
-import { Badge, Button, Card, ErrorState, Modal, Spinner, Tabs, useToast } from '../components/primitives';
+import { Badge, Button, Card, ConfirmDialog, ErrorState, Modal, Spinner, Tabs, useToast } from '../components/primitives';
 import { Field, Input, Select, Textarea } from '../components/forms';
 import { DataTable, TableToolbar, type Column } from '../components/table';
 import { Icon } from '../components/shell';
-import { bdt } from '../format';
+import { bdt, formatDate } from '../format';
 import type { DentistDTO, StaffDTO } from '../../shared/types';
 
 function StaffModal(props: { open: boolean; initial?: StaffDTO | null; onClose: () => void; onSaved: () => void }) {
@@ -216,6 +216,8 @@ export function StaffPage() {
   const [staffModal, setStaffModal] = useState<{ open: boolean; initial: StaffDTO | null }>({ open: false, initial: null });
   const [dentistModal, setDentistModal] = useState<{ open: boolean; initial: DentistDTO | null }>({ open: false, initial: null });
   const [showInactive, setShowInactive] = useState(false);
+  const [deleteStaff, setDeleteStaff] = useState<StaffDTO | null>(null);
+  const [deleteDentist, setDeleteDentist] = useState<DentistDTO | null>(null);
 
   React.useEffect(() => {
     const reqTab = params.get('tab');
@@ -237,13 +239,13 @@ export function StaffPage() {
     { key: 'designation', label: 'Designation', render: (s) => s.designation ?? '—' },
     { key: 'dept', label: 'Department', render: (s) => s.department ?? '—' },
     { key: 'phone', label: 'Phone', render: (s) => <span className="mono">{s.phone ?? '—'}</span> },
-    { key: 'joining', label: 'Joined', render: (s) => (s.joiningDate ? new Date(s.joiningDate).toLocaleDateString() : '—') },
+    { key: 'joining', label: 'Joined', render: (s) => (s.joiningDate ? formatDate(s.joiningDate) : '—') },
     ...(can('staff.salary.view') ? [{ key: 'salary', label: 'Salary', align: 'right' as const, render: (s: StaffDTO) => (s.salaryPaisa != null ? <span className="num">{bdt(s.salaryPaisa)}</span> : '—') }] : []),
     { key: 'status', label: 'Status', render: (s) => <Badge tone={s.status === 'active' ? 'success' : 'neutral'}>{s.status}</Badge> },
     {
       key: 'actions', label: '', align: 'right',
       render: (s) => (can('staff.manage') ? (
-        <Button size="sm" variant="ghost" onClick={() => setStaffModal({ open: true, initial: s })}>Edit</Button>
+        <div className="row gap-2 end"><Button size="sm" variant="ghost" onClick={() => setStaffModal({ open: true, initial: s })}>Edit</Button>{can('data.delete') && <Button size="sm" variant="danger" onClick={() => setDeleteStaff(s)}>Delete</Button>}</div>
       ) : null),
     },
   ];
@@ -257,7 +259,7 @@ export function StaffPage() {
     {
       key: 'actions', label: '', align: 'right',
       render: (d) => (can('staff.manage') ? (
-        <Button size="sm" variant="ghost" onClick={() => setDentistModal({ open: true, initial: d })}>Edit</Button>
+        <div className="row gap-2 end"><Button size="sm" variant="ghost" onClick={() => setDentistModal({ open: true, initial: d })}>Edit</Button>{can('data.delete') && <Button size="sm" variant="danger" onClick={() => setDeleteDentist(d)}>Delete</Button>}</div>
       ) : null),
     },
   ];
@@ -353,6 +355,24 @@ export function StaffPage() {
 
       <StaffModal open={staffModal.open} initial={staffModal.initial} onClose={() => setStaffModal({ open: false, initial: null })} onSaved={staffQ.reload} />
       <DentistModal open={dentistModal.open} initial={dentistModal.initial} onClose={() => setDentistModal({ open: false, initial: null })} onSaved={dentistQ.reload} />
+
+      {deleteStaff && <ConfirmDialog
+        title="Delete staff record?"
+        body={`${deleteStaff.name} will be removed from active staff records. Historical references will be preserved.`}
+        confirmLabel="Delete staff"
+        danger
+        onConfirm={async () => { try { await api['staff/delete'](deleteStaff.id); toast.success('Staff deleted'); setDeleteStaff(null); staffQ.reload(); } catch (err) { toast.fromError(err, 'Delete failed'); } }}
+        onCancel={() => setDeleteStaff(null)}
+      />}
+
+      {deleteDentist && <ConfirmDialog
+        title="Delete dentist record?"
+        body={`${deleteDentist.name} will be removed from active dentist records and unavailable for new appointments.`}
+        confirmLabel="Delete dentist"
+        danger
+        onConfirm={async () => { try { await api['dentists/delete'](deleteDentist.id); toast.success('Dentist deleted'); setDeleteDentist(null); dentistQ.reload(); } catch (err) { toast.fromError(err, 'Delete failed'); } }}
+        onCancel={() => setDeleteDentist(null)}
+      />}
     </div>
   );
 }
