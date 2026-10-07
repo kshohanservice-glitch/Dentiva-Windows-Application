@@ -4,7 +4,7 @@ import { useApp } from '../state/app-context';
 import { Badge, Button, Card, ErrorState, Spinner, useToast } from '../components/primitives';
 import { DataTable, type Column } from '../components/table';
 import { Icon } from '../components/shell';
-import { bdt, isoDate } from '../format';
+import { bdt, formatDate, isoDate } from '../format';
 import type { ReportResult } from '../../shared/types';
 
 import { REPORT_DEFS, type ReportDef } from '../../shared/reports';
@@ -162,7 +162,7 @@ export function ReportsPage() {
                 <div className="report-head">
                   <div>
                     <strong>{result.title}</strong>
-                    <div className="xsmall muted">{result.scope} · generated {new Date(result.generatedAt).toLocaleString()}</div>
+                    <div className="xsmall muted">{result.scope} · generated {`${formatDate(result.generatedAt)} ${new Date(result.generatedAt).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}`}</div>
                   </div>
                   <Badge tone="brand">{result.rows.length} rows</Badge>
                 </div>
