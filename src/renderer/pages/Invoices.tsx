@@ -226,7 +226,7 @@ function InvoiceDetailModal(props: { invoice: InvoiceDTO; onClose: () => void; o
             <div className="list-row" key={p.id}>
               <span className="flex-1">
                 <strong className="num">{bdt(p.amountPaisa)}</strong> <Badge tone={p.type === 'refund' ? 'danger' : 'neutral'}>{p.type}</Badge>
-                <div className="xsmall muted">{new Date(p.paidAt).toLocaleString()} · {p.method} {p.reference ? `· ${p.reference}` : ''} · by {p.receivedByName}</div>
+                <div className="xsmall muted">{formatDate(p.paidAt)} {new Date(p.paidAt).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })} · {p.method} {p.reference ? `· ${p.reference}` : ''} · by {p.receivedByName}</div>
               </span>
             </div>
           ))}
