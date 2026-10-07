@@ -77,7 +77,7 @@ function EntryModal(props: {
     >
       <div className="form-grid">
         <Field label="Date" required error={errors.date}>
-          {(id) => <Input id={id} type="date" lang="en-GB" value={values.date} onChange={(v) => set('date', v)} invalid={!!errors.date} />}
+          {(id) => <Input id={id} type="date" value={values.date} onChange={(v) => set('date', v)} invalid={!!errors.date} />}
         </Field>
         <Field label="Category" required error={errors.categoryId}>
           {(id) => (
@@ -253,11 +253,11 @@ export function AccountingPage() {
         <TableToolbar>
           <label className="row gap-2 small">
             From
-            <input className="input" style={{ width: 150 }} type="date" lang="en-GB" value={from} onChange={(e) => { setFrom(e.target.value); setPage(1); }} />
+            <input className="input" style={{ width: 150 }} type="date" value={from} onChange={(e) => { setFrom(e.target.value); setPage(1); }} />
           </label>
           <label className="row gap-2 small">
             To
-            <input className="input" style={{ width: 150 }} type="date" lang="en-GB" value={to} onChange={(e) => { setTo(e.target.value); setPage(1); }} />
+            <input className="input" style={{ width: 150 }} type="date" value={to} onChange={(e) => { setTo(e.target.value); setPage(1); }} />
           </label>
         </TableToolbar>
 
