@@ -76,8 +76,8 @@ async function pickFile(title: string, filters: Electron.FileFilter[]): Promise<
 
 export function registerRouter(deps: RouterDeps): void {
     const demoBlocked: Set<string> = new Set([
-    IPC.activationVerify, IPC.authLogout, IPC.authChangePassword, IPC.authUnlock, IPC.setupComplete, IPC.systemLock,
-    IPC.patientsCreate, IPC.patientsUpdate, IPC.patientsArchive, IPC.patientsDelete,
+    IPC.activationVerify, IPC.authLogin, IPC.authLogout, IPC.authChangePassword, IPC.authUnlock, IPC.setupComplete, IPC.systemLock,
+    IPC.patientsCreate, IPC.patientsUpdate, IPC.patientsArchive, IPC.patientsDelete, IPC.patientsExport,
     IPC.visitsCreate, IPC.visitsUpdate, IPC.visitsDelete, IPC.chartSet,
     IPC.treatmentsSave, IPC.treatmentsSetActive, IPC.treatmentsDelete,
     IPC.prescriptionsCreate, IPC.prescriptionsDelete, IPC.prescriptionsSaveTemplate, IPC.prescriptionsDeleteTemplate,
@@ -88,7 +88,7 @@ export function registerRouter(deps: RouterDeps): void {
     IPC.accountingAddExpense, IPC.accountingDeleteExpense, IPC.accountingAddIncome, IPC.accountingDeleteIncome, IPC.accountingSaveCategory,
     IPC.staffSave, IPC.staffDelete, IPC.dentistsSave, IPC.dentistsDelete,
     IPC.usersSave, IPC.usersResetPassword, IPC.usersDelete, IPC.rolesSave, IPC.rolesRemove,
-    IPC.attachmentsAdd, IPC.attachmentsRename, IPC.attachmentsRemove,
+    IPC.attachmentsAdd, IPC.attachmentsRename, IPC.attachmentsRemove, IPC.attachmentsExport,
     IPC.backupRun, IPC.backupRestore, IPC.backupSetAuto,
     IPC.settingsSave, IPC.settingsUploadLogo, IPC.settingsResetBusiness, IPC.referralsDelete,
     IPC.notificationsMarkRead, IPC.referralsSave,
