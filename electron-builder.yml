@@ -1,5 +1,5 @@
 appId: com.dentiva.pro
-productName: Dentiva Pro Demo
+productName: Dentiva Pro
 copyright: © 2026 Dentiva Pro — Shohan Khan
 
 directories:
@@ -78,10 +78,10 @@ nsis:
   allowToChangeInstallationDirectory: true
   createDesktopShortcut: always
   createStartMenuShortcut: true
-  shortcutName: Dentiva Pro Demo
-  uninstallDisplayName: Dentiva Pro Demo
+  shortcutName: Dentiva Pro
+  uninstallDisplayName: Dentiva Pro
   installerIcon: build/icon.ico
   uninstallerIcon: build/icon.ico
   installerHeaderIcon: build/icon.ico
-  artifactName: DentivaPro-Demo-Setup-${version}.exe
+  artifactName: DentivaPro-Setup-${version}.exe
   deleteAppDataOnUninstall: false
