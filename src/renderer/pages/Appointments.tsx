@@ -427,9 +427,9 @@ export function AppointmentsPage() {
             const key = isoDate(d);
             return (
               <button key={key} className={`cal-day ${key === date ? 'active' : ''}`} onClick={() => { setDate(key); setView('day'); }} type="button">
-                <div className="dow">{d.toLocaleDateString(undefined, { weekday: 'short' })}</div>
+                <div className="dow">{d.toLocaleDateString('en-GB', { weekday: 'short' })}</div>
                 <div className="dnum">{d.getDate()}</div>
-                <div className="cnt">{d.getMonth() === new Date(date).getMonth() ? '' : d.toLocaleDateString(undefined, { month: 'short' })}</div>
+                <div className="cnt">{d.getMonth() === new Date(date).getMonth() ? '' : d.toLocaleDateString('en-GB', { month: 'short' })}</div>
               </button>
             );
           })}
