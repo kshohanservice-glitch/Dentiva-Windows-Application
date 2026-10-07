@@ -11,7 +11,7 @@ import { DataTable, TableToolbar, type Column } from '../components/table';
 import { Icon } from '../components/shell';
 import { ToothChart } from '../components/ToothChart';
 import { bdt, formatDate, isoDate, localDateTime } from '../format';
-import type { DuplicateCandidate, PatientDTO, PatientFilters, PatientDetailDTO, PrescriptionDTO, TreatmentDTO } from '../../shared/types';
+import type { DuplicateCandidate, PatientDTO, PatientFilters, PatientDetailDTO, PrescriptionDTO, TreatmentDTO, VisitDTO } from '../../shared/types';
 import type { PatientInputPayload, ReferralRecord, ReferralInput } from '../../shared/ipc';
 
 /* ================================ List ================================= */

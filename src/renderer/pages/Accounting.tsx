@@ -5,7 +5,7 @@ import { Badge, Button, Card, ConfirmDialog, Modal, Pagination, Tabs, useToast }
 import { Field, Input, Select, Textarea } from '../components/forms';
 import { DataTable, TableToolbar, type Column } from '../components/table';
 import { Icon } from '../components/shell';
-import { bdt, isoDate } from '../format';
+import { bdt, formatDate, isoDate } from '../format';
 import type { ExpenseDTO, IncomeDTO } from '../../shared/types';
 
 function EntryModal(props: {
