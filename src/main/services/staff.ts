@@ -101,6 +101,26 @@ function dentistDTO(r: any): DentistDTO {
   };
 }
 
+export function deleteStaff(ctx: Ctx, id: number): { ok: boolean } {
+  requirePermission(ctx, 'data.delete');
+  const row = ctx.db.prepare('SELECT id, name FROM staff WHERE id = ? AND deleted_at IS NULL').get(id) as any;
+  if (!row) throw new Error('Staff member not found.');
+  const at = new Date().toISOString();
+  ctx.db.prepare('UPDATE staff SET deleted_at = ?, updated_at = ? WHERE id = ?').run(at, at, id);
+  audit(ctx, { action: 'staff.delete', entityType: 'staff', entityId: id, summary: `Deleted staff ${row.name}` });
+  return { ok: true };
+}
+
+export function deleteDentist(ctx: Ctx, id: number): { ok: boolean } {
+  requirePermission(ctx, 'data.delete');
+  const row = ctx.db.prepare('SELECT id, name FROM dentists WHERE id = ? AND deleted_at IS NULL').get(id) as any;
+  if (!row) throw new Error('Dentist not found.');
+  const at = new Date().toISOString();
+  ctx.db.prepare('UPDATE dentists SET deleted_at = ?, updated_at = ?, active = 0 WHERE id = ?').run(at, at, id);
+  audit(ctx, { action: 'dentist.delete', entityType: 'dentist', entityId: id, summary: `Deleted dentist ${row.name}` });
+  return { ok: true };
+}
+
 export function listDentists(ctx: Ctx, includeInactive = false): DentistDTO[] {
   requirePermission(ctx, 'patients.view');
   const rows = ctx.db
