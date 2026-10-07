@@ -1137,6 +1137,7 @@ export function VisitFormModal(props: { patientId: number; onClose: () => void; 
 }
 
 export function RxFormModal(props: { patientId: number; visitId?: number | null; onClose: () => void; onSaved: (id: number) => void }) {
+  const { can } = useApp();
   const patientId = props.patientId;
   const { values, set, validate, errors } = useForm({
     dentistId: '', date: isoDate(new Date()), cC: '', oE: '', rE: '', diagnosis: '', treatment: '', advice: '', followUp: '',
