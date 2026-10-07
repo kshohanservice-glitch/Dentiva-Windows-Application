@@ -1147,7 +1147,8 @@ export function RxFormModal(props: { patientId: number; visitId?: number | null;
     saveAsTemplate: '',
   });
   const { data: dentists } = useAsync(() => api['dentists/list'](), []);
-  const { data: templates } = useAsync(() => api['prescriptions/templates'](), []);
+  const { data: templates, reload: reloadTemplates } = useAsync(() => api['prescriptions/templates'](), []);
+  const [deleteTemplate, setDeleteTemplate] = useState<{ id: number; name: string } | null>(null);
   const [pending, setPending] = useState(false);
   const toast = useToast();
   const [patientQuery, setPatientQuery] = useState('');
@@ -1258,8 +1259,16 @@ export function RxFormModal(props: { patientId: number; visitId?: number | null;
         </Field>
         <Field label="Apply saved template" className="span-2">
           {(id) => (
-            <Select id={id} value="" onChange={applyTemplate} placeholder="Choose a template…"
-              options={(templates ?? []).map((t) => ({ value: String(t.id), label: t.name }))} />
+            <div className="col gap-2">
+              <Select id={id} value="" onChange={applyTemplate} placeholder="Choose a template…"
+                options={(templates ?? []).map((t) => ({ value: String(t.id), label: t.name }))} />
+              {(templates ?? []).map((t) => (
+                <div key={t.id} className="row between small" style={{ padding: '6px 8px', border: '1px solid var(--line)', borderRadius: 6 }}>
+                  <span>{t.name}</span>
+                  {can('data.delete') && <Button size="sm" variant="danger" onClick={() => setDeleteTemplate({ id: t.id, name: t.name })}>Delete</Button>}
+                </div>
+              ))}
+            </div>
           )}
         </Field>
         <Field label={<>C/C <span className="muted">(chief complaint)</span></>} className="span-2">
@@ -1376,6 +1385,18 @@ export function RxFormModal(props: { patientId: number; visitId?: number | null;
           {(id) => <Input id={id} value={values.saveAsTemplate} onChange={(v) => set('saveAsTemplate', v)} placeholder="e.g. Standard post-extraction" />}
         </Field>
       </div>
+
+      {deleteTemplate && <ConfirmDialog
+        title="Delete medicine template?"
+        body={`${deleteTemplate.name} will be permanently deleted from saved prescription templates.`}
+        confirmLabel="Delete template"
+        danger
+        onConfirm={async () => {
+          try { await api['prescriptions/delete-template'](deleteTemplate.id); toast.success('Template deleted'); setDeleteTemplate(null); reloadTemplates(); }
+          catch (err) { toast.fromError(err, 'Delete failed'); }
+        }}
+        onCancel={() => setDeleteTemplate(null)}
+      />}
     </Modal>
   );
 }
