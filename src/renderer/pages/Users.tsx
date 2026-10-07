@@ -415,8 +415,10 @@ export function UsersPage() {
                   <div className="row gap-2">
                     <span className="xsmall muted mono">{r.key}</span>
                     {can('roles.manage') && (
-                      <Button size="sm" variant="secondary" onClick={() => setRoleModal({ open: true, initial: r })}>View / edit</Button>
-                      {!r.builtin && can('data.delete') && <Button size="sm" variant="danger" onClick={() => setDeleteRoleTarget(r)}>Delete</Button>
+                      <div className="row gap-2">
+                        <Button size="sm" variant="secondary" onClick={() => setRoleModal({ open: true, initial: r })}>View / edit</Button>
+                        {!r.builtin && can('data.delete') && <Button size="sm" variant="danger" onClick={() => setDeleteRoleTarget(r)}>Delete</Button>}
+                      </div>
                     )}
                   </div>
                 </div>
