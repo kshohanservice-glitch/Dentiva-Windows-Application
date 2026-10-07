@@ -665,6 +665,7 @@ function VisitsTab(props: { patientId: number; refreshKey?: number; onCreate: ()
   const { can } = useApp();
   const { data, loading, error, reload } = useAsync(() => api['visits/list']({ patientId: props.patientId, pageSize: 100 }), [props.patientId, props.refreshKey]);
   const toast = useToast();
+  const [deleteVisit, setDeleteVisit] = useState<VisitDTO | null>(null);
 
   const printSummary = async (visitId: number) => {
     try {
@@ -690,7 +691,7 @@ function VisitsTab(props: { patientId: number; refreshKey?: number; onCreate: ()
           <div className="mini-visit" key={v.id}>
             <div className="row between wrap">
               <div>
-                <strong>{new Date(v.datetime).toLocaleString()}</strong>{' '}
+                <strong>{formatDate(v.datetime)} {new Date(v.datetime).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}</strong>{' '}
                 <Badge tone={v.status === 'open' ? 'warning' : 'neutral'}>{v.status}</Badge>
                 <div className="small muted">{v.dentistName ?? 'Any dentist'} · {v.chiefComplaint || 'no complaint recorded'}</div>
               </div>
@@ -703,6 +704,7 @@ function VisitsTab(props: { patientId: number; refreshKey?: number; onCreate: ()
                   }}>Complete visit</Button>
                 )}
                 <Button size="sm" variant="ghost" onClick={() => void printSummary(v.id)}>Print summary</Button>
+                {can('data.delete') && <Button size="sm" variant="danger" onClick={() => setDeleteVisit(v)}>Delete</Button>}
               </div>
             </div>
             {v.diagnosis && <div className="small mt-2"><strong>Diagnosis:</strong> {v.diagnosis}</div>}
@@ -712,6 +714,18 @@ function VisitsTab(props: { patientId: number; refreshKey?: number; onCreate: ()
           </div>
         ))
       )}
+
+      {deleteVisit && <ConfirmDialog
+        title="Delete visit?"
+        body={`Visit on ${formatDate(deleteVisit.datetime)} will be removed from this patient's visit history. Linked prescription references will be detached.`}
+        confirmLabel="Delete visit"
+        danger
+        onConfirm={async () => {
+          try { await api['visits/delete'](deleteVisit.id); toast.success('Visit deleted'); setDeleteVisit(null); reload(); }
+          catch (err) { toast.fromError(err, 'Delete failed'); }
+        }}
+        onCancel={() => setDeleteVisit(null)}
+      />}
     </>
   );
 }
