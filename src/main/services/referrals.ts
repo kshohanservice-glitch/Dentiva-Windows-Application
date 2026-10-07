@@ -14,6 +14,15 @@ export function listReferrals(ctx: Ctx, patientId: number): any[] {
     .all(patientId) as any[];
 }
 
+export function deleteReferral(ctx: Ctx, id: number): { ok: boolean } {
+  requirePermission(ctx, 'data.delete');
+  const row = ctx.db.prepare('SELECT id FROM referrals WHERE id = ?').get(id) as any;
+  if (!row) throw new Error('Referral not found.');
+  ctx.db.prepare('DELETE FROM referrals WHERE id = ?').run(id);
+  audit(ctx, { action: 'referral.delete', entityType: 'referral', entityId: id, summary: `Deleted referral #${id}` });
+  return { ok: true };
+}
+
 export function saveReferral(ctx: Ctx, input: any): any {
   requirePermission(ctx, 'clinical.referral.manage');
   const patientId = Number(input?.patientId);
