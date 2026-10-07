@@ -94,6 +94,7 @@ export interface DentivaApi {
   'queue/list'(date: string): Promise<QueueEntryDTO[]>;
   'queue/add'(input: { patientId: number; dentistId?: number | null; priority?: number; appointmentId?: number }): Promise<QueueEntryDTO>;
   'queue/action'(payload: { id: number | null; action: string; payload?: { dentistId?: number; priority?: number } }): Promise<QueueEntryDTO>;
+  'queue/delete'(id: number): Promise<{ ok: boolean }>;
   'queue/reorder'(orderedIds: number[]): Promise<{ ok: true }>;
 
   /* billing */
@@ -353,6 +354,7 @@ export const IPC = {
   queueList: 'queue/list',
   queueAdd: 'queue/add',
   queueAction: 'queue/action',
+  queueDelete: 'queue/delete',
   queueReorder: 'queue/reorder',
 
   invoicesList: 'invoices/list',
