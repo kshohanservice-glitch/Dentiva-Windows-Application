@@ -210,6 +210,7 @@ type StaffTab = 'staff' | 'dentists';
 
 export function StaffPage() {
   const { can } = useApp();
+  const toast = useToast();
   const [params, setParams] = useSearchParams();
   const [tab, setTab] = useState<StaffTab>(params.get('tab') === 'dentists' ? 'dentists' : 'staff');
   const [query, setQuery] = useState('');
