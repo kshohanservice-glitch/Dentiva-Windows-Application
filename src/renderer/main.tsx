@@ -11,6 +11,9 @@ import './styles/global.css';
 import './styles/print.css';
 import { App } from './App';
 
+// Use Bangladesh/UK-style calendar ordering everywhere the Chromium date controls render: DD/MM/YYYY.
+document.documentElement.lang = 'en-GB';
+
 const container = document.getElementById('root');
 if (container) {
   createRoot(container).render(
