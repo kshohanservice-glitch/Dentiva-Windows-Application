@@ -59,6 +59,7 @@ export interface DentivaApi {
   'visits/get'(id: number): Promise<VisitDTO>;
   'visits/create'(input: VisitInputPayload): Promise<VisitDTO>;
   'visits/update'(payload: { id: number } & VisitInputPayload): Promise<VisitDTO>;
+  'visits/delete'(id: number): Promise<{ ok: boolean }>;
 
   /* chart */
   'chart/get'(patientId: number): Promise<ChartState>;
@@ -68,6 +69,7 @@ export interface DentivaApi {
   'treatments/list'(includeInactive?: boolean): Promise<TreatmentDTO[]>;
   'treatments/save'(input: Partial<TreatmentDTO>): Promise<TreatmentDTO>;
   'treatments/set-active'(payload: { id: number; active: boolean }): Promise<TreatmentDTO>;
+  'treatments/delete'(id: number): Promise<{ ok: boolean }>;
 
   /* prescriptions */
   'prescriptions/list'(filter: { patientId?: number; range?: string; page?: number; pageSize?: number }): Promise<Paged<PrescriptionDTO>>;
@@ -76,12 +78,14 @@ export interface DentivaApi {
   'prescriptions/delete'(id: number): Promise<{ ok: boolean }>;
   'prescriptions/templates'(): Promise<{ id: number; name: string; items: any[] }[]>;
   'prescriptions/save-template'(payload: { name: string; items: any[] }): Promise<{ id: number }>;
+  'prescriptions/delete-template'(id: number): Promise<{ ok: boolean }>;
 
   /* appointments */
   'appointments/list'(filter: { from: string; to: string; dentistId?: number; status?: string }): Promise<AppointmentDTO[]>;
   'appointments/create'(input: AppointmentInput): Promise<AppointmentDTO>;
   'appointments/update'(payload: { id: number; status?: string; allowConflict?: boolean; reschedule?: { date: string; time: string; durationMin?: number }; dentistId?: number | null; date?: string; time?: string; durationMin?: number; notes?: string | null }): Promise<AppointmentDTO>;
   'appointments/cancel'(payload: { id: number; reason?: string }): Promise<AppointmentDTO>;
+  'appointments/delete'(id: number): Promise<{ ok: boolean }>;
   'appointments/no-show'(id: number): Promise<AppointmentDTO>;
   'appointments/arrive'(id: number): Promise<{ appointment: AppointmentDTO; queue: QueueEntryDTO }>;
 
@@ -99,14 +103,18 @@ export interface DentivaApi {
   'invoices/delete'(id: number): Promise<{ ok: boolean }>;
   'payments/list'(filter: { patientId?: number; invoiceId?: number; range?: string; method?: string; page?: number; pageSize?: number }): Promise<Paged<PaymentDTO>>;
   'payments/create'(input: PaymentInput): Promise<{ payment: PaymentDTO; invoice: InvoiceDTO | null }>;
+  'payments/delete'(id: number): Promise<{ ok: boolean }>;
 
   /* inventory */
   'inventory/items'(filter?: { query?: string; lowOnly?: boolean; includeInactive?: boolean }): Promise<InventoryItemDTO[]>;
   'inventory/batches'(filter?: { itemId?: number; expiringWithinDays?: number; expiredOnly?: boolean }): Promise<InventoryBatchDTO[]>;
   'inventory/save-item'(input: Partial<InventoryItemDTO>): Promise<InventoryItemDTO>;
+  'inventory/delete-item'(id: number): Promise<{ ok: boolean }>;
+  'inventory/delete-batch'(id: number): Promise<{ ok: boolean }>;
   'inventory/stock'(input: StockInput): Promise<{ item: InventoryItemDTO; batches: InventoryBatchDTO[] }>;
   'inventory/suppliers'(): Promise<{ id: number; name: string; phone: string | null }[]>;
   'inventory/save-supplier'(input: { id?: number; name: string; phone?: string | null; address?: string | null }): Promise<{ id: number }>;
+  'inventory/delete-supplier'(id: number): Promise<{ ok: boolean }>;
 
   /* accounting */
   'accounting/expenses'(filter: { from?: string; to?: string; categoryId?: number; page?: number; pageSize?: number }): Promise<Paged<ExpenseDTO>>;
@@ -114,22 +122,27 @@ export interface DentivaApi {
   'accounting/delete-expense'(id: number): Promise<{ ok: boolean }>;
   'accounting/incomes'(filter: { from?: string; to?: string; page?: number; pageSize?: number }): Promise<Paged<IncomeDTO>>;
   'accounting/add-income'(input: AccountEntryInput): Promise<IncomeDTO>;
+  'accounting/delete-income'(id: number): Promise<{ ok: boolean }>;
   'accounting/categories'(): Promise<{ id: number; name: string; kind: 'expense' | 'income' }[]>;
   'accounting/save-category'(input: { kind: 'expense' | 'income'; name: string; id?: number }): Promise<{ id: number }>;
 
   /* staff + dentists */
   'staff/list'(): Promise<StaffDTO[]>;
   'staff/save'(input: Partial<StaffDTO>): Promise<StaffDTO>;
+  'staff/delete'(id: number): Promise<{ ok: boolean }>;
   'dentists/list'(includeInactive?: boolean): Promise<DentistDTO[]>;
   'dentists/save'(input: Partial<DentistDTO>): Promise<DentistDTO>;
+  'dentists/delete'(id: number): Promise<{ ok: boolean }>;
 
   /* users + roles + audit */
   'users/list'(): Promise<UserDTO[]>;
   'users/save'(input: UserSavePayload): Promise<UserDTO>;
   'users/reset-password'(payload: { id: number; password: string }): Promise<{ ok: boolean }>;
+  'users/delete'(id: number): Promise<{ ok: boolean }>;
   'roles/list'(): Promise<RoleDTO[]>;
   'roles/save'(input: RoleSavePayload): Promise<RoleDTO>;
   'roles/remove'(id: number): Promise<{ ok: boolean }>;
+  'referrals/delete'(id: number): Promise<{ ok: boolean }>;
   'audit/list'(filter: { page?: number; pageSize?: number; action?: string; userId?: number; from?: string; to?: string; query?: string }): Promise<Paged<AuditEntry>>;
 
   /* attachments */
