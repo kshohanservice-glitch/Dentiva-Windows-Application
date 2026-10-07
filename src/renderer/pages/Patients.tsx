@@ -150,7 +150,7 @@ function PatientFormModal(props: { open: boolean; initial?: (PatientDTO & Partia
           )}
         </Field>
         <Field label="Date of birth" error={errors.dob}>
-          {(id) => <Input id={id} type="date" value={values.dob ?? ''} onChange={(v) => set('dob', v)} invalid={!!errors.dob} />}
+          {(id) => <Input id={id} type="date" lang="en-GB" value={values.dob ?? ''} onChange={(v) => set('dob', v)} invalid={!!errors.dob} />}
         </Field>
         <Field label="Age (years)" hint="Alternative to DOB" error={errors.ageYears}>
           {(id) => <Input id={id} type="number" min={0} max={120} value={values.ageYears} onChange={(v) => set('ageYears', v)} invalid={!!errors.ageYears} />}
@@ -625,13 +625,13 @@ function ReferralFormModal(props: { patientId: number; initial?: ReferralRecord 
     <Modal title={props.initial ? 'Edit referral' : 'New referral'} onClose={props.onClose} width="wide" footer={<><Button variant="secondary" onClick={props.onClose}>Cancel</Button><Button variant="primary" loading={pending} onClick={() => void submit()}>Save referral</Button></>}>
       <div className="form-grid">
         <Field label="Direction">{(id) => <Select id={id} value={values.direction ?? 'out'} onChange={(v) => set('direction', v)} options={[{ value: 'out', label: 'Outgoing — refer this patient' }, { value: 'in', label: 'Incoming — referred to us' }]} />}</Field>
-        <Field label="Date" required>{(id) => <Input id={id} type="date" value={values.date} onChange={(v) => set('date', v)} />}</Field>
+        <Field label="Date" required>{(id) => <Input id={id} type="date" lang="en-GB" value={values.date} onChange={(v) => set('date', v)} />}</Field>
         <Field label="Person">{(id) => <Input id={id} value={values.person ?? ''} onChange={(v) => set('person', v)} placeholder="Doctor / contact person" />}</Field>
         <Field label="Clinic / hospital">{(id) => <Input id={id} value={values.clinic ?? ''} onChange={(v) => set('clinic', v)} />}</Field>
         <Field label="Specialty">{(id) => <Input id={id} value={values.specialty ?? ''} onChange={(v) => set('specialty', v)} placeholder="Orthodontics, Oral Surgery…" />}</Field>
         <Field label="Status">{(id) => <Select id={id} value={values.status ?? 'open'} onChange={(v) => set('status', v)} options={[{ value: 'open', label: 'Open' }, { value: 'completed', label: 'Completed' }, { value: 'cancelled', label: 'Cancelled' }]} />}</Field>
         <Field label="Reason" className="span-2">{(id) => <Textarea id={id} rows={3} value={values.reason ?? ''} onChange={(v) => set('reason', v)} />}</Field>
-        <Field label="Follow-up date">{(id) => <Input id={id} type="date" value={values.followUp ?? ''} onChange={(v) => set('followUp', v)} />}</Field>
+        <Field label="Follow-up date">{(id) => <Input id={id} type="date" lang="en-GB" value={values.followUp ?? ''} onChange={(v) => set('followUp', v)} />}</Field>
         <Field label="Note" className="span-2">{(id) => <Textarea id={id} rows={3} value={values.note ?? ''} onChange={(v) => set('note', v)} />}</Field>
       </div>
     </Modal>
@@ -1055,7 +1055,7 @@ export function VisitFormModal(props: { patientId: number; onClose: () => void; 
       )}
       <div className="form-grid">
         <Field label="Date & time" required error={errors.datetime}>
-          {(id) => <Input id={id} type="datetime-local" value={values.datetime} onChange={(v) => set('datetime', v)} invalid={!!errors.datetime} />}
+          {(id) => <Input id={id} type="datetime-local" lang="en-GB" value={values.datetime} onChange={(v) => set('datetime', v)} invalid={!!errors.datetime} />}
         </Field>
         <Field label="Dentist" required error={errors.dentistId}>
           {(id) => (
@@ -1088,7 +1088,7 @@ export function VisitFormModal(props: { patientId: number; onClose: () => void; 
           {(id) => <Input id={id} value={values.advice} onChange={(v) => set('advice', v)} />}
         </Field>
         <Field label="Follow-up date">
-          {(id) => <Input id={id} type="date" value={values.followUpDate} onChange={(v) => set('followUpDate', v)} />}
+          {(id) => <Input id={id} type="date" lang="en-GB" value={values.followUpDate} onChange={(v) => set('followUpDate', v)} />}
         </Field>
         <Field label="Notes (internal)">
           {(id) => <Input id={id} value={values.notes} onChange={(v) => set('notes', v)} />}
@@ -1336,7 +1336,7 @@ export function RxFormModal(props: { patientId: number; visitId?: number | null;
           {(id) => <Input id={id} value={values.advice} onChange={(v) => set('advice', v)} />}
         </Field>
         <Field label="Follow-up date">
-          {(id) => <Input id={id} type="date" value={values.followUp} onChange={(v) => set('followUp', v)} />}
+          {(id) => <Input id={id} type="date" lang="en-GB" value={values.followUp} onChange={(v) => set('followUp', v)} />}
         </Field>
       </div>
 
