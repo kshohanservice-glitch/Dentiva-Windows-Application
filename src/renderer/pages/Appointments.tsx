@@ -382,7 +382,7 @@ export function AppointmentsPage() {
           {can('appointments.manage') && (r.status === 'scheduled' || r.status === 'confirmed' || r.status === 'arrived') && (
             <Button size="sm" variant="ghost" onClick={() => setEditing(r)}>Edit</Button>
           )}
-          {can('data.delete') && r.status !== 'completed' && (
+          {can('data.delete') && (
             <Button size="sm" variant="danger" onClick={() => setDeleteTarget(r)}>Delete</Button>
           )}
           {can('appointments.manage') && (r.status === 'scheduled' || r.status === 'confirmed') && (
