@@ -78,7 +78,7 @@ export function registerRouter(deps: RouterDeps): void {
     const demoBlocked: Set<string> = new Set([
     IPC.activationVerify, IPC.authLogin, IPC.authLogout, IPC.authChangePassword, IPC.authUnlock, IPC.setupComplete, IPC.systemLock,
     IPC.patientsCreate, IPC.patientsUpdate, IPC.patientsArchive, IPC.patientsDelete, IPC.patientsExport,
-    IPC.visitsCreate, IPC.visitsUpdate, IPC.visitsDelete, IPC.chartSet,
+    IPC.visitsCreate, IPC.visitsUpdate, IPC.visitsDelete, IPC.chartSet, IPC.chartDelete,
     IPC.treatmentsSave, IPC.treatmentsSetActive, IPC.treatmentsDelete,
     IPC.prescriptionsCreate, IPC.prescriptionsDelete, IPC.prescriptionsSaveTemplate, IPC.prescriptionsDeleteTemplate,
     IPC.appointmentsCreate, IPC.appointmentsUpdate, IPC.appointmentsCancel, IPC.appointmentsDelete, IPC.appointmentsNoShow, IPC.appointmentsArrive,
