@@ -82,7 +82,7 @@ export function registerRouter(deps: RouterDeps): void {
     IPC.treatmentsSave, IPC.treatmentsSetActive, IPC.treatmentsDelete,
     IPC.prescriptionsCreate, IPC.prescriptionsDelete, IPC.prescriptionsSaveTemplate, IPC.prescriptionsDeleteTemplate,
     IPC.appointmentsCreate, IPC.appointmentsUpdate, IPC.appointmentsCancel, IPC.appointmentsDelete, IPC.appointmentsNoShow, IPC.appointmentsArrive,
-    IPC.queueAdd, IPC.queueAction, IPC.queueReorder,
+    IPC.queueAdd, IPC.queueAction, IPC.queueDelete, IPC.queueReorder,
     IPC.invoicesCreate, IPC.invoicesVoid, IPC.invoicesDelete, IPC.paymentsCreate, IPC.paymentsDelete,
     IPC.inventorySaveItem, IPC.inventoryDeleteItem, IPC.inventoryDeleteBatch, IPC.inventoryStock, IPC.inventorySaveSupplier, IPC.inventoryDeleteSupplier,
     IPC.accountingAddExpense, IPC.accountingDeleteExpense, IPC.accountingAddIncome, IPC.accountingDeleteIncome, IPC.accountingSaveCategory,
@@ -244,6 +244,7 @@ export function registerRouter(deps: RouterDeps): void {
   handle(IPC.queueList, { auth: true, fn: (p, ctx) => queueSvc.listQueue(ctx!, String(p)) });
   handle(IPC.queueAdd, { auth: true, fn: (p, ctx) => queueSvc.addQueueEntry(ctx!, p) });
   handle(IPC.queueAction, { auth: true, fn: (p, ctx) => queueSvc.performQueueAction(ctx!, p?.id != null ? Number(p.id) : null, p?.action, p?.payload) });
+  handle(IPC.queueDelete, { auth: true, fn: (p, ctx) => queueSvc.deleteQueueEntry(ctx!, Number(p)) });
   handle(IPC.queueReorder, { auth: true, fn: (p, ctx) => queueSvc.reorderQueue(ctx!, p) });
 
   /* ------------------------------ billing ------------------------------ */
