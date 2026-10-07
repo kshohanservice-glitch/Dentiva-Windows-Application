@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { api, useAsync } from '../api';
 import { useApp } from '../state/app-context';
-import { Badge, Button, Card, EmptyState, ErrorState, Modal, Spinner, Tabs, useToast } from '../components/primitives';
+import { Badge, Button, Card, ConfirmDialog, EmptyState, ErrorState, Modal, Spinner, Tabs, useToast } from '../components/primitives';
 import { Field, Input, Select } from '../components/forms';
 import { DataTable, TableToolbar, type Column } from '../components/table';
 import { Icon } from '../components/shell';
@@ -314,6 +314,7 @@ type UsersTab = 'users' | 'roles';
 
 export function UsersPage() {
   const { can, user } = useApp();
+  const toast = useToast();
   const [tab, setTab] = useState<UsersTab>('users');
   const [userModal, setUserModal] = useState<{ open: boolean; initial: UserDTO | null }>({ open: false, initial: null });
   const [roleModal, setRoleModal] = useState<{ open: boolean; initial: RoleDTO | null }>({ open: false, initial: null });
