@@ -4,7 +4,7 @@ import { Badge, Button, Card, Pagination, Spinner, ErrorState, useToast } from '
 import { Input, Select } from '../components/forms';
 import { TableToolbar } from '../components/table';
 import { Icon } from '../components/shell';
-import { isoDate } from '../format';
+import { formatDate, isoDate } from '../format';
 import type { AuditEntry } from '../../shared/types';
 
 export function AuditPage() {
@@ -116,7 +116,7 @@ export function AuditPage() {
                 <tbody>
                   {data!.items.map((e) => (
                     <tr key={e.id}>
-                      <td className="xsmall">{new Date(e.at).toLocaleString()}</td>
+                      <td className="xsmall">{`${formatDate(e.at)} ${new Date(e.at).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}`}</td>
                       <td className="small">{e.username ?? <span className="muted">system</span>}</td>
                       <td className="mono xsmall">{e.action}</td>
                       <td className="small">
