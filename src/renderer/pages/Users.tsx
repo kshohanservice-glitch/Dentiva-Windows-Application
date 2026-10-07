@@ -321,6 +321,7 @@ export function UsersPage() {
   const [resetTarget, setResetTarget] = useState<UserDTO | null>(null);
   const [query, setQuery] = useState('');
   const [deleteTarget, setDeleteTarget] = useState<UserDTO | null>(null);
+  const [deleteRoleTarget, setDeleteRoleTarget] = useState<RoleDTO | null>(null);
 
   const usersQ = useAsync(() => api['users/list'](), []);
   const rolesQ = useAsync(() => api['roles/list'](), []);
@@ -415,6 +416,7 @@ export function UsersPage() {
                     <span className="xsmall muted mono">{r.key}</span>
                     {can('roles.manage') && (
                       <Button size="sm" variant="secondary" onClick={() => setRoleModal({ open: true, initial: r })}>View / edit</Button>
+                      {!r.builtin && can('data.delete') && <Button size="sm" variant="danger" onClick={() => setDeleteRoleTarget(r)}>Delete</Button>
                     )}
                   </div>
                 </div>
@@ -427,6 +429,14 @@ export function UsersPage() {
 
       <UserModal open={userModal.open} initial={userModal.initial} onClose={() => setUserModal({ open: false, initial: null })} onSaved={usersQ.reload} />
       <RoleModal open={roleModal.open} initial={roleModal.initial} onClose={() => setRoleModal({ open: false, initial: null })} onSaved={rolesQ.reload} />
+      {deleteRoleTarget && <ConfirmDialog
+        title="Delete role?"
+        body={`${deleteRoleTarget.name} will be permanently deleted. Built-in roles cannot be deleted, and roles assigned to users must be reassigned first.`}
+        confirmLabel="Delete role"
+        danger
+        onConfirm={async () => { try { await api['roles/remove'](deleteRoleTarget.id); toast.success('Role deleted'); setDeleteRoleTarget(null); rolesQ.reload(); } catch (err) { toast.fromError(err, 'Delete failed'); } }}
+        onCancel={() => setDeleteRoleTarget(null)}
+      />}
       {deleteTarget && <ConfirmDialog
         title="Delete user account?"
         body={`${deleteTarget.username} (${deleteTarget.displayName}) will be disabled and removed from active user records. You cannot delete your own signed-in account.`}
