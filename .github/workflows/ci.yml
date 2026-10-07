@@ -265,10 +265,20 @@ jobs:
           $sums = (Resolve-Path dist/SHA256SUMS.txt).Path
           gh release view $tag *> $null
           if ($LASTEXITCODE -ne 0) {
-            gh release create $tag $exe $sums `
-              --title "Dentiva Pro $ver" `
-              --latest `
-              --notes @"
+            $pkg = Get-Content package.json -Raw | ConvertFrom-Json
+            $isDemo = $pkg.dentivaBuildMode -eq 'demo'
+            $latestFlag = if ($isDemo) { '--latest=false' } else { '--latest' }
+            $notes = if ($isDemo) {
+              @"
+          Read-only Windows showcase build of Dentiva Pro 3.0.3.
+
+          - Direct-to-dashboard demo; no activation code and no clinic setup wizard
+          - Preloaded BrightSmile Dental Clinic sample data with 10 patients and clinical/billing/appointment/report records
+          - All write, delete, export, backup/restore, settings, print and PDF actions are blocked in demo mode
+          - Built, installed, launched and smoke-tested on Windows CI from source at $($env:GITHUB_SHA)
+          "@
+            } else {
+              @"
           Offline-first Windows dental clinic management for Bangladesh.
 
           - NSIS installer: DentivaPro-Setup-$ver.exe
@@ -276,6 +286,11 @@ jobs:
           - Fully offline after one-time activation; no telemetry, no paid APIs
           - Built and smoke-tested on Windows CI from source at $($env:GITHUB_SHA)
           "@
+            }
+            gh release create $tag $exe $sums `
+              --title "Dentiva Pro $ver" `
+              $latestFlag `
+              --notes $notes
           } else {
             gh release upload $tag $exe $sums --clobber
           }
