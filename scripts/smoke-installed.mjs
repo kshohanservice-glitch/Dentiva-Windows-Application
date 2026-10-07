@@ -31,33 +31,32 @@ try {
   const page = await app.firstWindow({ timeout: 90_000 });
   await page.waitForLoadState('domcontentloaded');
 
-  // 1. Activation screen renders (proves renderer + preload booted).
-  const codeInput = page.locator('input[placeholder="Enter activation code"]');
-  await codeInput.waitFor({ state: 'visible', timeout: 90_000 });
-
-  // 2. Offline activation succeeds (pure-JS verifier, no network).
-  await codeInput.fill(ACTIVATION_CODE);
-  await page.getByRole('button', { name: 'Activate' }).click();
-  await page.getByRole('heading', { name: 'Clinic information' }).waitFor({ state: 'visible', timeout: 30_000 });
-
-  // 3. First-run setup — exercises packaged SQLite (better-sqlite3) and
-  //    Argon2id (@node-rs/argon2) inside the asar/unpacked native modules.
-  await page.locator('input[placeholder="e.g. Smile Dental Care"]').fill('Artifact Smoke Clinic');
-  await page.locator('input[placeholder="01XXXXXXXXX"]').fill('01722222222');
-  await page.getByRole('button', { name: 'Continue' }).click();
-  await page.locator('input[placeholder="Dr. …"]').fill('Dr. Smoke Dentist');
-  await page.getByRole('button', { name: 'Continue' }).click();
-  await page.locator('input[placeholder="admin"]').fill('smokeowner');
-  const pwFields = page.locator('input[type="password"][autocomplete="new-password"]');
-  await pwFields.first().fill(PASSWORD);
-  await pwFields.nth(1).fill(PASSWORD);
-  await page.getByRole('button', { name: 'Continue' }).click();
-  await page.getByRole('button', { name: 'Finish setup' }).click();
-
-  // 4. Sign-in screen means DB was created, migrations ran and setup persisted.
-  await page.getByPlaceholder('e.g. admin').waitFor({ state: 'visible', timeout: 90_000 });
-
-  console.log('SMOKE OK: installed artifact activated, set up and reached the sign-in screen.');
+  const demo = await page.getByText('BrightSmile Dental Clinic — Demo').count() > 0;
+  if (demo) {
+    if (await page.locator('input[placeholder="Enter activation code"]').count()) throw new Error('Demo unexpectedly showed activation screen.');
+    if (await page.getByRole('heading', { name: 'Clinic information' }).count()) throw new Error('Demo unexpectedly showed setup screen.');
+    await page.getByText('Patients today').waitFor({ state: 'visible', timeout: 30_000 });
+    console.log('SMOKE OK: demo installed artifact bypassed activation/setup and reached dashboard.');
+  } else {
+    const codeInput = page.locator('input[placeholder="Enter activation code"]');
+    await codeInput.waitFor({ state: 'visible', timeout: 90_000 });
+    await codeInput.fill(ACTIVATION_CODE);
+    await page.getByRole('button', { name: 'Activate' }).click();
+    await page.getByRole('heading', { name: 'Clinic information' }).waitFor({ state: 'visible', timeout: 30_000 });
+    await page.locator('input[placeholder="e.g. Smile Dental Care"]').fill('Artifact Smoke Clinic');
+    await page.locator('input[placeholder="01XXXXXXXXX"]').fill('01722222222');
+    await page.getByRole('button', { name: 'Continue' }).click();
+    await page.locator('input[placeholder="Dr. …"]').fill('Dr. Smoke Dentist');
+    await page.getByRole('button', { name: 'Continue' }).click();
+    await page.locator('input[placeholder="admin"]').fill('smokeowner');
+    const pwFields = page.locator('input[type="password"][autocomplete="new-password"]');
+    await pwFields.first().fill(PASSWORD);
+    await pwFields.nth(1).fill(PASSWORD);
+    await page.getByRole('button', { name: 'Continue' }).click();
+    await page.getByRole('button', { name: 'Finish setup' }).click();
+    await page.getByPlaceholder('e.g. admin').waitFor({ state: 'visible', timeout: 90_000 });
+    console.log('SMOKE OK: installed artifact activated, set up and reached sign-in screen.');
+  }
 } finally {
   await app.close().catch(() => undefined);
 }
