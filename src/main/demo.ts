@@ -3,7 +3,7 @@ import { hashPassword } from './core/passwords';
 import { tx } from './core/context';
 import { ALL_PERMISSIONS } from '../shared/permissions';
 
-const DEMO_SEED_VERSION = 1;
+const DEMO_SEED_VERSION = 2;
 export const DEMO_USERNAME = 'demo';
 export const DEMO_PASSWORD = 'DentivaDemo2026!';
 
@@ -68,6 +68,10 @@ export async function seedDemoDatabase(db: DB): Promise<void> {
       ['P-1004','Samia Karim','সামিয়া করিম','1995-08-17',31,'female','AB+','+880 1844-100008',null,'Mahmud Karim','+880 1844-100009','Banani, Dhaka','Dhaka','Routine cleaning and preventive check-up','Existing patient',d1],
       ['P-1005','Mahin Chowdhury','মাহিন চৌধুরী','1978-03-09',48,'male','A-','+880 1855-100010',null,'Rumana Chowdhury','+880 1855-100011','Gulshan, Dhaka','Dhaka','Persistent pain in lower left first molar','Referral',d2],
       ['P-1006','Ishrat Jahan','ইশরাত জাহান','2012-06-26',14,'female','O+','+880 1866-100012',null,'Fahim Jahan','+880 1866-100013','Mohammadpur, Dhaka','Dhaka','Orthodontic screening and oral hygiene advice','School camp',d1],
+      ['P-1007','Sabbir Hasan','সাব্বির হাসান','1989-01-22',37,'male','B-','+880 1877-100014',null,'Rima Hasan','+880 1877-100015','Wari, Dhaka','Dhaka','Pain on chewing in lower right molar','Google',d2],
+      ['P-1008','Moumita Das','মৌমিতা দাস','1998-09-30',28,'female','A+','+880 1888-100016',null,'Anik Das','+880 1888-100017','Tejgaon, Dhaka','Dhaka','Cosmetic concern with upper front teeth','Instagram',d1],
+      ['P-1009','Rezaul Islam','রেজাউল ইসলাম','1969-12-05',56,'male','O-','+880 1899-100018',null,'Nargis Islam','+880 1899-100019','Khilgaon, Dhaka','Dhaka','Loose tooth and gum swelling','Referral',d2],
+      ['P-1010','Faria Rahman','ফারিয়া রহমান','2005-04-18',21,'female','AB-','+880 1800-100020',null,'Mizan Rahman','+880 1800-100021','Bashundhara, Dhaka','Dhaka','Wisdom tooth discomfort','Walk-in',d1],
     ];
     for(const p of patients) addPatient.run(...p,day(-120),at(-120,10),at(-120,10));
     const pats=db.prepare('SELECT id,code FROM patients ORDER BY id').all<{id:number;code:string}>(); const pid=(c:string)=>pats.find(x=>x.code===c)!.id;
@@ -80,6 +84,10 @@ export async function seedDemoDatabase(db: DB): Promise<void> {
       ['P-1004','medical','No significant medical history.'],['P-1004','dental','Good oral hygiene; annual scaling recommended.'],
       ['P-1005','medical','Type 2 diabetes, controlled with metformin.'],['P-1005','allergies','No known drug allergies.'],['P-1005','dental','Large old amalgam restoration on 36; recurrent caries suspected.'],
       ['P-1006','medical','No significant medical history.'],['P-1006','dental','Mixed dentition; early crowding noted.'],
+      ['P-1007','medical','No significant medical history.'],['P-1007','allergies','No known drug allergies.'],['P-1007','dental','Old restoration on 46; sensitivity to biting.'],
+      ['P-1008','medical','No significant medical history.'],['P-1008','dental','Interested in cosmetic bonding for 11 and 21.'],
+      ['P-1009','medical','Controlled hypertension; regular medication.'],['P-1009','dental','Generalized periodontal mobility; heavy calculus.'],
+      ['P-1010','medical','Healthy young adult.'],['P-1010','dental','Partially erupted 48 with recurrent food impaction.'],
     ]) hist.run(pid(h[0]),h[1],h[2],now,userId);
 
     const addVisit=db.prepare("INSERT INTO visits(patient_id,dentist_id,datetime,chief_complaint,history,examination,diagnosis,treatment_plan,advice,notes,follow_up_date,status,created_by,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,'closed',?,?,?)");
