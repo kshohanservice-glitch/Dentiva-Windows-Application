@@ -560,8 +560,11 @@ export function PatientProfilePage() {
 }
 
 function ReferralsTab(props: { patientId: number; canManage: boolean; onCreate: () => void }) {
+  const { can } = useApp();
+  const toast = useToast();
   const { data, loading, error, reload } = useAsync(() => api['referrals/list'](props.patientId), [props.patientId]);
   const [editing, setEditing] = useState<ReferralRecord | null>(null);
+  const [deleting, setDeleting] = useState<ReferralRecord | null>(null);
   if (loading && !data) return <Card title="Referrals"><Spinner label="Loading referrals…" /></Card>;
   if (error) return <Card title="Referrals"><ErrorState error={error} onRetry={reload} /></Card>;
   const rows = data ?? [];
@@ -577,13 +580,21 @@ function ReferralsTab(props: { patientId: number; canManage: boolean; onCreate: 
                   <div className="small">{r.person || r.clinic || 'Referral'}{r.specialty ? ' · ' + r.specialty : ''}</div>
                   <div className="xsmall muted">{formatDate(r.date)}{r.reason ? ' · ' + r.reason : ''}{r.follow_up ? ' · Follow-up ' + formatDate(r.follow_up) : ''}</div>
                 </div>
-                {props.canManage && <Button size="sm" variant="ghost" onClick={() => setEditing(r)}>Edit</Button>}
+                <div className="row gap-2 end">{props.canManage && <Button size="sm" variant="ghost" onClick={() => setEditing(r)}>Edit</Button>}{can('data.delete') && <Button size="sm" variant="danger" onClick={() => setDeleting(r)}>Delete</Button>}</div>
               </div>
             ))}
           </div>
         )}
       </Card>
       {editing && <ReferralFormModal patientId={props.patientId} initial={editing} onClose={() => setEditing(null)} onSaved={() => { setEditing(null); reload(); }} />}
+      {deleting && <ConfirmDialog
+        title="Delete referral?"
+        body={`Referral dated ${formatDate(deleting.date)} will be permanently deleted.`}
+        confirmLabel="Delete referral"
+        danger
+        onConfirm={async () => { try { await api['referrals/delete'](deleting.id); toast.success('Referral deleted'); setDeleting(null); reload(); } catch (err) { toast.fromError(err, 'Delete failed'); } }}
+        onCancel={() => setDeleting(null)}
+      />}
     </>
   );
 }
