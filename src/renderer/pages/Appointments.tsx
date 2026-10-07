@@ -232,7 +232,7 @@ function AppointmentFormModal(props: {
           )}
         </Field>
         <Field label="Date" required error={errors.date}>
-          {(id) => <Input id={id} type="date" value={values.date} onChange={(v) => set('date', v)} invalid={!!errors.date} />}
+          {(id) => <Input id={id} type="date" lang="en-GB" value={values.date} onChange={(v) => set('date', v)} invalid={!!errors.date} />}
         </Field>
         <Field label="Time" required error={errors.time}>
           {(id) => <Input id={id} type="time" value={values.time} onChange={(v) => set('time', v)} invalid={!!errors.time} />}
