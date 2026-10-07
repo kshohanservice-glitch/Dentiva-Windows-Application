@@ -236,7 +236,12 @@ if (!gotLock) {
       contents.on('will-attach-webview', (event) => event.preventDefault());
       contents.session.setPermissionRequestHandler((_wc, _permission, cb) => cb(false));
     });
-    void boot();
+    void boot().catch((err) => {
+      const message = err instanceof Error ? err.message : String(err);
+      console.error('[boot] fatal startup error:', message);
+      logger.error('Fatal startup error', { error: message, stack: err instanceof Error ? err.stack : undefined });
+      fatal('Startup problem', message);
+    });
   });
 
   app.on('window-all-closed', () => {
