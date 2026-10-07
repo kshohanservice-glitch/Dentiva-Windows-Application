@@ -441,7 +441,7 @@ export function AppointmentsPage() {
             <button className={view === 'list' ? 'active' : ''} onClick={() => setView('list')} type="button">7 days</button>
             <button className={view === 'month' ? 'active' : ''} onClick={() => setView('month')} type="button">30 days</button>
           </div>
-          <input className="input" style={{ width: 160 }} type="date" value={date} onChange={(e) => setDate(e.target.value)} aria-label="Date" />
+          <input className="input" style={{ width: 160 }} type="date" lang="en-GB" value={date} onChange={(e) => setDate(e.target.value)} aria-label="Date" />
           <Select
             value={dentistId}
             onChange={setDentistId}
