@@ -135,6 +135,20 @@ export function listCategories(ctx: Ctx): { id: number; name: string; kind: 'exp
   return ctx.db.prepare('SELECT id, name, kind FROM account_categories ORDER BY kind, name').all() as any;
 }
 
+export function deleteCategory(ctx: Ctx, id: number): { ok: boolean } {
+  requirePermission(ctx, 'data.delete');
+  const row = ctx.db.prepare('SELECT id, kind, name FROM account_categories WHERE id = ?').get(id) as any;
+  if (!row) throw notFound('Category not found.');
+  const expenseRefs = Number(ctx.db.prepare('SELECT COUNT(*) c FROM expenses WHERE category_id = ? AND deleted_at IS NULL').get<{ c: number }>(id)!.c);
+  const incomeRefs = Number(ctx.db.prepare('SELECT COUNT(*) c FROM incomes WHERE category_id = ? AND deleted_at IS NULL').get<{ c: number }>(id)!.c);
+  if (expenseRefs + incomeRefs > 0) throw conflict(`Category is used by ${expenseRefs + incomeRefs} stored entr${expenseRefs + incomeRefs === 1 ? 'y' : 'ies'}. Delete those entries first.`);
+  tx(ctx.db, () => {
+    ctx.db.prepare('DELETE FROM account_categories WHERE id = ?').run(id);
+    audit(ctx, { action: 'accounting.category_delete', entityType: 'account_category', entityId: id, summary: `Deleted ${row.kind} category ${row.name}` });
+  });
+  return { ok: true };
+}
+
 export function saveCategory(ctx: Ctx, input: { kind: 'expense' | 'income'; name: string; id?: number }): { id: number } {
   requirePermission(ctx, 'accounting.manage');
   const kind = input.kind === 'income' ? 'income' : input.kind === 'expense' ? 'expense' : null;
