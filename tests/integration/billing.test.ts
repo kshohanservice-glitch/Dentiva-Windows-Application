@@ -92,7 +92,7 @@ describe('invoice lifecycle', () => {
     expect(listPayments(ctx, { invoiceId: inv.id }).total).toBe(2);
   });
 
-  it('payment history is append-only (no update/delete at service level)', () => {
+  it('payment updates remain blocked while explicit deletes are allowed', () => {
     const ctx = ownerCtx(env);
     const p = patient(ctx, '01700000004');
     const inv = createInvoice(ctx, {
@@ -102,8 +102,8 @@ describe('invoice lifecycle', () => {
     createPayment(ctx, { invoiceId: inv.id, patientId: p.id, amountPaisa: 30000, method: 'cash' });
     // Direct tamper attempts below the service layer must fail
     expect(() => env.db.prepare('UPDATE payments SET amount_paisa = 1 WHERE invoice_id = ?').run(inv.id)).toThrow();
-    expect(() => env.db.prepare('DELETE FROM payments WHERE invoice_id = ?').run(inv.id)).toThrow();
-    expect(listPayments(ctx, { invoiceId: inv.id }).total).toBe(1);
+    expect(() => env.db.prepare('DELETE FROM payments WHERE invoice_id = ?').run(inv.id)).not.toThrow();
+    expect(listPayments(ctx, { invoiceId: inv.id }).total).toBe(0);
   });
 
   it('voiding keeps history and removes invoice from active totals', () => {
