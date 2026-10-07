@@ -85,8 +85,8 @@ export function AuditPage() {
             { value: 'user.', label: 'User administration' },
           ]}
         />
-        <input className="input" style={{ width: 150 }} type="date" value={from} onChange={(e) => { setFrom(e.target.value); setPage(1); }} aria-label="From" />
-        <input className="input" style={{ width: 150 }} type="date" value={to} onChange={(e) => { setTo(e.target.value); setPage(1); }} aria-label="To" />
+        <input className="input" style={{ width: 150 }} type="date" lang="en-GB" value={from} onChange={(e) => { setFrom(e.target.value); setPage(1); }} aria-label="From" />
+        <input className="input" style={{ width: 150 }} type="date" lang="en-GB" value={to} onChange={(e) => { setTo(e.target.value); setPage(1); }} aria-label="To" />
       </TableToolbar>
 
       <Card pad={false}>
