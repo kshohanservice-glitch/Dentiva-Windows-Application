@@ -110,7 +110,7 @@ function StaffModal(props: { open: boolean; initial?: StaffDTO | null; onClose: 
         <Field label="Monthly salary (৳)" hint="Visible only with salary permission">
           {(id) => <Input id={id} type="number" min={0} value={v.salary} onChange={(x) => set('salary', x)} />}
         </Field>
-        <Field label="Joining date">{(id) => <Input id={id} type="date" value={v.joiningDate} onChange={(x) => set('joiningDate', x)} />}</Field>
+        <Field label="Joining date">{(id) => <Input id={id} type="date" lang="en-GB" value={v.joiningDate} onChange={(x) => set('joiningDate', x)} />}</Field>
         <Field label="Status">
           {(id) => (
             <Select id={id} value={v.status} onChange={(x) => set('status', x)}
