@@ -1,7 +1,7 @@
 {
   "name": "dentiva-pro",
-  "productName": "Dentiva Pro",
-  "version": "3.0.3",
+  "productName": "Dentiva Pro Demo",
+  "version": "3.0.3-demo.1",
   "description": "Dentiva Pro — offline dental clinic management software for Windows",
   "author": "Shohan Khan <helloiamshohan@gmail.com>",
   "license": "UNLICENSED",
@@ -56,5 +56,6 @@
     "typescript-eslint": "^8.18.2",
     "vite": "^6.0.7",
     "vitest": "^5.0.2"
-  }
+  },
+  "dentivaBuildMode": "demo"
 }
