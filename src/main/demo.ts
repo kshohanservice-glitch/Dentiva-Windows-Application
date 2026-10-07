@@ -136,6 +136,10 @@ export async function seedDemoDatabase(db: DB): Promise<void> {
     rxi.run(rx1,1,'Dentiva Desensitizing Paste','Potassium nitrate','Paste','5%','Apply to sensitive area','Twice daily',1,0,1,'after','14 days','1 tube','Do not rinse immediately.','ব্যবহারের পর সঙ্গে সঙ্গে কুলি করবেন না।','Demo medicine');
     rxi.run(rx2,1,'Chlorhexidine Mouthwash','Chlorhexidine','Mouthwash','0.12%','10 mL rinse','Twice daily',1,0,1,'after','7 days','1 bottle','Rinse for 30 seconds; do not swallow.','৩০ সেকেন্ড কুলি করে ফেলে দিন।','Demo medicine');
     rxi.run(rx3,1,'Ibuprofen','Ibuprofen','Tablet','400 mg','1 tablet','After pain',0,1,1,'after','3 days','6 tablets','Take after food if needed.','প্রয়োজনে খাবারের পরে সেবন করুন।','Demo medicine');
+    const rx4=Number(rx.run('RX-2026-0045',pid('P-1007'),v5,d2,day(-8),'Pain on chewing','Caries and fractured cusp 46','Cold test positive','Caries 46','Composite restoration','Avoid hard foods until restored.',day(21),userId,at(-8,14,50)).lastInsertRowid);
+    const rx5=Number(rx.run('RX-2026-0046',pid('P-1010'),v8,d1,day(-25),'Wisdom tooth discomfort','Partially erupted 48','Inflamed operculum','Pericoronitis 48','Local care and review','Return sooner if swelling or fever develops.',day(10),userId,at(-25,11,40)).lastInsertRowid);
+    rxi.run(rx4,1,'Ibuprofen','Ibuprofen','Tablet','400 mg','1 tablet','After pain',0,1,1,'after','3 days','6 tablets','Take after food if needed.','প্রয়োজনে খাবারের পরে সেবন করুন।','Demo medicine');
+    rxi.run(rx5,1,'Chlorhexidine Mouthwash','Chlorhexidine','Mouthwash','0.12%','10 mL rinse','Twice daily',1,0,1,'after','7 days','1 bottle','Rinse and spit; do not swallow.','কুলি করে ফেলে দিন।','Demo medicine');
 
     const inv=db.prepare('INSERT INTO invoices(number,patient_id,visit_id,date,status,subtotal_paisa,discount_paisa,total_paisa,note,created_by,created_at) VALUES(?,?,?,?,?,?,?,?,?,?,?)');
     const inv1=Number(inv.run('INV-2026-0101',pid('P-1001'),v1,day(-2),'paid',230000,0,230000,'Demo paid invoice',userId,at(-2,11,20)).lastInsertRowid);
@@ -145,10 +149,16 @@ export async function seedDemoDatabase(db: DB): Promise<void> {
     const ii=db.prepare('INSERT INTO invoice_items(invoice_id,description,treatment_id,qty,unit_price_paisa,discount_paisa,total_paisa) VALUES(?,?,?,?,?,?,?)');
     ii.run(inv1,'Composite Filling — 16',tid('FILL-001'),1,180000,0,180000); ii.run(inv1,'IOPA X-Ray — 16',tid('XRAY-001'),1,50000,0,50000);
     ii.run(inv2,'Scaling & Polishing',tid('CLN-001'),1,250000,0,250000); ii.run(inv3,'Root Canal Treatment — 36',tid('RCT-001'),1,650000,0,650000); ii.run(inv4,'Composite build-up — 45',tid('FILL-001'),1,180000,0,180000);
+    const inv5=Number(inv.run('INV-2026-0105',pid('P-1007'),v5,day(-8),'paid',180000,0,180000,'Demo paid invoice',userId,at(-8,15)).lastInsertRowid);
+    const inv6=Number(inv.run('INV-2026-0106',pid('P-1008'),v6,day(-15),'unpaid',80000,0,80000,'Demo consultation invoice',userId,at(-15,10,40)).lastInsertRowid);
+    const inv7=Number(inv.run('INV-2026-0107',pid('P-1009'),v7,day(-20),'partial',250000,0,250000,'Demo periodontal invoice',userId,at(-20,17)).lastInsertRowid);
+    const inv8=Number(inv.run('INV-2026-0108',pid('P-1010'),v8,day(-25),'paid',80000,0,80000,'Demo consultation invoice',userId,at(-25,12)).lastInsertRowid);
+    ii.run(inv5,'Composite Filling — 46',tid('FILL-001'),1,180000,0,180000); ii.run(inv6,'Cosmetic consultation',tid('CONS-001'),1,80000,0,80000); ii.run(inv7,'Scaling & Polishing',tid('CLN-001'),1,250000,0,250000); ii.run(inv8,'Pericoronitis consultation',tid('CONS-001'),1,80000,0,80000);
     const pay=db.prepare("INSERT INTO payments(invoice_id,patient_id,amount_paisa,method,reference,type,received_by,paid_at,note,created_at) VALUES(?,?,?,?,?,'payment',?,?,?,?)");
     pay.run(inv1,pid('P-1001'),230000,'bkash','BK-DEMO-1001',userId,at(-2,11,25),'Demo payment',at(-2,11,25));
     pay.run(inv2,pid('P-1002'),150000,'cash','CASH-DEMO-1002',userId,at(-5,13,5),'Demo partial payment',at(-5,13,5));
     pay.run(inv4,pid('P-1003'),180000,'card','CARD-DEMO-1003',userId,at(-1,16,10),'Demo payment',at(-1,16,10));
+    pay.run(inv5,pid('P-1007'),180000,'cash','CASH-DEMO-1007',userId,at(-8,15,5),'Demo payment',at(-8,15,5)); pay.run(inv7,pid('P-1009'),100000,'bank','BANK-DEMO-1009',userId,at(-20,17,5),'Demo partial payment',at(-20,17,5)); pay.run(inv8,pid('P-1010'),80000,'bkash','BK-DEMO-1010',userId,at(-25,12,5),'Demo payment',at(-25,12,5));
 
     const supplier=Number(db.prepare('INSERT INTO suppliers(name,phone,address,created_at) VALUES(?,?,?,?)').run('Demo Dental Supplies Ltd.','+880 1700-999999','Tejgaon, Dhaka',now).lastInsertRowid);
     const item=Number(db.prepare('INSERT INTO inventory_items(code,name,category,unit,min_level,location,active,created_at,updated_at) VALUES(?,?,?,?,?,?,1,?,?)').run('INV-001','Nitrile Examination Gloves','Consumables','box',10,'Cabinet A',now,now).lastInsertRowid);
@@ -167,6 +177,9 @@ export async function seedDemoDatabase(db: DB): Promise<void> {
     db.prepare('INSERT INTO notifications(key,kind,severity,title,body,entity_type,entity_id,created_at) VALUES(?,?,?,?,?,?,?,?)').run('demo.appt','appointment','info','Upcoming appointment','Nabila Sultana has a scaling appointment today at 11:30.','patient',String(pid('P-1002')),now);
     db.prepare('INSERT INTO notifications(key,kind,severity,title,body,entity_type,entity_id,created_at) VALUES(?,?,?,?,?,?,?,?)').run('demo.stock','inventory','warning','Low stock','Composite Syringe is below its minimum stock level.','inventory',String(item2),now);
     db.prepare('INSERT INTO notifications(key,kind,severity,title,body,entity_type,entity_id,created_at) VALUES(?,?,?,?,?,?,?,?)').run('demo.due','billing','danger','Outstanding payment','INV-2026-0103 has an outstanding balance of BDT 6,500.','invoice',String(inv3),now);
+    db.prepare("INSERT INTO referrals (patient_id,direction,person,clinic,specialty,reason,date,status,follow_up,note,created_by,created_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)").run(pid('P-1005'),'in','Dr. Imran Kabir','City Medical Centre','Endodontics','Complex RCT opinion',day(-12),'completed',day(-7),'Demo inbound referral',userId,at(-12,9));
+    db.prepare("INSERT INTO referrals (patient_id,direction,person,clinic,specialty,reason,date,status,follow_up,note,created_by,created_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)").run(pid('P-1009'),'out','Dr. Sohana Karim','Periodontal Care Centre','Periodontics','Advanced periodontal assessment',day(-18),'open',day(10),'Demo outbound referral',userId,at(-18,16));
+    db.prepare("INSERT INTO medicine_templates (name,items_json,created_by,created_at) VALUES(?,?,?,?)").run('Demo Pain Relief',JSON.stringify([{seq:1,medicineName:'Ibuprofen',generic:'Ibuprofen',form:'Tablet',strength:'400 mg',dosage:'1 tablet',frequency:'After pain',morning:0,afternoon:1,night:1,timing:'after',duration:'3 days',qty:'6 tablets',instruction:'Take after food if needed.',instructionBn:'প্রয়োজনে খাবারের পরে সেবন করুন।',note:'Demo template'}]),userId,now);
     db.prepare("INSERT INTO audit_log(at,user_id,username,action,entity_type,entity_id,summary,result) VALUES(?,?,?,?,?,?,?,'success')").run(now,userId,DEMO_USERNAME,'demo.seed','system',null,'Demo showcase data initialized');
   });
 }
