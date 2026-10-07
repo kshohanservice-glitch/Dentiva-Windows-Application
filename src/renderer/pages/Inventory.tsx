@@ -186,7 +186,7 @@ function StockModal(props: {
               {(id) => <Input id={id} value={batchNo} onChange={setBatchNo} />}
             </Field>
             <Field label="Expiry date">
-              {(id) => <Input id={id} type="date" lang="en-GB" value={expiryDate} onChange={setExpiryDate} />}
+              {(id) => <Input id={id} type="date" value={expiryDate} onChange={setExpiryDate} />}
             </Field>
             <Field label="Purchase price (৳ / unit)">
               {(id) => <Input id={id} type="number" min={0} step="0.01" value={price} onChange={setPrice} />}
