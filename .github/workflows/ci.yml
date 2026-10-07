@@ -94,7 +94,13 @@ jobs:
       - name: Playwright E2E (real app window)
         shell: pwsh
         run: |
-          npm run test:e2e 2>&1 | Tee-Object -FilePath e2e-output.log
+          $pkg = Get-Content package.json -Raw | ConvertFrom-Json
+          if ($pkg.dentivaBuildMode -eq 'demo') {
+            $env:DENTIVA_DEMO = '1'
+            npx playwright test tests/e2e/demo.spec.ts 2>&1 | Tee-Object -FilePath e2e-output.log
+          } else {
+            npm run test:e2e 2>&1 | Tee-Object -FilePath e2e-output.log
+          }
           if ($LASTEXITCODE -ne 0) {
             # Surface failure details as annotations (readable via the API even
             # when artifact/log CDNs are unreachable from the sandbox).
@@ -148,7 +154,16 @@ jobs:
         shell: pwsh
         run: |
           $env:DEBUG = 'electron-builder*'
-          npm run dist 2>&1 | Tee-Object -FilePath dist-output.log
+          $pkg = Get-Content package.json -Raw | ConvertFrom-Json
+          if ($pkg.dentivaBuildMode -eq 'demo') {
+            npm run build 2>&1 | Tee-Object -FilePath dist-output.log
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+            npm run prepare:argon2 2>&1 | Tee-Object -FilePath dist-argon2.log
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+            npx electron-builder --win nsis --publish never --config electron-builder.demo.yml 2>&1 | Tee-Object -FilePath dist-output.log
+          } else {
+            npm run dist 2>&1 | Tee-Object -FilePath dist-output.log
+          }
           $code = $LASTEXITCODE
           if ($code -ne 0) {
             Write-Host "::error title=NSIS build exit code::$code"
@@ -193,14 +208,19 @@ jobs:
             if ($one.Length -gt 400) { $one = $one.Substring(0, 400) }
             Write-Host "::error title=artifact smoke::$one"
           }
-          $ver = (Get-Content package.json -Raw | ConvertFrom-Json).version
-          $installer = Get-Item (Join-Path (Get-Location) "dist\DentivaPro-Setup-$ver.exe") -ErrorAction SilentlyContinue
-          if (-not $installer) { Say "Version-matched installer missing: DentivaPro-Setup-$ver.exe"; exit 1 }
+          $pkg = Get-Content package.json -Raw | ConvertFrom-Json
+          $ver = $pkg.version
+          $isDemo = $pkg.dentivaBuildMode -eq 'demo'
+          $outDir = if ($isDemo) { 'dist-demo' } else { 'dist' }
+          $installerName = if ($isDemo) { "DentivaPro-Demo-Setup-$ver.exe" } else { "DentivaPro-Setup-$ver.exe" }
+          $appName = if ($isDemo) { 'Dentiva Pro Demo.exe' } else { 'Dentiva Pro.exe' }
+          $installer = Get-Item (Join-Path (Get-Location) "$outDir\$installerName") -ErrorAction SilentlyContinue
+          if (-not $installer) { Say "Version-matched installer missing: $outDir/$installerName"; exit 1 }
           $installDir = Join-Path $env:RUNNER_TEMP 'dentiva-installed'
           Write-Host "installer: $($installer.FullName)"
           $p = Start-Process -FilePath $installer.FullName -ArgumentList '/S', "/D=$installDir" -PassThru -Wait
           Write-Host "installer exit code: $($p.ExitCode)"
-          $appExe = Join-Path $installDir 'Dentiva Pro.exe'
+          $appExe = Join-Path $installDir $appName
           if (!(Test-Path $appExe)) {
             Say "installed exe missing: $appExe (installer exit $($p.ExitCode))"
             if (Test-Path $installDir) {
@@ -225,21 +245,28 @@ jobs:
       - name: Checksums
         shell: pwsh
         run: |
-          $exe = Get-ChildItem dist\*.exe | Select-Object -First 1
+          $pkg = Get-Content package.json -Raw | ConvertFrom-Json
+          $outDir = if ($pkg.dentivaBuildMode -eq 'demo') { 'dist-demo' } else { 'dist' }
+          $exe = Get-ChildItem "$outDir\*.exe" | Select-Object -First 1
           $hash = (Get-FileHash $exe.FullName -Algorithm SHA256).Hash.ToLower()
-          "$hash  $($exe.Name)" | Out-File -Encoding ascii dist/SHA256SUMS.txt
-          Get-Content dist/SHA256SUMS.txt
+          "$hash  $($exe.Name)" | Out-File -Encoding ascii "$outDir/SHA256SUMS.txt"
+          Get-Content "$outDir/SHA256SUMS.txt"
       - uses: actions/upload-artifact@v4
         with:
           name: DentivaPro-Windows-NSIS
           path: |
             dist/*.exe
             dist/SHA256SUMS.txt
+            dist-demo/*.exe
+            dist-demo/SHA256SUMS.txt
           retention-days: 30
       - name: Installer payload size report (top 20)
         shell: pwsh
         run: |
-          $root = (Get-ChildItem -Directory dist | Where-Object { Test-Path (Join-Path $_.FullName 'Dentiva Pro.exe') } | Select-Object -First 1)
+          $pkg = Get-Content package.json -Raw | ConvertFrom-Json
+          $outDir = if ($pkg.dentivaBuildMode -eq 'demo') { 'dist-demo' } else { 'dist' }
+          $appName = if ($pkg.dentivaBuildMode -eq 'demo') { 'Dentiva Pro Demo.exe' } else { 'Dentiva Pro.exe' }
+          $root = (Get-ChildItem -Directory $outDir | Where-Object { Test-Path (Join-Path $_.FullName $appName) } | Select-Object -First 1)
           if ($root) {
             $files = Get-ChildItem -Recurse -File $root.FullName | Sort-Object Length -Descending | Select-Object -First 20
             foreach ($f in $files) {
@@ -249,7 +276,7 @@ jobs:
             $total = (Get-ChildItem -Recurse -File $root.FullName | Measure-Object Length -Sum).Sum
             Write-Host "win-unpacked total: $total bytes"
           }
-          Get-ChildItem dist -File | ForEach-Object { Write-Host "dist/$($_.Name): $($_.Length) bytes" }
+          Get-ChildItem $outDir -File | ForEach-Object { Write-Host "$outDir/$($_.Name): $($_.Length) bytes" }
 
       - name: Create or update GitHub Release
         if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/heads/arena/'))
@@ -259,10 +286,14 @@ jobs:
         run: |
           $ver = (Get-Content package.json -Raw | ConvertFrom-Json).version
           $tag = "v$ver"
-          $expectedExe = Join-Path (Get-Location) "dist\DentivaPro-Setup-$ver.exe"
+          $pkg = Get-Content package.json -Raw | ConvertFrom-Json
+          $isDemo = $pkg.dentivaBuildMode -eq 'demo'
+          $outDir = if ($isDemo) { 'dist-demo' } else { 'dist' }
+          $installerName = if ($isDemo) { "DentivaPro-Demo-Setup-$ver.exe" } else { "DentivaPro-Setup-$ver.exe" }
+          $expectedExe = Join-Path (Get-Location) "$outDir\$installerName"
           if (!(Test-Path $expectedExe)) { throw "Expected versioned installer not found: $expectedExe" }
           $exe = (Resolve-Path $expectedExe).Path
-          $sums = (Resolve-Path dist/SHA256SUMS.txt).Path
+          $sums = (Resolve-Path "$outDir/SHA256SUMS.txt").Path
           gh release view $tag *> $null
           if ($LASTEXITCODE -ne 0) {
             $pkg = Get-Content package.json -Raw | ConvertFrom-Json
