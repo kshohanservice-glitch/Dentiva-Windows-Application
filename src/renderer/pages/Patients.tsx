@@ -907,7 +907,7 @@ function AttachmentsTab(props: { entityType: string; entityId: number }) {
             <div className="list-row" key={a.id}>
               <span className="flex-1">
                 <strong>{a.originalName}</strong>
-                <div className="xsmall muted">{a.mime} · {(a.size / 1024).toFixed(0)} KB · {new Date(a.uploadedAt).toLocaleString()} · by {a.uploadedByName}</div>
+                <div className="xsmall muted">{a.mime} · {(a.size / 1024).toFixed(0)} KB · {`${formatDate(a.uploadedAt)} ${new Date(a.uploadedAt).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}`} · by {a.uploadedByName}</div>
               </span>
               <Button size="sm" variant="ghost" onClick={() => void api['attachments/open'](a.id).catch(() => undefined)}>Open</Button>
               <Button size="sm" variant="ghost" onClick={() => void api['attachments/export'](a.id).catch(() => undefined)}>Save a copy</Button>
@@ -938,7 +938,7 @@ function TimelineTab(props: { patientId: number; refreshKey?: number }) {
           <div className="timeline-card">
             <div className="timeline-head">
               <span className="timeline-title">{ev.title}</span>
-              <span className="timeline-time">{new Date(ev.at).toLocaleString()}</span>
+              <span className="timeline-time">{`${formatDate(ev.at)} ${new Date(ev.at).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}`}</span>
             </div>
             {ev.summary && <div className="timeline-summary">{ev.summary}</div>}
           </div>
