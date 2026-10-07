@@ -177,7 +177,6 @@ export function QueuePage() {
               <Button size="sm" variant="ghost" onClick={() => void action(e, 'pause')}>Pause</Button>
               <Button size="sm" variant="ghost" onClick={() => void action(e, 'cancel')}>Remove</Button>
               {can('data.delete') && <Button size="sm" variant="danger" onClick={() => setDeleteTarget(e)}>Delete</Button>}
-              {can('data.delete') && <Button size="sm" variant="danger" onClick={() => setDeleteTarget(e)}>Delete</Button>}
             </>
           )}
           {can('queue.manage') && e.status === 'paused' && (
