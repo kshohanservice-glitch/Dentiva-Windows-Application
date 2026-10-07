@@ -214,6 +214,7 @@ export function registerRouter(deps: RouterDeps): void {
 
   handle(IPC.chartGet, { auth: true, fn: (p, ctx) => chart.getChart(ctx!, Number(p)) });
   handle(IPC.chartSet, { auth: true, fn: (p, ctx) => chart.setChart(ctx!, Number(p?.patientId), p) });
+  handle(IPC.chartDelete, { auth: true, fn: (p, ctx) => chart.deleteChartCondition(ctx!, Number(p)) });
 
   /* --------------------------- treatments ------------------------------ */
   handle(IPC.treatmentsList, { auth: true, fn: (p, ctx) => treatments.listTreatments(ctx!, !!p) });
