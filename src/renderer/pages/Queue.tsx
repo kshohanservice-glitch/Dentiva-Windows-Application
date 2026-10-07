@@ -198,7 +198,7 @@ export function QueuePage() {
           </p>
         </div>
         <div className="page-actions">
-          <input className="input" style={{ width: 160 }} type="date" value={date} onChange={(e) => setDate(e.target.value)} aria-label="Queue date" />
+          <input className="input" style={{ width: 160 }} type="date" lang="en-GB" value={date} onChange={(e) => setDate(e.target.value)} aria-label="Queue date" />
           <Button variant="ghost" icon={Icon.refresh} onClick={reload}>Refresh</Button>
           {can('queue.manage') && <Button variant="primary" icon={Icon.plus} onClick={() => setAddOpen(true)}>Add to queue</Button>}
         </div>
@@ -266,7 +266,7 @@ export function QueuePage() {
         >
           <div className="kv-list">
             <div className="kv"><span className="k">Patient</span><span className="v">{selected.patientName} ({selected.patientCode})</span></div>
-            <div className="kv"><span className="k">Arrived</span><span className="v">{new Date(selected.arrivedAt).toLocaleTimeString()}</span></div>
+            <div className="kv"><span className="k">Arrived</span><span className="v">{new Date(selected.arrivedAt).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}</span></div>
             <div className="kv"><span className="k">Waiting</span><span className="v">{selected.waitingMin} min</span></div>
             <div className="kv"><span className="k">Dentist</span><span className="v">{selected.dentistName ?? 'unassigned'}</span></div>
             <div className="kv"><span className="k">Status</span><span className="v">{STATUS_LABEL[selected.status]}</span></div>
