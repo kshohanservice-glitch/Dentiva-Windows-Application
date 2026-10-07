@@ -91,7 +91,7 @@ export function registerRouter(deps: RouterDeps): void {
     IPC.attachmentsAdd, IPC.attachmentsRename, IPC.attachmentsRemove, IPC.attachmentsExport,
     IPC.backupRun, IPC.backupRestore, IPC.backupSetAuto,
     IPC.settingsSave, IPC.settingsUploadLogo, IPC.settingsResetBusiness, IPC.referralsDelete,
-    IPC.notificationsMarkRead, IPC.referralsSave,
+    IPC.notificationsMarkRead, IPC.referralsSave, IPC.reportsExport, IPC.reportsPrint, IPC.reportsSavePdf, IPC.printExecute, IPC.printPdf, IPC.printClose,
   ]);
   const handle = (channel: string, opts: { auth: boolean; fn: (payload: any, ctx: Ctx | null) => any | Promise<any> }) => {
     ipcMain.handle(channel, async (_event, payload): Promise<Result<any>> => {
