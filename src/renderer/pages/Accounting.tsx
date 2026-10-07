@@ -157,6 +157,7 @@ export function AccountingPage() {
   const [catOpen, setCatOpen] = useState<'expense' | 'income' | null>(null);
   const [deleting, setDeleting] = useState<ExpenseDTO | null>(null);
   const [deletingIncome, setDeletingIncome] = useState<IncomeDTO | null>(null);
+  const [deletingCategory, setDeletingCategory] = useState<{ id: number; name: string; kind: 'expense' | 'income' } | null>(null);
 
   const filter = { from, to, page, pageSize: 25 };
   const expQ = useAsync(() => api['accounting/expenses'](filter), [from, to, page]);
@@ -226,6 +227,19 @@ export function AccountingPage() {
         <div className="stat-card"><div className="stat-label">Categories</div><div className="stat-value">{categories?.length ?? 0}</div></div>
       </div>
 
+      <Card title="Categories" className="mt-4">
+        <div className="row gap-2 wrap">
+          {(categories ?? []).map((cat) => (
+            <div key={cat.id} className="row gap-2" style={{ border: '1px solid var(--line)', borderRadius: 6, padding: '6px 8px' }}>
+              <span className="small">{cat.name}</span>
+              <Badge tone="neutral">{cat.kind}</Badge>
+              {can('data.delete') && <Button size="sm" variant="danger" onClick={() => setDeletingCategory(cat)}>Delete</Button>}
+            </div>
+          ))}
+          {(categories ?? []).length === 0 && <span className="small muted">No custom categories yet.</span>}
+        </div>
+      </Card>
+
       <Tabs
         tabs={[
           { key: 'expenses' as const, label: 'Expenses', count: expQ.data?.total },
@@ -272,6 +286,20 @@ export function AccountingPage() {
 
       <EntryModal kind={tab === 'expenses' ? 'expense' : 'income'} open={!!entryOpen} onClose={() => setEntryOpen(null)} onSaved={() => { expQ.reload(); incQ.reload(); }} />
       {catOpen && <CategoryModal open kind={catOpen} onClose={() => setCatOpen(null)} onSaved={reloadCats} />}
+
+      {deletingCategory && (
+        <ConfirmDialog
+          title="Delete category?"
+          body={`${deletingCategory.name} (${deletingCategory.kind}) will be permanently deleted. A category that is still used by stored entries cannot be deleted until those entries are removed.`}
+          confirmLabel="Delete category"
+          danger
+          onConfirm={async () => {
+            try { await api['accounting/delete-category'](deletingCategory.id); toast.success('Category deleted'); setDeletingCategory(null); reloadCats(); }
+            catch (err) { toast.fromError(err, 'Delete failed'); }
+          }}
+          onCancel={() => setDeletingCategory(null)}
+        />
+      )}
 
       {deletingIncome && (
         <ConfirmDialog
