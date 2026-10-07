@@ -35,6 +35,7 @@ export const Input = React.forwardRef<HTMLInputElement, {
       name={props.name}
       className={`input ${props.invalid ? 'invalid' : ''}`}
       type={props.type ?? 'text'}
+      lang={props.type === 'date' || props.type === 'datetime-local' ? 'en-GB' : undefined}
       value={props.value}
       placeholder={props.placeholder}
       disabled={props.disabled}
