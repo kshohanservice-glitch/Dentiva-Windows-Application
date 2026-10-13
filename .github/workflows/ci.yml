@@ -258,6 +258,12 @@ jobs:
           if ($env:GITHUB_REF_NAME -ne $tag) { throw "Tag $env:GITHUB_REF_NAME does not match package version $tag" }
           $tagCommit = (git rev-list -n 1 $tag).Trim()
           if ($tagCommit -ne $env:GITHUB_SHA) { throw "Tag points to $tagCommit, not verified commit $env:GITHUB_SHA" }
+          git fetch origin main
+          if ($LASTEXITCODE -ne 0) { throw 'Cannot verify main ancestry' }
+          git merge-base --is-ancestor $env:GITHUB_SHA FETCH_HEAD
+          if ($LASTEXITCODE -ne 0) { throw "Release tag must point to a commit on main: $env:GITHUB_SHA" }
+          $notes = "docs/RELEASE_NOTES_$ver.md"
+          if (!(Test-Path $notes)) { throw "Versioned release notes missing: $notes" }
           $expectedExe = Join-Path (Get-Location) "dist\DentivaPro-Setup-$ver.exe"
           if (!(Test-Path $expectedExe)) { throw "Version-matched installer missing: $expectedExe" }
           $exe = (Resolve-Path $expectedExe).Path
@@ -267,7 +273,7 @@ jobs:
           if ($checksumLine -ne "$expectedHash  DentivaPro-Setup-$ver.exe") { throw 'Installer checksum does not match the checksum file' }
           gh release view $tag *> $null
           if ($LASTEXITCODE -eq 0) { throw "Release $tag already exists; refusing to overwrite its assets" }
-          gh release create $tag $exe $sums --title "Dentiva Pro $ver" --verify-tag --notes "Dentiva Pro $ver Windows installer. Built and smoke-tested by CI from commit $env:GITHUB_SHA. See SHA256SUMS.txt for the installer checksum."
+          gh release create $tag $exe $sums --title "Dentiva Pro $ver" --verify-tag --notes-file $notes
           if ($LASTEXITCODE -ne 0) { throw "Release publication failed for $tag" }
           gh release view $tag --json tagName,targetCommitish,assets
           if ($LASTEXITCODE -ne 0) { throw "Release verification failed for $tag" }

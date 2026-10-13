@@ -106,4 +106,3 @@ describe('attachment ownership and permission matrix', () => {
     expect(() => removeAttachment(ownerCtx(env), added.id)).toThrow(/path/i);
   });
 });
-
