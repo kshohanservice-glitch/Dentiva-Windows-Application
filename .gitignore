@@ -1,6 +1,9 @@
 node_modules/
 dist/
 release/
+# The durable v4.0.0 release-progress log lives under docs/release and must be
+# tracked (RELEASE.md requires it); the root release/ output stays ignored.
+!docs/release/
 coverage/
 *.log
 .DS_Store
