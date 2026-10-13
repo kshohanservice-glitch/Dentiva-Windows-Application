@@ -1,66 +1,28 @@
-# Dentiva Pro — Testing Strategy
+# Dentiva Pro — testing and release gates
 
-## Layers
+This is a map of executable checks, **not** a claim that all device-level checks have passed. For exact commit-specific outcomes see `RELEASE_EXECUTION_JOURNAL.md`.
 
-### 1. Unit tests (Vitest, headless CI)
-- Validation helpers (phone/bangladesh formats, dates, age, required fields)
-- Money math: invoice totals, discounts, partial/over/zero payments, refund math,
-  inventory qty ledger, expiry math
-- Permission matrix: role × permission (all built-in roles), override application
-- Currency formatting (BDT ৳), sequences, duplicate-detection scoring
-- Activation verifier (obfuscated fixture; never plaintext)
-- Filename sanitization / path traversal attempts
+## Automated local tests
 
-### 2. Integration tests (Vitest + real SQLite temp DB, full service layer)
-- Migrations up from zero; integrity_check; FK enforcement; audit immutability triggers
-- Patient CRUD + duplicate detection + soft delete/archive
-- Visit workflow; tooth condition supersede-history replay
-- Prescription create/list/print-view model
-- Appointment double-booking & override; queue state machine
-- Invoice + payment workflows: paid/partial/due/overpayment/refund/void, invariants
-- Inventory: stock in/out/damage/expire/return, negative-stock rejection, low/expiry alerts
-- Accounting: expense/income entries, report aggregation
-- RBAC at service boundary: unauthorized call ⇒ throws PermissionError (not UI-level)
-- Backup→restore roundtrip; corrupt backup rejection; pre-restore behavior
-- Search respects permissions; dashboard aggregates redaction
-- Audit: sensitive actions recorded; UPDATE/DELETE rejected by DB
+- `npm run typecheck` checks renderer and main TypeScript projects.
+- `npm run lint` runs ESLint (one pre-existing unused-disable warning is tracked in the journal).
+- `npm test` runs Vitest unit and integration suites against disposable migrated SQLite databases. Coverage includes v3.0.3 fixture upgrade, legacy Queue preservation, appointment expiry/reschedule, backup/restore tamper/rollback cases, money masking rules, RBAC, financial reconciliation, template permissions/validation, and a 20,000-patient synthetic query fixture. A passing 20k-patient fixture is **not** a benchmark for 60k visits or 100k invoices.
+- `npm run build` compiles the main process and renderer.
+- `npm audit --omit=dev --audit-level=moderate` checks known production dependency advisories at the time of the run.
 
-### 3. E2E tests (Playwright _electron)
-- First-run setup wizard → login → lock/logout → dashboard
-- Patient create → profile tabs → visit → chart edit → prescription
-- Appointment → queue call/complete
-- Invoice → payment → due shows correctly
-- Settings edit; backup manual; unauthorized user cannot open restricted page
-- Window resize at 1280×720 min size; keyboard shortcut smoke
+Linux installation requires the documented `npm_config_nodedir=/usr/local npm ci --force` workaround for the Windows-only Argon2 dependency. Local `npm run test:e2e` cannot launch in this sandbox when the Electron binary cannot be downloaded; this does not count as an E2E pass.
 
-### 4. Non-functional QA (manual + scripted where feasible)
-- Performance fixture: seeded 20k patients / 60k visits / 100k invoices — measure search,
-  profile open, dashboard, reports (results recorded in FINAL_RELEASE_REPORT)
-- Stress: rapid navigation/search/lock loops (scripted in integration tests)
-- Print matrix: prescription/invoice × A4/A5/thermal × en/bn × long content (render
-  fixtures + layout assertions; physical printer pass/fail recorded honestly as
-  environment-limited if no printer available)
-- DPI: screenshots at 100–200% emulation
-- Install/uninstall clean-machine: Windows VM/runner checks (CI windows-latest + manual checklist)
+## Windows CI
 
-## Commands
+`.github/workflows/ci.yml` runs verify and real Electron Playwright E2E on Windows. Its package job runs **only after both pass**, builds an x64 NSIS installer, checks packaged native Argon2, silently installs the actual installer, runs `scripts/smoke-installed.mjs`, computes SHA-256 and uploads the installer/checksum as an Actions artifact. These checks are commit-specific: a passing run from before a migration or UI change does **not** verify the later commit. A branch push never publishes a release.
 
-- `npm run lint` — ESLint (no unused/dead code rules)
-- `npm run typecheck` — `tsc --noEmit` (all projects)
-- `npm test` — unit + integration (Vitest run)
-- `npm run test:e2e` — Playwright Electron suite (needs display / xvfb on Linux)
-- `npm run build` — production renderer+main build
-- `npm run dist` — electron-builder NSIS artifact
+The serial E2E suite covers activation/setup/login, patient entry and chart, invoice/payment money reveal, appointment move and override, prescription and invoice print windows, reports, visit completion, deletion and screen sizes. A new template apply/save journey and screen-versus-print money assertion must pass on the final Windows commit before they can be called verified. Tests do not replace manual accessibility review or long-content print testing.
 
-## Release gate rules
+## Manual release checks still needed
 
-- All unit+integration green; E2E green on release commit (Windows runner or local).
-- No flaky-pass: failing tests fixed at root cause, never skipped or deleted.
-- Coverage of service layer modules reported (informational, not a vanity gate).
+- Upgrade and restore disposable copies of clinic data on target Windows devices; preserve pre-upgrade backup and historical finance/clinical records.
+- Real printer/PDF content (including Bengali glyphs), A4/A5/custom margins, long-page pagination, installed DPI and 1280×720 / 1920×1080 interactions.
+- Rehearse install/uninstall and data retention on a clinic-equivalent Windows machine; inspect permissions and secure-storage behavior without modifying the user's only data copy.
+- Check unsaved-change navigation, duplicate-action guards, all template kinds, screen-reader operation and staff-role privacy end to end.
 
-## Honesty policy
-
-Tests assert real behavior (transactions, files, checksums) — not mocked "success".
-Physical-printer validation is tracked as an explicit checklist item; if the release
-environment has no printer, the release report states it as an environmental limitation
-with the print-render fixtures as evidence — never as "printer tested".
+Never mark a skipped or blocked gate as passed. Tag/release only a unique version after all required automated checks and critical device-level signoffs are accounted for. The previous `v3.0.3` tag/assets remain immutable.

@@ -202,6 +202,20 @@ test('clinician templates fill visit and invoice drafts without creating records
   await visit.getByRole('button', { name: 'Cancel' }).click();
   await page.getByRole('button', { name: 'Discard changes' }).click();
 
+  await page.getByRole('button', { name: 'New prescription' }).first().click();
+  const rx = page.locator('.modal[role="dialog"]', { hasText: 'New prescription' });
+  await rx.getByLabel('Advice', { exact: true }).fill('Routine post-op advice');
+  const instructions = rx.locator('.form-section', { hasText: 'Prescription instructions templates' });
+  await instructions.getByPlaceholder('New template name').fill('E2E reusable advice');
+  await instructions.getByRole('button', { name: 'Save current draft' }).click();
+  await expect(instructions.getByRole('option', { name: 'E2E reusable advice' })).toBeAttached();
+  await rx.getByLabel('Advice', { exact: true }).fill('');
+  await instructions.getByLabel('Prescription instructions templates').selectOption({ label: 'E2E reusable advice' });
+  await instructions.getByRole('button', { name: 'Apply to draft' }).click();
+  await expect(rx.getByLabel('Advice', { exact: true })).toHaveValue('Routine post-op advice');
+  await rx.getByRole('button', { name: 'Cancel' }).click();
+  await page.getByRole('button', { name: 'Discard changes' }).click();
+
   await page.getByRole('link', { name: 'Invoice', exact: true }).click();
   await page.getByRole('button', { name: 'New invoice' }).first().click();
   const invoice = page.locator('.modal[role="dialog"]', { hasText: 'Create invoice' });
