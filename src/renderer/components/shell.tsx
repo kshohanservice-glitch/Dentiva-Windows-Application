@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Money, MoneyRevealToggle } from './money';
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { api, useAsync } from '../api';
 import { useApp } from '../state/app-context';
@@ -183,7 +184,7 @@ function GlobalSearch({ open, onClose }: { open: boolean; onClose: () => void })
               <span className="kind">{h.kind}</span>
               <span className="flex-1">
                 <span className="title">{h.title}</span>
-                <div className="sub">{h.subtitle}{h.meta ? ` · ${h.meta}` : ''}</div>
+                <div className="sub">{h.subtitle}{h.meta ? ` · ${h.meta}` : ''}{h.amountPaisa !== undefined && <> · <Money paisa={h.amountPaisa} noToggle /></>}</div>
               </span>
             </button>
           ))}
@@ -414,6 +415,7 @@ export function AppShell() {
             <div>{`${now.toLocaleDateString('en-GB', { weekday: 'short' }).replace(',', '')} ${formatDate(now)}`}</div>
             <div className="num">{now.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })}</div>
           </div>
+          <MoneyRevealToggle />
           <NotificationBell />
           {!demo && <IconButton icon={Icon.lock} title="Lock application (Ctrl+L)" onClick={lock} />}
           <div className="row gap-2" style={{ paddingLeft: 4, borderLeft: '1px solid var(--line)' }}>

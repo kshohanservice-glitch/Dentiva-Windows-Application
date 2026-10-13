@@ -1,11 +1,11 @@
 import React, { useState } from 'react';
 import { api, useAsync } from '../api';
+import { Money } from '../components/money';
 import { useApp } from '../state/app-context';
 import { Badge, Button, Card, ConfirmDialog, EmptyState, ErrorState, Modal, Spinner, useToast } from '../components/primitives';
 import { Field, Input, Textarea } from '../components/forms';
 import { DataTable, TableToolbar, type Column } from '../components/table';
 import { Icon } from '../components/shell';
-import { bdt } from '../format';
 import type { TreatmentDTO } from '../../shared/types';
 
 function TreatmentModal(props: {
@@ -170,7 +170,7 @@ export function TreatmentsPage() {
       ),
     },
     { key: 'category', label: 'Category', render: (t) => t.category ?? <span className="muted">—</span> },
-    { key: 'price', label: 'Default price', align: 'right', sortValue: (t) => t.defaultPricePaisa, render: (t) => <span className="num">{bdt(t.defaultPricePaisa)}</span> },
+    { key: 'price', label: 'Default price', align: 'right', sortValue: (t) => t.defaultPricePaisa, render: (t) => <span className="num"><Money paisa={t.defaultPricePaisa} /></span> },
     { key: 'duration', label: 'Duration', align: 'right', render: (t) => (t.durationMin ? `${t.durationMin} min` : '—') },
     { key: 'active', label: 'Status', render: (t) => <Badge tone={t.active ? 'success' : 'neutral'}>{t.active ? 'active' : 'inactive'}</Badge> },
     {

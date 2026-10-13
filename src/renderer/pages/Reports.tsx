@@ -2,9 +2,10 @@ import { useMemo, useState } from 'react';
 import { api } from '../api';
 import { useApp } from '../state/app-context';
 import { Badge, Button, Card, ErrorState, Spinner, useToast } from '../components/primitives';
+import { Money } from '../components/money';
 import { DataTable, type Column } from '../components/table';
 import { Icon } from '../components/shell';
-import { bdt, formatDate, isoDate } from '../format';
+import { formatDate, isoDate } from '../format';
 import type { ReportResult } from '../../shared/types';
 
 import { REPORT_DEFS, type ReportDef } from '../../shared/reports';
@@ -178,7 +179,7 @@ export function ReportsPage() {
                       <span>
                         {Object.entries(result.totals).map(([k, v]) => (
                           <span key={k} style={{ marginLeft: 16 }}>
-                            {k}: <strong>{typeof v === 'number' && k.includes('paisa') ? bdt(v) : String(v)}</strong>
+                            {k}: <strong>{typeof v === 'number' && k.includes('paisa') ? <Money paisa={v} /> : String(v)}</strong>
                           </span>
                         ))}
                       </span>

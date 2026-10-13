@@ -335,6 +335,8 @@ export interface SearchHit {
   kind: 'patient' | 'appointment' | 'invoice' | 'payment' | 'prescription' | 'treatment' |
         'staff' | 'dentist' | 'inventory' | 'expense' | 'visit';
   id: number; title: string; subtitle: string; meta?: string;
+  /** Integer paisa for money hits; the renderer masks it (never formatted server-side). */
+  amountPaisa?: number;
 }
 
 /* ------------------------------ Activation -------------------------- */

@@ -39,8 +39,8 @@ function createWindow(): void {
   mainWindow = new BrowserWindow({
     width: 1440,
     height: 900,
-    minWidth: 960,
-    minHeight: 640,
+    minWidth: 1180, // documented shell minimum (docs/UX_SYSTEM.md); supports the 1280×720 target
+    minHeight: 680,
     show: false,
     backgroundColor: '#f6f8fa',
     title: 'Dentiva Pro',

@@ -1318,3 +1318,20 @@ kbd {
 .link-button:focus-visible { outline: 2px solid var(--brand-700); outline-offset: 2px; }
 .row-expired td { color: var(--muted); }
 .row-highlight td { background: var(--brand-50, #eef6ff); }
+
+/* Money masking */
+.money { display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; }
+.money[data-masked="true"] .money-value { letter-spacing: 0.12em; color: var(--muted); }
+.money-eye {
+  all: unset; cursor: pointer; display: inline-flex; align-items: center; justify-content: center;
+  width: 22px; height: 22px; border-radius: 6px; color: var(--muted);
+}
+.money-eye:hover:not(:disabled), .money-eye:focus-visible { color: var(--brand-700); background: var(--surface-2); }
+.money-eye[aria-pressed="true"] { color: var(--brand-700); }
+.money-eye:disabled { opacity: 0.4; cursor: default; }
+.money-eye:focus-visible, .money-global:focus-visible { outline: 2px solid var(--brand-700); outline-offset: 2px; }
+.money-global {
+  display: inline-flex; align-items: center; gap: 6px; height: 32px; padding: 0 10px;
+  border: 1px solid var(--line); border-radius: var(--r-sm); background: var(--surface-1); color: var(--ink-2, inherit); cursor: pointer;
+}
+.money-global.on { border-color: var(--brand-700); color: var(--brand-700); }

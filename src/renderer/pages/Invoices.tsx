@@ -1,12 +1,13 @@
 import React, { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
+import { Money } from '../components/money';
 import { api, useAsync } from '../api';
 import { useApp } from '../state/app-context';
 import { Badge, Button, Card, ConfirmDialog, Modal, Pagination, useToast } from '../components/primitives';
 import { Field, Input, Select, Textarea } from '../components/forms';
 import { DataTable, TableToolbar, type Column } from '../components/table';
 import { Icon } from '../components/shell';
-import { bdt, formatDate } from '../format';
+import { formatDate } from '../format';
 import { InvoiceFormModal } from './Patients';
 import type { InvoiceDTO, PaymentDTO } from '../../shared/types';
 
@@ -27,7 +28,7 @@ function PaymentModal(props: { invoice: InvoiceDTO; onClose: () => void; onPaid:
 
   const submit = async () => {
     const ok = validate((v) => ({
-      amountPaisa: v.amountPaisa <= 0 ? 'Enter the amount received.' : v.amountPaisa > due ? `Amount exceeds due (${bdt(due)}).` : '',
+      amountPaisa: v.amountPaisa <= 0 ? 'Enter the amount received.' : v.amountPaisa > due ? 'Amount exceeds the balance due.' : '',
       method: !v.method ? 'Select a payment method.' : '',
     }));
     if (!ok) return;
@@ -41,7 +42,7 @@ function PaymentModal(props: { invoice: InvoiceDTO; onClose: () => void; onPaid:
         reference: values.reference || null,
         note: values.note || null,
       });
-      toast.success('Payment recorded', `${bdt(res.payment.amountPaisa)} · balance ${bdt(res.invoice?.duePaisa ?? 0)}`);
+      toast.success('Payment recorded', 'The invoice balance has been updated.');
       props.onPaid(res.invoice ?? props.invoice);
       props.onClose();
     } catch (err) {
@@ -57,7 +58,7 @@ function PaymentModal(props: { invoice: InvoiceDTO; onClose: () => void; onPaid:
       onClose={props.onClose}
       footer={
         <>
-          <span className="small muted" style={{ marginRight: 'auto' }}>Due: <strong className="num">{bdt(due)}</strong></span>
+          <span className="small muted" style={{ marginRight: 'auto' }}>Due: <strong className="num"><Money paisa={due} /></strong></span>
           <Button variant="secondary" onClick={props.onClose}>Cancel</Button>
           <Button variant="primary" loading={pending} onClick={() => void submit()}>Record payment</Button>
         </>
@@ -77,7 +78,7 @@ function PaymentModal(props: { invoice: InvoiceDTO; onClose: () => void; onPaid:
         <Field label="Quick amount">
           {() => (
             <div className="row gap-2">
-              <Button size="sm" variant="secondary" onClick={() => set('amountPaisa', due)}>Full {bdt(due)}</Button>
+              <Button size="sm" variant="secondary" onClick={() => set('amountPaisa', due)}>Full balance</Button>
               <Button size="sm" variant="ghost" onClick={() => set('amountPaisa', Math.round(due / 2))}>Half</Button>
             </div>
           )}
@@ -192,17 +193,17 @@ function InvoiceDetailModal(props: { invoice: InvoiceDTO; onClose: () => void; o
             <tr key={l.id}>
               <td>{l.description}</td>
               <td className="align-right num">{l.qty}</td>
-              <td className="align-right num">{bdt(l.unitPricePaisa)}</td>
-              <td className="align-right num">{bdt(l.totalPaisa)}</td>
+              <td className="align-right num"><Money paisa={l.unitPricePaisa} /></td>
+              <td className="align-right num"><Money paisa={l.totalPaisa} /></td>
             </tr>
           ))}
         </tbody>
         <tfoot>
-          <tr><td colSpan={3} className="align-right muted">Subtotal</td><td className="align-right num">{bdt(invoice.subtotalPaisa)}</td></tr>
-          {invoice.discountPaisa > 0 && <tr><td colSpan={3} className="align-right muted">Discount</td><td className="align-right num">−{bdt(invoice.discountPaisa)}</td></tr>}
-          <tr><td colSpan={3} className="align-right muted"><strong>Total</strong></td><td className="align-right num"><strong>{bdt(invoice.totalPaisa)}</strong></td></tr>
-          <tr><td colSpan={3} className="align-right muted">Paid</td><td className="align-right num">{bdt(invoice.paidPaisa)}</td></tr>
-          <tr><td colSpan={3} className="align-right muted"><strong>Due</strong></td><td className="align-right num danger-text"><strong>{bdt(invoice.duePaisa)}</strong></td></tr>
+          <tr><td colSpan={3} className="align-right muted">Subtotal</td><td className="align-right num"><Money paisa={invoice.subtotalPaisa} /></td></tr>
+          {invoice.discountPaisa > 0 && <tr><td colSpan={3} className="align-right muted">Discount</td><td className="align-right num">−<Money paisa={invoice.discountPaisa} /></td></tr>}
+          <tr><td colSpan={3} className="align-right muted"><strong>Total</strong></td><td className="align-right num"><strong><Money paisa={invoice.totalPaisa} /></strong></td></tr>
+          <tr><td colSpan={3} className="align-right muted">Paid</td><td className="align-right num"><Money paisa={invoice.paidPaisa} /></td></tr>
+          <tr><td colSpan={3} className="align-right muted"><strong>Due</strong></td><td className="align-right num danger-text"><strong><Money paisa={invoice.duePaisa} /></strong></td></tr>
         </tfoot>
       </table>
 
@@ -225,7 +226,7 @@ function InvoiceDetailModal(props: { invoice: InvoiceDTO; onClose: () => void; o
           {pays!.items.map((p) => (
             <div className="list-row" key={p.id}>
               <span className="flex-1">
-                <strong className="num">{bdt(p.amountPaisa)}</strong> <Badge tone={p.type === 'refund' ? 'danger' : 'neutral'}>{p.type}</Badge>
+                <strong className="num"><Money paisa={p.amountPaisa} /></strong> <Badge tone={p.type === 'refund' ? 'danger' : 'neutral'}>{p.type}</Badge>
                 <div className="xsmall muted">{formatDate(p.paidAt)} {new Date(p.paidAt).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })} · {p.method} {p.reference ? `· ${p.reference}` : ''} · by {p.receivedByName}</div>
               </span>
             </div>
@@ -365,9 +366,9 @@ export function InvoicesPage() {
     { key: 'number', label: 'Invoice', render: (inv) => <span className="mono strong">{inv.number}</span> },
     { key: 'date', label: 'Date', sortValue: (inv) => inv.date, render: (inv) => formatDate(inv.date) },
     { key: 'patient', label: 'Patient', render: (inv) => (<div><strong>{inv.patientName}</strong><div className="xsmall muted mono">{inv.patientCode}</div></div>) },
-    { key: 'total', label: 'Total', align: 'right', sortValue: (inv) => inv.totalPaisa, render: (inv) => <span className="num">{bdt(inv.totalPaisa)}</span> },
-    { key: 'paid', label: 'Paid', align: 'right', render: (inv) => <span className="num success-text">{bdt(inv.paidPaisa)}</span> },
-    { key: 'due', label: 'Due', align: 'right', sortValue: (inv) => inv.duePaisa, render: (inv) => <span className={`num ${inv.duePaisa > 0 ? 'danger-text strong' : 'muted'}`}>{bdt(inv.duePaisa)}</span> },
+    { key: 'total', label: 'Total', align: 'right', sortValue: (inv) => inv.totalPaisa, render: (inv) => <span className="num"><Money paisa={inv.totalPaisa} /></span> },
+    { key: 'paid', label: 'Paid', align: 'right', render: (inv) => <span className="num success-text"><Money paisa={inv.paidPaisa} /></span> },
+    { key: 'due', label: 'Due', align: 'right', sortValue: (inv) => inv.duePaisa, render: (inv) => <span className={`num ${inv.duePaisa > 0 ? 'danger-text strong' : 'muted'}`}><Money paisa={inv.duePaisa} /></span> },
     { key: 'status', label: 'Status', render: (inv) => <Badge tone={STATUS_TONE[inv.status]}>{inv.status}</Badge> },
     {
       key: 'actions', label: '', align: 'right',
@@ -473,7 +474,7 @@ export function PaymentsPage() {
     },
     {
       key: 'amount', label: 'Amount', align: 'right', sortValue: (p) => p.amountPaisa,
-      render: (p) => <span className={`num ${p.type === 'refund' ? 'danger-text' : 'success-text'}`}>{p.type === 'refund' ? '−' : ''}{bdt(p.amountPaisa)}</span>,
+      render: (p) => <span className={`num ${p.type === 'refund' ? 'danger-text' : 'success-text'}`}>{p.type === 'refund' ? '−' : ''}<Money paisa={p.amountPaisa} /></span>,
     },
     { key: 'method', label: 'Method', render: (p) => <Badge tone="neutral">{p.method}</Badge> },
     { key: 'reference', label: 'Reference', render: (p) => <span className="mono">{p.reference ?? '—'}</span> },
@@ -502,8 +503,8 @@ export function PaymentsPage() {
         <div className="page-actions">
           <div className="text-right">
             <div className="xsmall muted">In view</div>
-            <div className="strong num success-text">{bdt(totalIn)}</div>
-            {totalRef > 0 && <div className="xsmall danger-text num">refunds {bdt(totalRef)}</div>}
+            <div className="strong num success-text"><Money paisa={totalIn} /></div>
+            {totalRef > 0 && <div className="xsmall danger-text num">refunds <Money paisa={totalRef} /></div>}
           </div>
           <Button variant="ghost" icon={Icon.refresh} onClick={reload}>Refresh</Button>
         </div>
@@ -543,7 +544,7 @@ export function PaymentsPage() {
       {deletePaymentTarget && (
     <ConfirmDialog
       title="Delete payment?"
-      body={`Payment of ${bdt(deletePaymentTarget.amountPaisa)} for ${deletePaymentTarget.patientName} will be permanently deleted and the related invoice balance will be recalculated.`}
+      body={<>Payment of <Money paisa={deletePaymentTarget.amountPaisa} /> for <strong>{deletePaymentTarget.patientName}</strong> will be permanently deleted and the related invoice balance will be recalculated.</>}
       confirmLabel="Delete payment"
       danger
       onConfirm={async () => {
@@ -574,7 +575,7 @@ export function PaymentsPage() {
                 onClick={async () => {
                   setRefundPending(true);
                   try {
-                    const res = await api['payments/create']({
+                    await api['payments/create']({
                       invoiceId: refundTarget.invoiceId,
                       patientId: refundTarget.patientId,
                       amountPaisa: Math.round(Number(refundAmount) * 100),
@@ -582,7 +583,7 @@ export function PaymentsPage() {
                       note: `Refund: ${refundReason}`,
                       type: 'refund',
                     });
-                    toast.success('Refund recorded', bdt(res.payment.amountPaisa));
+                    toast.success('Refund recorded', 'The refund is listed in the payment history.');
                     setRefundTarget(null);
                     reload();
                   } catch (err) {
@@ -598,7 +599,7 @@ export function PaymentsPage() {
           }
         >
           <p className="small">
-            Refunding <strong className="num">{bdt(refundTarget.amountPaisa)}</strong> received via {refundTarget.method} on{' '}
+            Refunding <strong className="num"><Money paisa={refundTarget.amountPaisa} /></strong> received via {refundTarget.method} on{' '}
             {formatDate(refundTarget.paidAt)} {new Date(refundTarget.paidAt).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}. The original payment row stays untouched.
           </p>
           <div className="form-grid mt-4">

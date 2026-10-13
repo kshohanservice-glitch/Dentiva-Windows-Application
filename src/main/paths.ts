@@ -91,7 +91,8 @@ export function sanitizeFilename(name: string, maxLen = 120): string {
 export function safeResolve(root: string, ...segments: string[]): string {
   const target = path.resolve(root, ...segments);
   const rel = path.relative(path.resolve(root), target);
-  if (rel.startsWith('..') || path.isAbsolute(rel)) {
+  // Exact containment: a name such as `..notes` is legal; only a real parent step escapes.
+  if (rel === '..' || rel.startsWith(`..${path.sep}`) || path.isAbsolute(rel)) {
     throw new Error(`Path escapes allowed root: ${target}`);
   }
   return target;

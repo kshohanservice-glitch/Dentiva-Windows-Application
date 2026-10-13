@@ -1,6 +1,7 @@
 import React from 'react';
 import { HashRouter, Navigate, Route, Routes, useLocation } from 'react-router-dom';
 import { AppProvider, useApp } from './state/app-context';
+import { MoneyRevealProvider } from './components/money';
 import { ToastProvider, useToast } from './components/primitives';
 import { AppShell, BootSplash, LockOverlay } from './components/shell';
 import { LoginPage } from './pages/Login';
@@ -96,7 +97,9 @@ export function App() {
     <ToastProvider>
       <HashRouter>
         <AppProvider>
-          <Root />
+          <MoneyRevealProvider>
+            <Root />
+          </MoneyRevealProvider>
         </AppProvider>
       </HashRouter>
     </ToastProvider>

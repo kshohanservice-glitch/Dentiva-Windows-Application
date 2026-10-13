@@ -1,8 +1,13 @@
 name: CI
 
-# Dentiva Pro v2.0.1 release pipeline: verify, E2E, package and publish the Windows installer.
+# Dentiva Pro verification pipeline. Publishing is tag-gated after all required jobs pass.
 on:
   push:
+    branches:
+      - main
+      - 'arena/**'
+    tags:
+      - 'v*'
     paths-ignore:
       - 'dist/**'
       - 'docs/**'
@@ -159,19 +164,8 @@ jobs:
               $esc = ($l -replace '%', '%25' -replace '[\r\n]', ' ')
               Write-Host "::error title=NSIS build tail $n::$esc"
             }
-            # Commit the full builder log so it can be read over plain git
-            # (artifact/log CDNs are unreachable from the agent sandbox).
-            # Push side-effects only on push events — never on pull requests.
-            if ($env:GITHUB_EVENT_NAME -eq 'push') {
-              Copy-Item dist-output.log ci-debug.log -Force
-              git config user.name "github-actions[bot]"
-              git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-              git add -f ci-debug.log
-              if (!(git diff --cached --quiet)) {
-                git commit -m "ci: capture electron-builder debug log"
-                git push origin "HEAD:$env:GITHUB_REF_NAME"
-              }
-            }
+            # Never mutate the source branch from a failing packaging job.
+            # The step annotations above preserve the failure evidence.
             exit 1
           }
       - name: Verify Windows Argon2 native binding is packaged at runtime path
@@ -251,35 +245,29 @@ jobs:
           }
           Get-ChildItem dist -File | ForEach-Object { Write-Host "dist/$($_.Name): $($_.Length) bytes" }
 
-      - name: Create or update GitHub Release
-        if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/heads/arena/'))
+      # Publishing is permitted ONLY for a new version tag, never for branch pushes.
+      # A failed verify, E2E, or installed-artifact smoke test prevents this job.
+      - name: Publish new tagged GitHub Release
+        if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
         shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           $ver = (Get-Content package.json -Raw | ConvertFrom-Json).version
           $tag = "v$ver"
+          if ($env:GITHUB_REF_NAME -ne $tag) { throw "Tag $env:GITHUB_REF_NAME does not match package version $tag" }
+          $tagCommit = (git rev-list -n 1 $tag).Trim()
+          if ($tagCommit -ne $env:GITHUB_SHA) { throw "Tag points to $tagCommit, not verified commit $env:GITHUB_SHA" }
           $expectedExe = Join-Path (Get-Location) "dist\DentivaPro-Setup-$ver.exe"
-          if (!(Test-Path $expectedExe)) { throw "Expected versioned installer not found: $expectedExe" }
+          if (!(Test-Path $expectedExe)) { throw "Version-matched installer missing: $expectedExe" }
           $exe = (Resolve-Path $expectedExe).Path
           $sums = (Resolve-Path dist/SHA256SUMS.txt).Path
+          $expectedHash = (Get-FileHash $exe -Algorithm SHA256).Hash.ToLower()
+          $checksumLine = (Get-Content $sums -Raw).Trim()
+          if ($checksumLine -ne "$expectedHash  DentivaPro-Setup-$ver.exe") { throw 'Installer checksum does not match the checksum file' }
           gh release view $tag *> $null
-          if ($LASTEXITCODE -ne 0) {
-            gh release create $tag $exe $sums `
-              --title "Dentiva Pro $ver" `
-              --latest `
-              --notes @"
-          Offline-first Windows dental clinic management for Bangladesh.
-
-          - NSIS installer: DentivaPro-Setup-$ver.exe
-          - SHA-256 checksums in SHA256SUMS.txt
-          - Fully offline after one-time activation; no telemetry, no paid APIs
-          - Built and smoke-tested on Windows CI from source at $($env:GITHUB_SHA)
-          "@
-          } else {
-            gh release upload $tag $exe $sums --clobber
-          }
-          if ($LASTEXITCODE -ne 0) { throw 'Release step failed' }
-
-          # Keep existing published releases/tags intact; each version gets its own release.
-          Write-Host "Published release $tag; previous releases are retained."
+          if ($LASTEXITCODE -eq 0) { throw "Release $tag already exists; refusing to overwrite its assets" }
+          gh release create $tag $exe $sums --title "Dentiva Pro $ver" --verify-tag --notes "Dentiva Pro $ver Windows installer. Built and smoke-tested by CI from commit $env:GITHUB_SHA. See SHA256SUMS.txt for the installer checksum."
+          if ($LASTEXITCODE -ne 0) { throw "Release publication failed for $tag" }
+          gh release view $tag --json tagName,targetCommitish,assets
+          if ($LASTEXITCODE -ne 0) { throw "Release verification failed for $tag" }

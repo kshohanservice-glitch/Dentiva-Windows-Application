@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
+import { Money } from '../components/money';
 import { api, useAsync } from '../api';
 import { useApp } from '../state/app-context';
 import {
@@ -10,7 +11,7 @@ import { Field, Input, Select, Textarea, useForm } from '../components/forms';
 import { DataTable, TableToolbar, type Column } from '../components/table';
 import { Icon } from '../components/shell';
 import { ToothChart } from '../components/ToothChart';
-import { bdt, formatDate, isoDate, localDateTime } from '../format';
+import { formatDate, isoDate, localDateTime } from '../format';
 import type { DuplicateCandidate, PatientDTO, PatientFilters, PatientDetailDTO, PrescriptionDTO, TreatmentDTO, VisitDTO } from '../../shared/types';
 import type { PatientInputPayload, ReferralRecord, ReferralInput } from '../../shared/ipc';
 
@@ -865,7 +866,7 @@ function InvoicesForPatient(props: { patientId: number; refreshKey?: number; onO
         <div className="list-row clickable" key={inv.id} onClick={() => props.onOpen(inv.id)}>
           <span className="mono strong">{inv.number}</span>
           <span className="flex-1 xsmall muted">{formatDate(inv.date)} · {inv.items.length} line(s)</span>
-          <span className="num small">{bdt(inv.totalPaisa)}</span>
+          <span className="num small"><Money paisa={inv.totalPaisa} /></span>
           <Badge tone={inv.status === 'paid' ? 'success' : inv.status === 'voided' ? 'danger' : inv.status === 'partial' ? 'warning' : 'info'}>{inv.status}</Badge>
         </div>
       ))}
@@ -1104,9 +1105,9 @@ export function VisitFormModal(props: { patientId: number; onClose: () => void; 
               type="button"
               className="preset-chip"
               onClick={() => addTreatment(t)}
-              title={`${t.description ?? t.name} · ${bdt(t.defaultPricePaisa)}`}
+              title={t.description ?? t.name}
             >
-              + {t.name} <span className="muted">{bdt(t.defaultPricePaisa)}</span>
+              + {t.name}
             </button>
           ))}
         </div>
@@ -1118,14 +1119,14 @@ export function VisitFormModal(props: { patientId: number; onClose: () => void; 
                 <div className="list-row" key={sel.treatmentId}>
                   <span className="flex-1">{t?.name ?? `Treatment #${sel.treatmentId}`}</span>
                   <Input value={String(sel.qty)} onChange={(v) => set('treatments', values.treatments.map((x) => x.treatmentId === sel.treatmentId ? { ...x, qty: Math.max(1, Number(v) || 1) } : x))} type="number" />
-                  <span className="num small">{bdt(sel.qty * sel.unitPricePaisa)}</span>
+                  <span className="num small"><Money paisa={sel.qty * sel.unitPricePaisa} /></span>
                   <Button size="sm" variant="ghost" onClick={() => set('treatments', values.treatments.filter((x) => x.treatmentId !== sel.treatmentId))}>✕</Button>
                 </div>
               );
             })}
             <div className="row between mt-2">
               <strong>Total</strong>
-              <strong className="num">{bdt(values.treatments.reduce((s, x) => s + x.qty * x.unitPricePaisa, 0))}</strong>
+              <strong className="num"><Money paisa={values.treatments.reduce((s, x) => s + x.qty * x.unitPricePaisa, 0)} /></strong>
             </div>
           </div>
         ) : (
@@ -1478,7 +1479,7 @@ export function InvoiceFormModal(props: { patientId: number; visitId?: number | 
       width="wide"
       footer={
         <>
-          <span className="small muted" style={{ marginRight: 'auto' }}>Total: <strong className="num">{bdt(total)}</strong></span>
+          <span className="small muted" style={{ marginRight: 'auto' }}>Total: <strong className="num"><Money paisa={total} /></strong></span>
           <Button variant="secondary" onClick={props.onClose}>Cancel</Button>
           <Button variant="primary" loading={pending} onClick={() => void submit()}>Create invoice</Button>
         </>
@@ -1536,7 +1537,7 @@ export function InvoiceFormModal(props: { patientId: number; visitId?: number | 
             <button key={t.id} type="button" className="preset-chip" onClick={() => {
               set('items', [...values.items, { description: t.name, qty: 1, unitPricePaisa: t.defaultPricePaisa, treatmentId: t.id }]);
             }}>
-              + {t.name} <span className="muted">{bdt(t.defaultPricePaisa)}</span>
+              + {t.name}
             </button>
           ))}
         </div>
@@ -1552,14 +1553,14 @@ export function InvoiceFormModal(props: { patientId: number; visitId?: number | 
               {(id) => <Input id={id} type="number" min={0} step="0.01" value={String(line.unitPricePaisa / 100)} onChange={(v) => setItem(i, { unitPricePaisa: Math.round((Number(v) || 0) * 100) })} />}
             </Field>
             <Field label="Total">
-              {(id) => <Input id={id} value={bdt(line.qty * line.unitPricePaisa)} onChange={() => undefined} disabled />}
+              {() => <div className="input" style={{ display: 'flex', alignItems: 'center', minHeight: 34 }} aria-readonly="true"><Money paisa={line.qty * line.unitPricePaisa} /></div>}
             </Field>
             <Button variant="ghost" size="sm" onClick={() => set('items', values.items.filter((_, j) => j !== i))} title="Remove line">✕</Button>
           </div>
         ))}
         <div className="row between mt-4">
-          <span className="small muted">Subtotal {bdt(subtotal)} · Discount {bdt(values.discountPaisa)}</span>
-          <strong>Payable: {bdt(total)}</strong>
+          <span className="small muted">Subtotal <Money paisa={subtotal} /> · Discount <Money paisa={values.discountPaisa} /></span>
+          <strong>Payable: <Money paisa={total} /></strong>
         </div>
       </div>
     </Modal>

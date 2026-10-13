@@ -8,7 +8,8 @@
  * (including negative numbers) untouched so numeric imports keep working.
  */
 
-const FORMULA_START = new Set(['=', '+', '@', '-']);
+// OWASP CSV-injection triggers: = + - @ and leading TAB / CR.
+const FORMULA_START = new Set(['=', '+', '-', '@', '\t', '\r']);
 
 export function isNumericCell(s: string): boolean {
   // Strict number (int/decimal, optional leading -, no whitespace) → safe as-is.
@@ -21,8 +22,6 @@ export function neutralizeFormula(value: unknown): string {
   const first = s.charAt(0);
   if (!FORMULA_START.has(first)) return s;
   if (isNumericCell(s)) return s;
-  // Tab/CR variants are also formula triggers in some spreadsheet tools;
-  // those never reach here (first char check) but `-2+3+cmd|…` style does.
   return `'${s}`;
 }
 
