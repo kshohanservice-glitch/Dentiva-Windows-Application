@@ -56,7 +56,9 @@ describe('clinic logo upload', () => {
     fs.writeFileSync(source, PNG_BYTES);
 
     const rel = uploadLogo(ctx, source);
-    expect(rel.startsWith('branding/')).toBe(true);
+    // Stored relative paths follow the same platform-native convention as
+    // attachments, so compare the logical (forward-slash) form.
+    expect(rel.replace(/\\/g, '/')).toMatch(/^branding\/logo-\d+\.png$/);
     expect(fs.existsSync(path.join(env.paths.dataDir, rel))).toBe(true);
 
     const settings = getSettings(ctx);
@@ -135,20 +137,28 @@ describe('clinic branding survives backup and restore', () => {
     expect(restored.clinic.logoDataUrl?.startsWith('data:image/png;base64,')).toBe(true);
   });
 
-  it('still restores a backup that predates branding (no branding folder)', async () => {
+  it('preserves the existing logo when restoring a pre-branding backup', async () => {
     // A v3.1.0-era archive contains only manifest.json + database + attachments.
     saveSettings(ctx, { clinic: { clinicName: 'Legacy Clinic' } as any });
     const rec = await service.runBackup(ctx, dest);
+    expect(fs.existsSync(brandingDir())).toBe(false);
 
-    // Rebuild the archive without the branding directory.
-    const stripped = path.join(dest, 'stripped.dpv');
-    fs.copyFileSync(rec.path, stripped);
-    // (runBackup archives branding only when it exists; nothing to strip here,
-    //  this assertion guards the "no branding entries" restore path.)
-    const res = await service.restoreBackup(ctx, stripped, 'RESTORE');
+    // The clinic uploads a logo afterwards, then restores that older backup.
+    const source = path.join(env.dir, 'logo.png');
+    fs.writeFileSync(source, PNG_BYTES);
+    const rel = uploadLogo(ctx, source);
+    expect(fs.existsSync(path.join(env.paths.dataDir, rel))).toBe(true);
+
+    const res = await service.restoreBackup(ctx, rec.path, 'RESTORE');
     expect(res.ok).toBe(true);
     ctx = ownerCtx(env);
-    expect(getSettings(ctx).clinic.clinicName).toBe('Legacy Clinic');
-    expect(getSettings(ctx).clinic.logoDataUrl).toBeNull();
+
+    // The archive knows nothing about branding, so it must not delete the
+    // clinic's own asset. The restored database is authoritative for settings,
+    // so its (older) clinic row simply no longer references the logo.
+    expect(fs.existsSync(path.join(env.paths.dataDir, rel))).toBe(true);
+    const restored = getSettings(ctx);
+    expect(restored.clinic.clinicName).toBe('Legacy Clinic');
+    expect(restored.clinic.logoDataUrl).toBeNull();
   });
 });

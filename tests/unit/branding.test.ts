@@ -22,7 +22,8 @@ import { ClinicLogo, ClinicName } from '../../src/renderer/components/clinic-bra
 import type { ClinicSettings } from '../../src/shared/types';
 
 const repoRoot = path.resolve(__dirname, '..', '..');
-const read = (rel: string): string => fs.readFileSync(path.join(repoRoot, rel), 'utf8');
+const read = (rel: string): string =>
+  fs.readFileSync(path.join(repoRoot, rel), 'utf8').replace(/\r\n/g, '\n');
 
 const PNG_1X1 =
   'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8DwHwAFAAH/q842iQAAAABJRU5ErkJggg==';

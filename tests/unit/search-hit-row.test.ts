@@ -26,7 +26,7 @@ import { SEARCH_KIND_LABELS, SearchHitRow, searchKindLabel } from '../../src/ren
 import type { SearchHit } from '../../src/shared/types';
 
 const repoRoot = path.resolve(__dirname, '..', '..');
-const css = fs.readFileSync(path.join(repoRoot, 'src/renderer/styles/global.css'), 'utf8');
+const css = fs.readFileSync(path.join(repoRoot, 'src/renderer/styles/global.css'), 'utf8').replace(/\r\n/g, '\n');
 
 const ALL_KINDS = Object.keys(SEARCH_KIND_LABELS) as SearchHit['kind'][];
 

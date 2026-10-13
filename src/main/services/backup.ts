@@ -361,11 +361,15 @@ export function createBackupService(deps: BackupDeps) {
     const rollbackAtt = `${attachmentsDir}.rollback-${stamp}`;
     const brandDir = brandingDir(paths);
     const rollbackBranding = `${brandDir}.rollback-${stamp}`;
+    // A backup written before branding was archived carries no branding
+    // entries. Such an archive must not wipe the clinic's existing logo, so the
+    // branding folder is only replaced when the archive actually contains one.
+    const brandRestored = plan.branding.some((a) => a.info.type !== 'Directory');
 
     // A consistent snapshot (not a raw file copy, which can miss WAL contents).
     await holder.get().backup(rollbackDb);
     if (fs.existsSync(attachmentsDir)) fs.renameSync(attachmentsDir, rollbackAtt);
-    if (fs.existsSync(brandDir)) fs.renameSync(brandDir, rollbackBranding);
+    if (brandRestored && fs.existsSync(brandDir)) fs.renameSync(brandDir, rollbackBranding);
 
     try {
       holder.get().close();
@@ -376,7 +380,7 @@ export function createBackupService(deps: BackupDeps) {
       if (fs.existsSync(stagedAttachments)) fs.renameSync(stagedAttachments, attachmentsDir);
       else ensureDir(attachmentsDir);
       if (fs.existsSync(stagedBranding)) fs.renameSync(stagedBranding, brandDir);
-      else ensureDir(brandDir);
+      else if (brandRestored) ensureDir(brandDir);
 
       // 5b. Reopen + verify; any failure below triggers the rollback path.
       const { db: newDb } = openDatabase(dbFile);
@@ -403,8 +407,10 @@ export function createBackupService(deps: BackupDeps) {
         fs.copyFileSync(rollbackDb, dbFile);
         if (fs.existsSync(attachmentsDir)) fs.rmSync(attachmentsDir, { recursive: true, force: true });
         if (fs.existsSync(rollbackAtt)) fs.renameSync(rollbackAtt, attachmentsDir);
-        if (fs.existsSync(brandDir)) fs.rmSync(brandDir, { recursive: true, force: true });
-        if (fs.existsSync(rollbackBranding)) fs.renameSync(rollbackBranding, brandDir);
+        if (brandRestored) {
+          if (fs.existsSync(brandDir)) fs.rmSync(brandDir, { recursive: true, force: true });
+          if (fs.existsSync(rollbackBranding)) fs.renameSync(rollbackBranding, brandDir);
+        }
         holder.set(openDatabase(dbFile).db);
       } catch {
         throw new AppError('RESTORE', `Restore failed and rollback also failed: ${swapErr?.message ?? swapErr}. Manual intervention required — previous data is preserved at ${rollbackDb}.`);

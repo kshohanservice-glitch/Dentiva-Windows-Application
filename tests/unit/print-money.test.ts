@@ -18,7 +18,8 @@ import { formatBdt } from '../../src/shared/currency';
 import { MONEY_MASK } from '../../src/shared/money-mask';
 
 const repoRoot = path.resolve(__dirname, '..', '..');
-const read = (rel: string): string => fs.readFileSync(path.join(repoRoot, rel), 'utf8');
+const read = (rel: string): string =>
+  fs.readFileSync(path.join(repoRoot, rel), 'utf8').replace(/\r\n/g, '\n');
 
 describe('PrintMoney (print / PDF export rendering)', () => {
   it('renders the authoritative integer-exact amount, never the mask', () => {
