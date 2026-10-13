@@ -14,6 +14,7 @@ import { ToothChart } from '../components/ToothChart';
 import { formatDate, isoDate, localDateTime } from '../format';
 import type { DuplicateCandidate, PatientDTO, PatientFilters, PatientDetailDTO, PrescriptionDTO, TreatmentDTO, VisitDTO } from '../../shared/types';
 import type { PatientInputPayload, ReferralRecord, ReferralInput } from '../../shared/ipc';
+import { hasInvoiceDraftChanges } from '../../shared/unsaved';
 
 /* ================================ List ================================= */
 
@@ -29,6 +30,14 @@ const EMPTY_FORM: PatientFormValues = {
 function PatientFormModal(props: { open: boolean; initial?: (PatientDTO & Partial<PatientDetailDTO>) | null; onClose: () => void; onSaved: (id: number) => void }) {
   const { values, set, errors, setErrors, validate, reset } = useForm({ ...EMPTY_FORM });
   const [pending, setPending] = useState(false);
+  const requestInFlight = React.useRef(false);
+  const initialSnapshot = React.useRef(JSON.stringify(EMPTY_FORM));
+  const [discardOpen, setDiscardOpen] = useState(false);
+  const requestClose = () => {
+    if (requestInFlight.current) return;
+    if (JSON.stringify(values) !== initialSnapshot.current || forceAck) setDiscardOpen(true);
+    else props.onClose();
+  };
   const [dupes, setDupes] = useState<DuplicateCandidate[]>([]);
   const [forceAck, setForceAck] = useState(false);
   const { data: dentists } = useAsync(() => api['dentists/list'](true), []);
@@ -36,7 +45,7 @@ function PatientFormModal(props: { open: boolean; initial?: (PatientDTO & Partia
 
   useEffect(() => {
     if (!props.open) return;
-    reset({
+    const next: PatientFormValues = {
       ...EMPTY_FORM,
       ...(props.initial
         ? {
@@ -58,7 +67,10 @@ function PatientFormModal(props: { open: boolean; initial?: (PatientDTO & Partia
             },
           }
         : {}),
-    });
+    };
+    initialSnapshot.current = JSON.stringify(next);
+    reset(next);
+    setDiscardOpen(false);
     setDupes([]);
     setForceAck(false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -94,6 +106,8 @@ function PatientFormModal(props: { open: boolean; initial?: (PatientDTO & Partia
       preferredDentistId: values.preferredDentistId ?? null,
       forceCreate: forceAck,
     };
+    if (requestInFlight.current) return;
+    requestInFlight.current = true;
     setPending(true);
     setErrors({});
     try {
@@ -108,19 +122,30 @@ function PatientFormModal(props: { open: boolean; initial?: (PatientDTO & Partia
       if (/duplicate|already exists/i.test(msg)) setErrors({ name: msg });
       else toast.error('Save failed', msg);
     } finally {
+      requestInFlight.current = false;
       setPending(false);
     }
   };
 
   if (!props.open) return null;
+  if (discardOpen) return (
+    <ConfirmDialog
+      title="Discard patient changes?"
+      body="Unsaved patient details will be lost. No changes have been saved."
+      confirmLabel="Discard changes"
+      danger
+      onCancel={() => setDiscardOpen(false)}
+      onConfirm={props.onClose}
+    />
+  );
   return (
     <Modal
       title={props.initial ? `Edit patient — ${props.initial.name}` : 'Register new patient'}
-      onClose={props.onClose}
+      onClose={requestClose}
       width="wide"
       footer={
         <>
-          <Button variant="secondary" onClick={props.onClose}>Cancel</Button>
+          <Button variant="secondary" onClick={requestClose}>Cancel</Button>
           <Button variant="primary" loading={pending} onClick={() => void submit()}>
             {props.initial ? 'Save changes' : 'Register patient'}
           </Button>
@@ -1414,6 +1439,8 @@ export function InvoiceFormModal(props: { patientId: number; visitId?: number | 
   });
   const { data: treatments } = useAsync(() => api['treatments/list'](), []);
   const [pending, setPending] = useState(false);
+  const [discardOpen, setDiscardOpen] = useState(false);
+  const initialDate = React.useRef(values.date);
   const requestInFlight = React.useRef(false);
   const toast = useToast();
   const [patientQuery, setPatientQuery] = useState('');
@@ -1439,6 +1466,12 @@ export function InvoiceFormModal(props: { patientId: number; visitId?: number | 
 
   const subtotal = values.items.reduce((s, l) => s + l.qty * l.unitPricePaisa, 0);
   const total = Math.max(0, subtotal - values.discountPaisa);
+  const dirty = hasInvoiceDraftChanges(values, initialDate.current, !!chosenPatient && !props.patientId, patientQuery);
+  const requestClose = () => {
+    if (requestInFlight.current) return;
+    if (dirty) setDiscardOpen(true);
+    else props.onClose();
+  };
 
   const submit = async () => {
     const ok = validate((v) => ({
@@ -1476,15 +1509,26 @@ export function InvoiceFormModal(props: { patientId: number; visitId?: number | 
     }
   };
 
+  if (discardOpen) return (
+    <ConfirmDialog
+      title="Discard invoice draft?"
+      body="Your unsaved invoice details will be lost. No invoice has been created."
+      confirmLabel="Discard changes"
+      danger
+      onCancel={() => setDiscardOpen(false)}
+      onConfirm={props.onClose}
+    />
+  );
+
   return (
     <Modal
       title="Create invoice"
-      onClose={props.onClose}
+      onClose={requestClose}
       width="wide"
       footer={
         <>
           <span className="small muted" style={{ marginRight: 'auto' }}>Total: <strong className="num"><Money paisa={total} /></strong></span>
-          <Button variant="secondary" onClick={props.onClose}>Cancel</Button>
+          <Button variant="secondary" onClick={requestClose}>Cancel</Button>
           <Button variant="primary" loading={pending} onClick={() => void submit()}>Create invoice</Button>
         </>
       }

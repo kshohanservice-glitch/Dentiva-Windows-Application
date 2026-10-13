@@ -10,6 +10,7 @@ import { Icon } from '../components/shell';
 import { formatDate } from '../format';
 import { InvoiceFormModal } from './Patients';
 import type { InvoiceDTO, PaymentDTO } from '../../shared/types';
+import { hasPaymentDraftChanges } from '../../shared/unsaved';
 
 const STATUS_TONE = {
   paid: 'success', partial: 'warning', unpaid: 'info', voided: 'danger', draft: 'neutral',
@@ -18,9 +19,16 @@ const STATUS_TONE = {
 function PaymentModal(props: { invoice: InvoiceDTO; onClose: () => void; onPaid: (invoice: InvoiceDTO) => void }) {
   const { values, set, errors, validate } = usePaymentForm();
   const [pending, setPending] = useState(false);
+  const [discardOpen, setDiscardOpen] = useState(false);
   const requestInFlight = React.useRef(false);
   const toast = useToast();
   const due = props.invoice.duePaisa;
+  const dirty = hasPaymentDraftChanges(values, due);
+  const requestClose = () => {
+    if (requestInFlight.current) return;
+    if (dirty) setDiscardOpen(true);
+    else props.onClose();
+  };
 
   React.useEffect(() => {
     set('amountPaisa', due);
@@ -55,14 +63,25 @@ function PaymentModal(props: { invoice: InvoiceDTO; onClose: () => void; onPaid:
     }
   };
 
+  if (discardOpen) return (
+    <ConfirmDialog
+      title="Discard payment details?"
+      body="Your unsaved payment details will be lost. No payment has been recorded."
+      confirmLabel="Discard changes"
+      danger
+      onCancel={() => setDiscardOpen(false)}
+      onConfirm={props.onClose}
+    />
+  );
+
   return (
     <Modal
       title={`Receive payment — ${props.invoice.number}`}
-      onClose={props.onClose}
+      onClose={requestClose}
       footer={
         <>
           <span className="small muted" style={{ marginRight: 'auto' }}>Due: <strong className="num"><Money paisa={due} /></strong></span>
-          <Button variant="secondary" onClick={props.onClose}>Cancel</Button>
+          <Button variant="secondary" onClick={requestClose}>Cancel</Button>
           <Button variant="primary" loading={pending} onClick={() => void submit()}>Record payment</Button>
         </>
       }
