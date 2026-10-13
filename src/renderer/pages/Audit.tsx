@@ -4,6 +4,7 @@ import { Badge, Button, Card, Pagination, Spinner, ErrorState, useToast } from '
 import { Input, Select } from '../components/forms';
 import { TableToolbar } from '../components/table';
 import { Icon } from '../components/shell';
+import { FormattedMoney } from '../components/formatted-money';
 import { formatDate, isoDate } from '../format';
 import type { AuditEntry } from '../../shared/types';
 
@@ -120,11 +121,11 @@ export function AuditPage() {
                       <td className="small">{e.username ?? <span className="muted">system</span>}</td>
                       <td className="mono xsmall">{e.action}</td>
                       <td className="small">
-                        {e.summary}
+                        <FormattedMoney value={e.summary} />
                         {e.entityType && (
                           <span className="xsmall muted"> · {e.entityType}{e.entityId ? `#${e.entityId}` : ''}</span>
                         )}
-                        {e.reason && <div className="xsmall danger-text">{e.reason}</div>}
+                        {e.reason && <div className="xsmall danger-text"><FormattedMoney value={e.reason} /></div>}
                       </td>
                       <td><Badge tone={toneFor(e)}>{e.result}</Badge></td>
                     </tr>

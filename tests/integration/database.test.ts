@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { cleanupEnv, createTestEnv, type TestEnv } from '../helpers';
+import { MIGRATIONS } from '../../src/main/db/migrations';
 import { schemaVersionOf, fullIntegrityCheck, openDatabase } from '../../src/main/db/database';
 import { ALL_PERMISSIONS, BUILTIN_ROLES } from '../../src/shared/permissions';
 
@@ -15,7 +16,7 @@ afterEach(() => {
 
 describe('database migrations & seeds', () => {
   it('migrates to the current schema with pragmas applied', () => {
-    expect(schemaVersionOf(env.db)).toBe(2);
+    expect(schemaVersionOf(env.db)).toBe(MIGRATIONS.length);
     const foreignKeys = env.db.pragma('foreign_keys', { simple: true });
     expect(Number(foreign_keys_value(foreignKeys))).toBe(1);
     const journal = String(env.db.pragma('journal_mode', { simple: true }));
@@ -57,15 +58,15 @@ describe('database migrations & seeds', () => {
   });
 
   it('audit log is append-only at the trigger level', () => {
-    env.db
+    const seedId = Number(env.db
       .prepare(
         `INSERT INTO audit_log (at, user_id, username, action, entity_type, summary) VALUES (?, NULL, 'system', 'test.seed', 'test', 'seed row')`,
       )
-      .run(new Date().toISOString());
+      .run(new Date().toISOString()).lastInsertRowid);
 
-    expect(() => env.db.prepare(`UPDATE audit_log SET summary = 'tampered' WHERE id = 1`).run()).toThrow(/append-only/i);
-    expect(() => env.db.prepare('DELETE FROM audit_log WHERE id = 1').run()).toThrow(/append-only/i);
-    const row = env.db.prepare('SELECT summary FROM audit_log WHERE id = 1').get<{ summary: string }>()!;
+    expect(() => env.db.prepare(`UPDATE audit_log SET summary = 'tampered' WHERE id = ?`).run(seedId)).toThrow(/append-only/i);
+    expect(() => env.db.prepare('DELETE FROM audit_log WHERE id = ?').run(seedId)).toThrow(/append-only/i);
+    const row = env.db.prepare('SELECT summary FROM audit_log WHERE id = ?').get<{ summary: string }>(seedId)!;
     expect(row.summary).toBe('seed row');
   });
 

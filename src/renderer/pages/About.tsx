@@ -36,7 +36,7 @@ export function AboutPage() {
 
           <div className="divider" />
           <p className="small" style={{ lineHeight: 1.7, color: 'var(--text-2)' }}>
-            Dentiva Pro manages patients, dental charting, appointments, queue, treatments, prescriptions, billing,
+            Dentiva Pro manages patients, dental charting, appointments, treatments, prescriptions, billing,
             inventory, accounting and staff for dental clinics — entirely on your computer. No internet connection is
             required or used at runtime; patient data never leaves this machine.
           </p>

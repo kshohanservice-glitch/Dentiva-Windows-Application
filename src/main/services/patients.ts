@@ -373,6 +373,7 @@ export function archivePatient(ctx: Ctx, id: number): { ok: boolean } {
 
 interface TimelineEvent {
   at: string; type: string; title: string; summary: string;
+  amountPaisa?: number;
   linkEntity: string | null; linkId: number | null; actor: string | null;
 }
 
@@ -426,7 +427,7 @@ export function patientTimeline(ctx: Ctx, patientId: number): TimelineEvent[] {
     ).all<any>(patientId)) {
       push({
         at: `${inv.date}T12:00:00.000Z`, type: 'invoice', title: `Invoice ${inv.number}`,
-        summary: `${inv.status} · total ${(inv.total_paisa / 100).toFixed(2)}`,
+        summary: `${inv.status} · total`, amountPaisa: inv.total_paisa,
         linkEntity: 'invoice', linkId: inv.id, actor: null,
       });
     }
@@ -438,7 +439,7 @@ export function patientTimeline(ctx: Ctx, patientId: number): TimelineEvent[] {
       push({
         at: pay.paid_at, type: 'payment',
         title: pay.type === 'refund' ? 'Refund recorded' : 'Payment recorded',
-        summary: `${(pay.amount_paisa / 100).toFixed(2)} BDT via ${pay.method}`,
+        summary: `via ${pay.method}`, amountPaisa: pay.amount_paisa,
         linkEntity: pay.invoice_id ? 'invoice' : null, linkId: pay.invoice_id, actor: null,
       });
     }

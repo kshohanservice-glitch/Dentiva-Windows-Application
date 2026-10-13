@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react';
 import { api, useAsync } from '../api';
+import { Money } from '../components/money';
 import { useApp } from '../state/app-context';
 import { Badge, Button, Card, ConfirmDialog, EmptyState, Modal, Tabs, useToast } from '../components/primitives';
 import { Field, Input, Select, Textarea } from '../components/forms';
 import { DataTable, TableToolbar, type Column } from '../components/table';
 import { Icon } from '../components/shell';
-import { bdt, daysUntil, formatDate } from '../format';
+import { daysUntil, formatDate } from '../format';
 import type { InventoryBatchDTO, InventoryItemDTO, InventoryTxnType } from '../../shared/types';
 
 function ItemModal(props: { open: boolean; initial?: InventoryItemDTO | null; onClose: () => void; onSaved: () => void }) {
@@ -324,7 +325,7 @@ export function InventoryPage() {
     { key: 'batchNo', label: 'Batch', render: (b) => <span className="mono">{b.batchNo ?? '—'}</span> },
     { key: 'expiry', label: 'Expiry', sortValue: (b) => b.expiryDate ?? '', render: (b) => (b.expiryDate ? formatDate(b.expiryDate) : '—') },
     { key: 'qty', label: 'Qty left', align: 'right', render: (b) => <span className="num">{b.qtyAvailable}/{b.qtyInitial}</span> },
-    { key: 'price', label: 'Cost', align: 'right', render: (b) => <span className="num">{bdt(b.purchasePricePaisa)}</span> },
+    { key: 'price', label: 'Cost', align: 'right', render: (b) => <span className="num"><Money paisa={b.purchasePricePaisa} /></span> },
     { key: 'supplier', label: 'Supplier', render: (b) => b.supplierName ?? '—' },
     {
       key: 'state', label: 'State',

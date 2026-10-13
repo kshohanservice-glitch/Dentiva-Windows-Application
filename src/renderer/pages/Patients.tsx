@@ -1,5 +1,8 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
+import { Money } from '../components/money';
+import { ClinicalTemplatePicker } from '../components/ClinicalTemplatePicker';
+import type { InvoiceTemplateItem } from '../../shared/clinical-templates';
 import { api, useAsync } from '../api';
 import { useApp } from '../state/app-context';
 import {
@@ -10,9 +13,10 @@ import { Field, Input, Select, Textarea, useForm } from '../components/forms';
 import { DataTable, TableToolbar, type Column } from '../components/table';
 import { Icon } from '../components/shell';
 import { ToothChart } from '../components/ToothChart';
-import { bdt, formatDate, isoDate, localDateTime } from '../format';
+import { formatDate, isoDate, localDateTime } from '../format';
 import type { DuplicateCandidate, PatientDTO, PatientFilters, PatientDetailDTO, PrescriptionDTO, TreatmentDTO, VisitDTO } from '../../shared/types';
 import type { PatientInputPayload, ReferralRecord, ReferralInput } from '../../shared/ipc';
+import { hasInvoiceDraftChanges } from '../../shared/unsaved';
 
 /* ================================ List ================================= */
 
@@ -28,6 +32,14 @@ const EMPTY_FORM: PatientFormValues = {
 function PatientFormModal(props: { open: boolean; initial?: (PatientDTO & Partial<PatientDetailDTO>) | null; onClose: () => void; onSaved: (id: number) => void }) {
   const { values, set, errors, setErrors, validate, reset } = useForm({ ...EMPTY_FORM });
   const [pending, setPending] = useState(false);
+  const requestInFlight = React.useRef(false);
+  const initialSnapshot = React.useRef(JSON.stringify(EMPTY_FORM));
+  const [discardOpen, setDiscardOpen] = useState(false);
+  const requestClose = () => {
+    if (requestInFlight.current) return;
+    if (JSON.stringify(values) !== initialSnapshot.current || forceAck) setDiscardOpen(true);
+    else props.onClose();
+  };
   const [dupes, setDupes] = useState<DuplicateCandidate[]>([]);
   const [forceAck, setForceAck] = useState(false);
   const { data: dentists } = useAsync(() => api['dentists/list'](true), []);
@@ -35,7 +47,7 @@ function PatientFormModal(props: { open: boolean; initial?: (PatientDTO & Partia
 
   useEffect(() => {
     if (!props.open) return;
-    reset({
+    const next: PatientFormValues = {
       ...EMPTY_FORM,
       ...(props.initial
         ? {
@@ -57,7 +69,10 @@ function PatientFormModal(props: { open: boolean; initial?: (PatientDTO & Partia
             },
           }
         : {}),
-    });
+    };
+    initialSnapshot.current = JSON.stringify(next);
+    reset(next);
+    setDiscardOpen(false);
     setDupes([]);
     setForceAck(false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -93,6 +108,8 @@ function PatientFormModal(props: { open: boolean; initial?: (PatientDTO & Partia
       preferredDentistId: values.preferredDentistId ?? null,
       forceCreate: forceAck,
     };
+    if (requestInFlight.current) return;
+    requestInFlight.current = true;
     setPending(true);
     setErrors({});
     try {
@@ -107,19 +124,30 @@ function PatientFormModal(props: { open: boolean; initial?: (PatientDTO & Partia
       if (/duplicate|already exists/i.test(msg)) setErrors({ name: msg });
       else toast.error('Save failed', msg);
     } finally {
+      requestInFlight.current = false;
       setPending(false);
     }
   };
 
   if (!props.open) return null;
+  if (discardOpen) return (
+    <ConfirmDialog
+      title="Discard patient changes?"
+      body="Unsaved patient details will be lost. No changes have been saved."
+      confirmLabel="Discard changes"
+      danger
+      onCancel={() => setDiscardOpen(false)}
+      onConfirm={props.onClose}
+    />
+  );
   return (
     <Modal
       title={props.initial ? `Edit patient — ${props.initial.name}` : 'Register new patient'}
-      onClose={props.onClose}
+      onClose={requestClose}
       width="wide"
       footer={
         <>
-          <Button variant="secondary" onClick={props.onClose}>Cancel</Button>
+          <Button variant="secondary" onClick={requestClose}>Cancel</Button>
           <Button variant="primary" loading={pending} onClick={() => void submit()}>
             {props.initial ? 'Save changes' : 'Register patient'}
           </Button>
@@ -865,7 +893,7 @@ function InvoicesForPatient(props: { patientId: number; refreshKey?: number; onO
         <div className="list-row clickable" key={inv.id} onClick={() => props.onOpen(inv.id)}>
           <span className="mono strong">{inv.number}</span>
           <span className="flex-1 xsmall muted">{formatDate(inv.date)} · {inv.items.length} line(s)</span>
-          <span className="num small">{bdt(inv.totalPaisa)}</span>
+          <span className="num small"><Money paisa={inv.totalPaisa} /></span>
           <Badge tone={inv.status === 'paid' ? 'success' : inv.status === 'voided' ? 'danger' : inv.status === 'partial' ? 'warning' : 'info'}>{inv.status}</Badge>
         </div>
       ))}
@@ -940,7 +968,7 @@ function TimelineTab(props: { patientId: number; refreshKey?: number }) {
               <span className="timeline-title">{ev.title}</span>
               <span className="timeline-time">{`${formatDate(ev.at)} ${new Date(ev.at).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}`}</span>
             </div>
-            {ev.summary && <div className="timeline-summary">{ev.summary}</div>}
+            {(ev.summary || ev.amountPaisa !== undefined) && <div className="timeline-summary">{ev.summary} {ev.amountPaisa !== undefined && <Money paisa={ev.amountPaisa} />}</div>}
           </div>
         </div>
       ))}
@@ -951,7 +979,7 @@ function TimelineTab(props: { patientId: number; refreshKey?: number }) {
 /* ------------------------- shared form modals -------------------------- */
 
 export function VisitFormModal(props: { patientId: number; onClose: () => void; onSaved: (id: number) => void }) {
-  const { values, set, validate, errors } = useForm({
+  const { values, set, setMany, validate, errors } = useForm({
     dentistId: '', datetime: localDateTime(new Date()), chiefComplaint: '', history: '',
     examination: '', diagnosis: '', treatmentPlan: '', advice: '', followUpDate: '', notes: '',
     treatments: [] as { treatmentId: number; qty: number; unitPricePaisa: number }[],
@@ -959,12 +987,20 @@ export function VisitFormModal(props: { patientId: number; onClose: () => void; 
   const { data: dentists } = useAsync(() => api['dentists/list'](), []);
   const { data: treatments } = useAsync(() => api['treatments/list'](), []);
   const [pending, setPending] = useState(false);
+  const [discardOpen, setDiscardOpen] = useState(false);
+  const requestInFlight = React.useRef(false);
+  const initialSnapshot = React.useRef(JSON.stringify(values));
   const toast = useToast();
   const [patientQuery, setPatientQuery] = useState('');
   const [chosenPatient, setChosenPatient] = useState<{ id: number; name: string; code: string } | null>(
     props.patientId ? { id: props.patientId, name: '', code: '' } : null,
   );
   const [patientMatches, setPatientMatches] = useState<{ id: number; name: string; code: string }[]>([]);
+  const requestClose = () => {
+    if (requestInFlight.current) return;
+    if (JSON.stringify(values) !== initialSnapshot.current || (!props.patientId && !!patientQuery)) setDiscardOpen(true);
+    else props.onClose();
+  };
 
   React.useEffect(() => {
     if (props.patientId) return;
@@ -987,6 +1023,8 @@ export function VisitFormModal(props: { patientId: number; onClose: () => void; 
       toast.warning('Select a patient', 'Search and choose the patient first.');
       return;
     }
+    if (requestInFlight.current) return;
+    requestInFlight.current = true;
     setPending(true);
     try {
       const visit = await api['visits/create']({
@@ -1008,6 +1046,7 @@ export function VisitFormModal(props: { patientId: number; onClose: () => void; 
     } catch (err) {
       toast.fromError(err, 'Could not save visit');
     } finally {
+      requestInFlight.current = false;
       setPending(false);
     }
   };
@@ -1019,14 +1058,23 @@ export function VisitFormModal(props: { patientId: number; onClose: () => void; 
     ]);
   };
 
+  if (discardOpen) return (
+    <ConfirmDialog
+      title="Discard visit draft?"
+      body="Unsaved clinical details will be lost. No record has been saved."
+      confirmLabel="Discard changes" danger
+      onCancel={() => setDiscardOpen(false)} onConfirm={props.onClose}
+    />
+  );
+
   return (
     <Modal
       title="Record visit"
-      onClose={props.onClose}
+      onClose={requestClose}
       width="wide"
       footer={
         <>
-          <Button variant="secondary" onClick={props.onClose}>Cancel</Button>
+          <Button variant="secondary" onClick={requestClose}>Cancel</Button>
           <Button variant="primary" loading={pending} onClick={() => void submit()}>Save visit</Button>
         </>
       }
@@ -1095,6 +1143,15 @@ export function VisitFormModal(props: { patientId: number; onClose: () => void; 
         </Field>
       </div>
 
+      <ClinicalTemplatePicker kind="visit" label="Visit" getBody={() => ({
+        chiefComplaint: values.chiefComplaint, history: values.history, examination: values.examination,
+        diagnosis: values.diagnosis, treatmentPlan: values.treatmentPlan, advice: values.advice, notes: values.notes,
+      })} onApply={(body) => { if (!('items' in body)) setMany(body); }} />
+      <ClinicalTemplatePicker kind="plan" label="Treatment plan" getBody={() => ({ treatmentPlan: values.treatmentPlan })}
+        onApply={(body) => { if (!('items' in body)) set('treatmentPlan', body.treatmentPlan ?? ''); }} />
+      <ClinicalTemplatePicker kind="notes" label="Clinical notes" getBody={() => ({ notes: values.notes })}
+        onApply={(body) => { if (!('items' in body)) set('notes', body.notes ?? ''); }} />
+
       <div className="form-section mt-4">
         <h4>Procedures this visit</h4>
         <div className="preset-chips mb-4">
@@ -1104,9 +1161,9 @@ export function VisitFormModal(props: { patientId: number; onClose: () => void; 
               type="button"
               className="preset-chip"
               onClick={() => addTreatment(t)}
-              title={`${t.description ?? t.name} · ${bdt(t.defaultPricePaisa)}`}
+              title={t.description ?? t.name}
             >
-              + {t.name} <span className="muted">{bdt(t.defaultPricePaisa)}</span>
+              + {t.name}
             </button>
           ))}
         </div>
@@ -1118,14 +1175,14 @@ export function VisitFormModal(props: { patientId: number; onClose: () => void; 
                 <div className="list-row" key={sel.treatmentId}>
                   <span className="flex-1">{t?.name ?? `Treatment #${sel.treatmentId}`}</span>
                   <Input value={String(sel.qty)} onChange={(v) => set('treatments', values.treatments.map((x) => x.treatmentId === sel.treatmentId ? { ...x, qty: Math.max(1, Number(v) || 1) } : x))} type="number" />
-                  <span className="num small">{bdt(sel.qty * sel.unitPricePaisa)}</span>
+                  <span className="num small"><Money paisa={sel.qty * sel.unitPricePaisa} /></span>
                   <Button size="sm" variant="ghost" onClick={() => set('treatments', values.treatments.filter((x) => x.treatmentId !== sel.treatmentId))}>✕</Button>
                 </div>
               );
             })}
             <div className="row between mt-2">
               <strong>Total</strong>
-              <strong className="num">{bdt(values.treatments.reduce((s, x) => s + x.qty * x.unitPricePaisa, 0))}</strong>
+              <strong className="num"><Money paisa={values.treatments.reduce((s, x) => s + x.qty * x.unitPricePaisa, 0)} /></strong>
             </div>
           </div>
         ) : (
@@ -1139,7 +1196,7 @@ export function VisitFormModal(props: { patientId: number; onClose: () => void; 
 export function RxFormModal(props: { patientId: number; visitId?: number | null; onClose: () => void; onSaved: (id: number) => void }) {
   const { can } = useApp();
   const patientId = props.patientId;
-  const { values, set, validate, errors } = useForm({
+  const { values, set, setMany, validate, errors } = useForm({
     dentistId: '', date: isoDate(new Date()), cC: '', oE: '', rE: '', diagnosis: '', treatment: '', advice: '', followUp: '',
     ccOther: '', oeOther: '',
     items: [{ medicineName: '', strength: '', dosage: '', frequency: '', duration: '', generic: '', form: '', qty: '', instruction: '' }] as {
@@ -1151,12 +1208,20 @@ export function RxFormModal(props: { patientId: number; visitId?: number | null;
   const { data: templates, reload: reloadTemplates } = useAsync(() => api['prescriptions/templates'](), []);
   const [deleteTemplate, setDeleteTemplate] = useState<{ id: number; name: string } | null>(null);
   const [pending, setPending] = useState(false);
+  const [discardOpen, setDiscardOpen] = useState(false);
+  const requestInFlight = React.useRef(false);
+  const initialSnapshot = React.useRef(JSON.stringify(values));
   const toast = useToast();
   const [patientQuery, setPatientQuery] = useState('');
   const [chosenPatient, setChosenPatient] = useState<{ id: number; name: string; code: string } | null>(
     patientId ? { id: patientId, name: '', code: '' } : null,
   );
   const [patientMatches, setPatientMatches] = useState<{ id: number; name: string; code: string }[]>([]);
+  const requestClose = () => {
+    if (requestInFlight.current) return;
+    if (JSON.stringify(values) !== initialSnapshot.current || (!props.patientId && !!patientQuery)) setDiscardOpen(true);
+    else props.onClose();
+  };
 
   React.useEffect(() => {
     if (patientId) return;
@@ -1191,6 +1256,8 @@ export function RxFormModal(props: { patientId: number; visitId?: number | null;
     }));
     if (!ok) return;
     if (!patientId && !chosenPatient) { toast.warning('Select a patient', 'Search and choose the patient first.'); return; }
+    if (requestInFlight.current) return;
+    requestInFlight.current = true;
     setPending(true);
     try {
       const rx = await api['prescriptions/create']({
@@ -1210,18 +1277,28 @@ export function RxFormModal(props: { patientId: number; visitId?: number | null;
     } catch (err) {
       toast.fromError(err, 'Could not save prescription');
     } finally {
+      requestInFlight.current = false;
       setPending(false);
     }
   };
 
+  if (discardOpen) return (
+    <ConfirmDialog
+      title="Discard prescription draft?"
+      body="Unsaved clinical details will be lost. No record has been saved."
+      confirmLabel="Discard changes" danger
+      onCancel={() => setDiscardOpen(false)} onConfirm={props.onClose}
+    />
+  );
+
   return (
     <Modal
       title="New prescription"
-      onClose={props.onClose}
+      onClose={requestClose}
       width="wide"
       footer={
         <>
-          <Button variant="secondary" onClick={props.onClose}>Cancel</Button>
+          <Button variant="secondary" onClick={requestClose}>Cancel</Button>
           <Button variant="primary" loading={pending} onClick={() => void submit()}>Save prescription</Button>
         </>
       }
@@ -1248,6 +1325,22 @@ export function RxFormModal(props: { patientId: number; visitId?: number | null;
           )}
         </div>
       )}
+      <ClinicalTemplatePicker kind="prescription" label="Prescription text" getBody={() => ({
+        cC: values.cC === 'Other' ? values.ccOther : values.cC,
+        oE: values.oE === 'Other' ? values.oeOther : values.oE, rE: values.rE,
+        diagnosis: values.diagnosis, treatment: values.treatment, advice: values.advice, followUp: values.followUp,
+      })} onApply={(body) => {
+        if ('items' in body) return;
+        setMany({
+          rE: body.rE ?? '', diagnosis: body.diagnosis ?? '', treatment: body.treatment ?? '',
+          advice: body.advice ?? '', followUp: body.followUp ?? '',
+          cC: body.cC ? 'Other' : '', ccOther: body.cC ?? '',
+          oE: body.oE ? 'Other' : '', oeOther: body.oE ?? '',
+        });
+      }} />
+      <ClinicalTemplatePicker kind="instructions" label="Prescription instructions" getBody={() => ({ advice: values.advice })}
+        onApply={(body) => { if (!('items' in body)) set('advice', body.advice ?? ''); }} />
+
       <div className="form-grid">
         <Field label="Prescribing dentist" required error={errors.dentistId}>
           {(id) => (
@@ -1413,6 +1506,9 @@ export function InvoiceFormModal(props: { patientId: number; visitId?: number | 
   });
   const { data: treatments } = useAsync(() => api['treatments/list'](), []);
   const [pending, setPending] = useState(false);
+  const [discardOpen, setDiscardOpen] = useState(false);
+  const initialDate = React.useRef(values.date);
+  const requestInFlight = React.useRef(false);
   const toast = useToast();
   const [patientQuery, setPatientQuery] = useState('');
   const [chosenPatient, setChosenPatient] = useState<{ id: number; name: string; code: string } | null>(
@@ -1437,6 +1533,12 @@ export function InvoiceFormModal(props: { patientId: number; visitId?: number | 
 
   const subtotal = values.items.reduce((s, l) => s + l.qty * l.unitPricePaisa, 0);
   const total = Math.max(0, subtotal - values.discountPaisa);
+  const dirty = hasInvoiceDraftChanges(values, initialDate.current, !!chosenPatient && !props.patientId, patientQuery);
+  const requestClose = () => {
+    if (requestInFlight.current) return;
+    if (dirty) setDiscardOpen(true);
+    else props.onClose();
+  };
 
   const submit = async () => {
     const ok = validate((v) => ({
@@ -1447,6 +1549,8 @@ export function InvoiceFormModal(props: { patientId: number; visitId?: number | 
     }));
     if (!ok) return;
     if (!props.patientId && !chosenPatient) { toast.warning('Select a patient', 'Search and choose the patient first.'); return; }
+    if (requestInFlight.current) return;
+    requestInFlight.current = true;
     setPending(true);
     try {
       const inv = await api['invoices/create']({
@@ -1467,19 +1571,31 @@ export function InvoiceFormModal(props: { patientId: number; visitId?: number | 
     } catch (err) {
       toast.fromError(err, 'Could not create invoice');
     } finally {
+      requestInFlight.current = false;
       setPending(false);
     }
   };
 
+  if (discardOpen) return (
+    <ConfirmDialog
+      title="Discard invoice draft?"
+      body="Your unsaved invoice details will be lost. No invoice has been created."
+      confirmLabel="Discard changes"
+      danger
+      onCancel={() => setDiscardOpen(false)}
+      onConfirm={props.onClose}
+    />
+  );
+
   return (
     <Modal
       title="Create invoice"
-      onClose={props.onClose}
+      onClose={requestClose}
       width="wide"
       footer={
         <>
-          <span className="small muted" style={{ marginRight: 'auto' }}>Total: <strong className="num">{bdt(total)}</strong></span>
-          <Button variant="secondary" onClick={props.onClose}>Cancel</Button>
+          <span className="small muted" style={{ marginRight: 'auto' }}>Total: <strong className="num"><Money paisa={total} /></strong></span>
+          <Button variant="secondary" onClick={requestClose}>Cancel</Button>
           <Button variant="primary" loading={pending} onClick={() => void submit()}>Create invoice</Button>
         </>
       }
@@ -1525,6 +1641,15 @@ export function InvoiceFormModal(props: { patientId: number; visitId?: number | 
         </Field>
       </div>
 
+      <ClinicalTemplatePicker kind="invoice_items" label="Invoice item" getBody={() => ({
+        items: values.items,
+      })} onApply={(body) => {
+        if (Array.isArray(body.items)) set('items', body.items.map((item: InvoiceTemplateItem) => ({
+          ...item,
+          treatmentId: item.treatmentId && treatments?.some((t) => t.id === item.treatmentId && t.active) ? item.treatmentId : null,
+        })));
+      }} />
+
       <div className="form-section mt-4">
         <div className="row between">
           <h4>Invoice lines</h4>
@@ -1536,7 +1661,7 @@ export function InvoiceFormModal(props: { patientId: number; visitId?: number | 
             <button key={t.id} type="button" className="preset-chip" onClick={() => {
               set('items', [...values.items, { description: t.name, qty: 1, unitPricePaisa: t.defaultPricePaisa, treatmentId: t.id }]);
             }}>
-              + {t.name} <span className="muted">{bdt(t.defaultPricePaisa)}</span>
+              + {t.name}
             </button>
           ))}
         </div>
@@ -1552,14 +1677,14 @@ export function InvoiceFormModal(props: { patientId: number; visitId?: number | 
               {(id) => <Input id={id} type="number" min={0} step="0.01" value={String(line.unitPricePaisa / 100)} onChange={(v) => setItem(i, { unitPricePaisa: Math.round((Number(v) || 0) * 100) })} />}
             </Field>
             <Field label="Total">
-              {(id) => <Input id={id} value={bdt(line.qty * line.unitPricePaisa)} onChange={() => undefined} disabled />}
+              {() => <div className="input" style={{ display: 'flex', alignItems: 'center', minHeight: 34 }} aria-readonly="true"><Money paisa={line.qty * line.unitPricePaisa} /></div>}
             </Field>
             <Button variant="ghost" size="sm" onClick={() => set('items', values.items.filter((_, j) => j !== i))} title="Remove line">✕</Button>
           </div>
         ))}
         <div className="row between mt-4">
-          <span className="small muted">Subtotal {bdt(subtotal)} · Discount {bdt(values.discountPaisa)}</span>
-          <strong>Payable: {bdt(total)}</strong>
+          <span className="small muted">Subtotal <Money paisa={subtotal} /> · Discount <Money paisa={values.discountPaisa} /></span>
+          <strong>Payable: <Money paisa={total} /></strong>
         </div>
       </div>
     </Modal>

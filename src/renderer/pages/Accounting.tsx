@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
 import { api, useAsync } from '../api';
+import { Money } from '../components/money';
 import { useApp } from '../state/app-context';
 import { Badge, Button, Card, ConfirmDialog, Modal, Pagination, Tabs, useToast } from '../components/primitives';
 import { Field, Input, Select, Textarea } from '../components/forms';
 import { DataTable, TableToolbar, type Column } from '../components/table';
 import { Icon } from '../components/shell';
-import { bdt, formatDate, isoDate } from '../format';
+import { formatDate, isoDate } from '../format';
 import type { ExpenseDTO, IncomeDTO } from '../../shared/types';
 
 function EntryModal(props: {
@@ -54,7 +55,7 @@ function EntryModal(props: {
       };
       if (props.kind === 'expense') await api['accounting/add-expense'](input);
       else await api['accounting/add-income'](input);
-      toast.success(`${props.kind === 'expense' ? 'Expense' : 'Income'} recorded`, bdt(paisa));
+      toast.success(`${props.kind === 'expense' ? 'Expense' : 'Income'} recorded`);
       props.onSaved();
       props.onClose();
     } catch (err) {
@@ -174,7 +175,7 @@ export function AccountingPage() {
   const expenseColumns: Column<ExpenseDTO>[] = [
     { key: 'date', label: 'Date', sortValue: (e) => e.date, render: (e) => formatDate(e.date) },
     { key: 'category', label: 'Category', render: (e) => e.categoryName },
-    { key: 'amount', label: 'Amount', align: 'right', sortValue: (e) => e.amountPaisa, render: (e) => <span className="num danger-text">{bdt(e.amountPaisa)}</span> },
+    { key: 'amount', label: 'Amount', align: 'right', sortValue: (e) => e.amountPaisa, render: (e) => <span className="num danger-text"><Money paisa={e.amountPaisa} /></span> },
     { key: 'method', label: 'Method', render: (e) => <Badge tone="neutral">{e.method}</Badge> },
     { key: 'reference', label: 'Reference', render: (e) => <span className="mono">{e.reference ?? '—'}</span> },
     { key: 'note', label: 'Note', clip: true, render: (e) => e.note ?? '—' },
@@ -192,7 +193,7 @@ export function AccountingPage() {
   const incomeColumns: Column<IncomeDTO>[] = [
     { key: 'date', label: 'Date', sortValue: (i) => i.date, render: (i) => formatDate(i.date) },
     { key: 'category', label: 'Category', render: (i) => i.categoryName },
-    { key: 'amount', label: 'Amount', align: 'right', sortValue: (i) => i.amountPaisa, render: (i) => <span className="num success-text">{bdt(i.amountPaisa)}</span> },
+    { key: 'amount', label: 'Amount', align: 'right', sortValue: (i) => i.amountPaisa, render: (i) => <span className="num success-text"><Money paisa={i.amountPaisa} /></span> },
     { key: 'method', label: 'Method', render: (i) => <Badge tone="neutral">{i.method}</Badge> },
     { key: 'reference', label: 'Reference', render: (i) => <span className="mono">{i.reference ?? '—'}</span> },
     { key: 'note', label: 'Note', clip: true, render: (i) => i.note ?? '—' },
@@ -221,9 +222,9 @@ export function AccountingPage() {
       </div>
 
       <div className="grid stats-grid">
-        <div className="stat-card"><div className="stat-label">Expenses (30d view)</div><div className="stat-value danger-text">{bdt(totals.expTotal)}</div></div>
-        <div className="stat-card"><div className="stat-label">Other income</div><div className="stat-value success-text">{bdt(totals.incTotal)}</div></div>
-        <div className="stat-card"><div className="stat-label">Net (this view)</div><div className="stat-value">{bdt(totals.net)}</div></div>
+        <div className="stat-card"><div className="stat-label">Expenses (30d view)</div><div className="stat-value danger-text"><Money paisa={totals.expTotal} /></div></div>
+        <div className="stat-card"><div className="stat-label">Other income</div><div className="stat-value success-text"><Money paisa={totals.incTotal} /></div></div>
+        <div className="stat-card"><div className="stat-label">Net (this view)</div><div className="stat-value"><Money paisa={totals.net} /></div></div>
         <div className="stat-card"><div className="stat-label">Categories</div><div className="stat-value">{categories?.length ?? 0}</div></div>
       </div>
 
@@ -304,7 +305,7 @@ export function AccountingPage() {
       {deletingIncome && (
         <ConfirmDialog
           title="Delete income entry?"
-          body={<> <strong>{deletingIncome.categoryName}</strong> · {bdt(deletingIncome.amountPaisa)} · {formatDate(deletingIncome.date)}.<br />This removes the income entry entirely and is recorded in the audit log.</>}
+          body={<> <strong>{deletingIncome.categoryName}</strong> · <Money paisa={deletingIncome.amountPaisa} /> · {formatDate(deletingIncome.date)}.<br />This removes the income entry entirely and is recorded in the audit log.</>}
           confirmLabel="Delete permanently"
           danger
           onConfirm={async () => {
@@ -320,7 +321,7 @@ export function AccountingPage() {
           title="Delete expense entry?"
           body={
             <>
-              <strong>{deleting.categoryName}</strong> · {bdt(deleting.amountPaisa)} · {formatDate(deleting.date)}.
+              <strong>{deleting.categoryName}</strong> · <Money paisa={deleting.amountPaisa} /> · {formatDate(deleting.date)}.
               <br />This removes the entry entirely and is recorded in the audit log. Prefer adding a contra entry for reversals.
             </>
           }

@@ -158,6 +158,9 @@ test('creates an invoice and receives full payment', async () => {
   // onSaved opens the invoice detail modal.
   const detail = page.locator('.modal[role="dialog"]', { hasText: 'Invoice INV-' });
   await expect(detail).toBeVisible({ timeout: 30_000 });
+  // Financial amounts are private by default, but this amount can be revealed locally.
+  await expect(detail.locator('[data-masked="true"]').first()).toContainText('****');
+  await detail.getByRole('button', { name: 'Show this amount' }).first().click();
   await expect(detail.getByText('৳500.00').first()).toBeVisible();
 
   await detail.getByRole('button', { name: 'Receive payment' }).click();
@@ -175,7 +178,60 @@ test('creates an invoice and receives full payment', async () => {
   // Dashboard is live: the same payment must be reflected without a manual refresh.
   await page.getByRole('link', { name: 'Dashboard' }).click();
   const paidCard = page.locator('.stat-card', { hasText: 'Paid Today' });
+  await expect(paidCard).toContainText('****', { timeout: 10_000 });
+  await page.getByRole('button', { name: /Show amounts/ }).click();
   await expect(paidCard).toContainText('৳500.00', { timeout: 10_000 });
+  await page.getByRole('button', { name: /Hide amounts/ }).click();
+});
+
+test('clinician templates fill visit and invoice drafts without creating records', async () => {
+  await page.getByRole('link', { name: 'Patients' }).click();
+  await page.getByPlaceholder('Search name, phone, patient ID, tag…').fill('E2E Test Patient');
+  await page.getByRole('cell', { name: 'E2E Test Patient' }).click();
+  await page.getByRole('button', { name: 'New visit', exact: true }).first().click();
+  const visit = page.locator('.modal[role="dialog"]', { hasText: 'Record visit' });
+  await visit.getByLabel('Treatment plan', { exact: true }).fill('Review options at next visit');
+  const plan = visit.locator('.form-section', { hasText: 'Treatment plan templates' });
+  await plan.getByPlaceholder('New template name').fill('E2E reusable plan');
+  await plan.getByRole('button', { name: 'Save current draft' }).click();
+  await expect(plan.getByRole('option', { name: 'E2E reusable plan' })).toBeAttached();
+  await visit.getByLabel('Treatment plan', { exact: true }).fill('');
+  await plan.getByLabel('Treatment plan templates').selectOption({ label: 'E2E reusable plan' });
+  await plan.getByRole('button', { name: 'Apply to draft' }).click();
+  await expect(visit.getByLabel('Treatment plan', { exact: true })).toHaveValue('Review options at next visit');
+  await visit.getByRole('button', { name: 'Cancel' }).click();
+  await page.getByRole('button', { name: 'Discard changes' }).click();
+
+  await page.getByRole('button', { name: 'New prescription' }).first().click();
+  const rx = page.locator('.modal[role="dialog"]', { hasText: 'New prescription' });
+  await rx.getByLabel('Advice', { exact: true }).fill('Routine post-op advice');
+  const instructions = rx.locator('.form-section', { hasText: 'Prescription instructions templates' });
+  await instructions.getByPlaceholder('New template name').fill('E2E reusable advice');
+  await instructions.getByRole('button', { name: 'Save current draft' }).click();
+  await expect(instructions.getByRole('option', { name: 'E2E reusable advice' })).toBeAttached();
+  await rx.getByLabel('Advice', { exact: true }).fill('');
+  await instructions.getByLabel('Prescription instructions templates').selectOption({ label: 'E2E reusable advice' });
+  await instructions.getByRole('button', { name: 'Apply to draft' }).click();
+  await expect(rx.getByLabel('Advice', { exact: true })).toHaveValue('Routine post-op advice');
+  await rx.getByRole('button', { name: 'Cancel' }).click();
+  await page.getByRole('button', { name: 'Discard changes' }).click();
+
+  await page.getByRole('link', { name: 'Invoice', exact: true }).click();
+  await page.getByRole('button', { name: 'New invoice' }).first().click();
+  const invoice = page.locator('.modal[role="dialog"]', { hasText: 'Create invoice' });
+  await invoice.getByPlaceholder('Treatment or item').fill('Template consultation');
+  await invoice.getByLabel('Unit price (৳)').fill('125');
+  const items = invoice.locator('.form-section', { hasText: 'Invoice item templates' });
+  await items.getByPlaceholder('New template name').fill('E2E invoice items');
+  await items.getByRole('button', { name: 'Save current draft' }).click();
+  await expect(items.getByRole('option', { name: 'E2E invoice items' })).toBeAttached();
+  await invoice.getByPlaceholder('Treatment or item').fill('');
+  await items.getByLabel('Invoice item templates').selectOption({ label: 'E2E invoice items' });
+  await items.getByRole('button', { name: 'Apply to draft' }).click();
+  await page.getByRole('button', { name: 'Replace draft fields' }).click();
+  await expect(invoice.getByPlaceholder('Treatment or item')).toHaveValue('Template consultation');
+  await invoice.getByRole('button', { name: 'Cancel' }).click();
+  await page.getByRole('button', { name: 'Discard changes' }).click();
 });
 
 test('shows developer credit on the About page', async () => {
@@ -191,11 +247,11 @@ test('runs a manual backup from the dashboard', async () => {
 });
 
 /* ---------------------------------------------------------------------------
- * Phase B journey expansion (ISS-005): appointment lifecycle + queue,
+ * Phase B journey expansion (ISS-005): appointment lifecycle (reminder-only),
  * prescription → print window, and the Reports UI contract (ISS-020 guard).
  * --------------------------------------------------------------------------- */
 
-test('books an appointment and walks the patient through the queue to completion', async () => {
+test('books an appointment, reschedules it with confirmation, and keeps it on the schedule', async () => {
   const today = new Date().toISOString().slice(0, 10);
   await page.getByRole('link', { name: 'Appointments' }).click();
   await expect(page.getByRole('heading', { name: 'Appointments', level: 1 })).toBeVisible();
@@ -211,29 +267,23 @@ test('books an appointment and walks the patient through the queue to completion
   await modal.getByRole('button', { name: 'Book appointment' }).click();
   await expect(page.locator('.toast-title', { hasText: 'Appointment booked' })).toBeVisible({ timeout: 30_000 });
 
-  // Patient arrives → enters the queue.
-  await page.getByRole('button', { name: 'Arrive → queue' }).first().click();
-  await expect(page.locator('.toast-title', { hasText: 'Patient arrived' })).toBeVisible({ timeout: 30_000 });
-
-  // Queue: call → start → complete.
-  await page.getByRole('link', { name: 'Queue' }).click();
-  await expect(page.getByRole('heading', { name: 'Queue', level: 1 })).toBeVisible();
-  await page.getByRole('button', { name: 'Call next' }).first().click();
-  await expect(page.locator('.toast-title', { hasText: '— call' })).toBeVisible({ timeout: 30_000 });
-  await page.getByRole('button', { name: 'Start treatment' }).first().click();
-  await expect(page.locator('.toast-title', { hasText: '— start' })).toBeVisible({ timeout: 30_000 });
-  await page.getByRole('button', { name: 'Complete' }).first().click();
-  await expect(page.locator('.toast-title', { hasText: '— complete' })).toBeVisible({ timeout: 30_000 });
-  // The finished entry lands in the completed section for the day.
-  await expect(page.getByText('Completed & removed')).toBeVisible();
-  await expect(page.locator('.card, .Card, section', { hasText: 'Completed & removed' }).getByText('E2E Test Patient').first()).toBeVisible({ timeout: 30_000 });
+  // Reschedule: the move must be confirmed explicitly before it is saved.
+  const row = page.locator('tr', { hasText: 'E2E Test Patient' }).filter({ hasText: '15:30' }).first();
+  await row.getByRole('button', { name: 'Reschedule' }).click();
+  const resModal = page.locator('.modal[role="dialog"]', { hasText: 'Reschedule appointment' });
+  await expect(resModal).toBeVisible();
+  await resModal.getByLabel('Time').fill('15:45');
+  await resModal.getByRole('button', { name: 'Save new time' }).click();
+  await page.getByRole('button', { name: 'Confirm move' }).click();
+  await expect(page.locator('.toast-title', { hasText: 'Appointment rescheduled' })).toBeVisible({ timeout: 30_000 });
+  await expect(page.locator('tr', { hasText: 'E2E Test Patient' }).filter({ hasText: '15:45' }).first()).toBeVisible();
 });
 
 test('blocks double-booking with a conflict alert and honours override permission', async () => {
   const today = new Date().toISOString().slice(0, 10);
   await page.getByRole('link', { name: 'Appointments' }).click();
 
-  // First book an active scheduled appointment at 16:00 (the earlier 15:30 slot was completed in the queue test).
+  // First book an active scheduled appointment at 17:00 (the earlier 15:45 appointment ends before this slot).
   await page.getByRole('button', { name: 'New appointment' }).first().click();
   const firstModal = page.locator('.modal[role="dialog"]', { hasText: 'New appointment' });
   await expect(firstModal).toBeVisible();
@@ -241,11 +291,11 @@ test('blocks double-booking with a conflict alert and honours override permissio
   await firstModal.locator('.list-row', { hasText: 'E2E Test Patient' }).first().click();
   await firstModal.getByLabel('Dentist').selectOption({ label: 'Dr. E2E Dentist' });
   await firstModal.getByLabel('Date').fill(today);
-  await firstModal.getByLabel('Time').fill('16:00');
+  await firstModal.getByLabel('Time').fill('17:00');
   await firstModal.getByRole('button', { name: 'Book appointment' }).click();
   await expect(page.locator('.toast-title', { hasText: 'Appointment booked' }).last()).toBeVisible({ timeout: 30_000 });
 
-  // Now attempt an overlapping appointment at 16:15 for the same dentist.
+  // Now attempt an overlapping appointment at 17:15 for the same dentist.
   await page.getByRole('button', { name: 'New appointment' }).first().click();
   const modal = page.locator('.modal[role="dialog"]', { hasText: 'New appointment' });
   await expect(modal).toBeVisible();
@@ -253,7 +303,7 @@ test('blocks double-booking with a conflict alert and honours override permissio
   await modal.locator('.list-row', { hasText: 'E2E Test Patient' }).first().click();
   await modal.getByLabel('Dentist').selectOption({ label: 'Dr. E2E Dentist' });
   await modal.getByLabel('Date').fill(today);
-  await modal.getByLabel('Time').fill('16:15'); // overlaps the 16:00 appointment
+  await modal.getByLabel('Time').fill('17:15'); // overlaps the 17:00 appointment
   await modal.getByRole('button', { name: 'Book appointment' }).click();
   // Conflict detected (owner holds appointments.override → inline alert, not a silent double-book).
   await expect(modal.getByText('Scheduling conflict')).toBeVisible({ timeout: 30_000 });
@@ -342,6 +392,14 @@ test('invoice print window uses standard profiles and closes with Back', async (
     'Receipt A4',
   ]);
   await expect(printWin.locator('.print-doc .doc-title', { hasText: 'Invoice' })).toBeVisible({ timeout: 60_000 });
+  const printedAmount = printWin.locator('.print-doc .print-money').first();
+  await expect(printedAmount.locator('.print-money-screen')).toContainText('****');
+  await expect(printedAmount.locator('.print-money-paper')).toBeHidden();
+  // An intentional print/PDF export contains the real amount, not asterisks.
+  await printWin.emulateMedia({ media: 'print' });
+  await expect(printedAmount.locator('.print-money-paper')).toBeVisible();
+  await expect(printedAmount.locator('.print-money-paper')).toContainText('৳500.00');
+  await printWin.emulateMedia({ media: 'screen' });
 
   await Promise.all([
     printWin.waitForEvent('close'),
@@ -400,7 +458,7 @@ test('completes a patient visit from the profile and supports patient deletion',
 test('adapts cleanly across 1280×720 and 1920×1080 viewports without horizontal overflow', async () => {
   for (const size of [{ width: 1280, height: 720 }, { width: 1920, height: 1080 }]) {
     await page.setViewportSize(size);
-    for (const nav of ['Dashboard', 'Patients', 'Appointments', 'Queue', 'Invoice', 'Inventory', 'Settings']) {
+    for (const nav of ['Dashboard', 'Patients', 'Appointments', 'Invoice', 'Inventory', 'Settings']) {
       await page.getByRole('link', { name: nav, exact: true }).click();
       const overflow = await page.evaluate(() => {
         const doc = document.documentElement;

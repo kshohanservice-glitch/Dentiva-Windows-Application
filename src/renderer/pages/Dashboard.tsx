@@ -1,12 +1,12 @@
 import { useEffect } from 'react';
 import { formatDate } from '../format';
+import { Money } from '../components/money';
 import { useNavigate } from 'react-router-dom';
 import { api, useAsync, useInterval } from '../api';
 import { useApp } from '../state/app-context';
 import { Badge, Button, Card, EmptyState, ErrorState, Spinner, StatCard, useToast } from '../components/primitives';
 import { Icon } from '../components/shell';
 
-const bdt = (paisa: number): string => `৳${(paisa / 100).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 const time = (iso: string): string => new Date(iso).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
 
 export function DashboardPage() {
@@ -72,15 +72,14 @@ export function DashboardPage() {
 
       <div className="grid stats-grid">
         <StatCard label="Patients today" value={String(data.todayPatients)} foot="registered & revisits" onClick={() => navigate('/patients')} />
-        <StatCard label="Appointments today" value={String(data.todayAppointments)} foot="scheduled" onClick={() => navigate('/appointments')} />
-        <StatCard label="Waiting in queue" value={String(data.waitingQueue)} foot="in queue now" onClick={() => navigate('/queue')} />
+        <StatCard label="Appointments today" value={String(data.todayAppointments)} foot="planned for today" onClick={() => navigate('/appointments')} />
         <StatCard label="Completed visits" value={String(data.completedVisits)} foot="closed today" onClick={() => navigate('/reports')} />
       </div>
 
       {data.financial && canFinance && (
         <div className="grid stats-grid">
-          <StatCard label="Paid Today" value={bdt(data.financial.todayRevenuePaisa)} foot="Net payments received" onClick={() => navigate('/payments')} />
-          <StatCard label="Outstanding dues" value={bdt(data.financial.outstandingDuePaisa)} foot="across invoices" onClick={() => navigate('/invoices')} />
+          <StatCard label="Paid Today" value={<Money paisa={data.financial.todayRevenuePaisa} />} foot="Net payments received" onClick={() => navigate('/payments')} />
+          <StatCard label="Outstanding dues" value={<Money paisa={data.financial.outstandingDuePaisa} />} foot="across invoices" onClick={() => navigate('/invoices')} />
           <StatCard label="Low-stock items" value={String(data.inventory?.lowStock ?? 0)} foot="at or below minimum" onClick={() => navigate('/inventory')} />
           <StatCard label="Expiring ≤30 days" value={String(data.inventory?.expiringSoon ?? 0)} foot="batches" onClick={() => navigate('/inventory')} />
         </div>
@@ -140,7 +139,7 @@ export function DashboardPage() {
                         <strong className="mono">{inv.number}</strong>
                         <div className="xsmall muted">{inv.patientName}</div>
                       </span>
-                      <span className="danger strong num">{bdt(inv.duePaisa)}</span>
+                      <span className="danger strong num"><Money paisa={inv.duePaisa} /></span>
                     </div>
                   ))}
                 </div>
@@ -161,7 +160,7 @@ export function DashboardPage() {
                       <div className="xsmall muted">{payment.invoiceNumber ?? 'Walk-in payment'} · {payment.method}</div>
                     </span>
                     <span className={payment.type === 'refund' ? 'danger strong num' : 'success-text strong num'}>
-                      {payment.type === 'refund' ? '−' : '+'}{bdt(payment.amountPaisa)}
+                      {payment.type === 'refund' ? '−' : '+'}<Money paisa={payment.amountPaisa} />
                     </span>
                   </div>
                 ))}

@@ -254,7 +254,7 @@ describe('staff module', () => {
   });
 
   it('dentists list requires patients.view; save requires staff.manage', () => {
-    const none = ctxWith('queue.view');
+    const none = ctxWith('staff.view');
     expect(() => listDentists(none)).toThrow(/permission/i);
     expect(() => saveDentists_guard(none)).toThrow(/permission/i);
     function saveDentists_guard(c: Ctx) {

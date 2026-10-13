@@ -54,7 +54,7 @@ export function globalSearch(ctx: Ctx, rawQuery: string): SearchHit[] {
          ORDER BY pay.paid_at DESC LIMIT ?`,
       )
       .all(q, q, LIMIT) as any[]) {
-      hits.push({ kind: 'payment', id: r.id, title: `Payment ${(r.amount_paisa / 100).toFixed(2)} ৳`, subtitle: r.name, meta: `${r.paid_at.slice(0, 10)} · ${r.method}` });
+      hits.push({ kind: 'payment', id: r.id, title: 'Payment', amountPaisa: Number(r.amount_paisa), subtitle: r.name, meta: `${r.paid_at.slice(0, 10)} · ${r.method}` });
     }
   }
 
@@ -118,7 +118,7 @@ export function globalSearch(ctx: Ctx, rawQuery: string): SearchHit[] {
          ORDER BY e.date DESC LIMIT ?`,
       )
       .all(q, q, q, LIMIT) as any[]) {
-      hits.push({ kind: 'expense', id: r.id, title: `${c(r)} ${(r.amount_paisa / 100).toFixed(2)} ৳`, subtitle: r.date, meta: r.name });
+      hits.push({ kind: 'expense', id: r.id, title: c(r), amountPaisa: Number(r.amount_paisa), subtitle: r.date, meta: r.name });
     }
   }
 

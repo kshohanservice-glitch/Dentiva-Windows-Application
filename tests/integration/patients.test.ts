@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { cleanupEnv, createTestEnv, ownerCtx, type TestEnv } from '../helpers';
 import { createPatient, listPatients, getPatient, updatePatient, archivePatient, checkDuplicates, patientTimeline } from '../../src/main/services/patients';
+import { createInvoice, createPayment } from '../../src/main/services/billing';
 import { createVisit, listVisits } from '../../src/main/services/visits';
 import { setChart, getChart } from '../../src/main/services/chart';
 import { globalSearch } from '../../src/main/services/search';
@@ -60,6 +61,20 @@ describe('patient records', () => {
     expect(getPatient(ctx, p.id).status).toBe('archived');
     expect(listPatients(ctx, { status: 'active' }).total).toBe(1);
     expect(listPatients(ctx, { status: 'archived' }).total).toBe(1);
+  });
+
+  it('returns financial timeline amounts as structured paisa, never as unmaskable text', () => {
+    const ctx = ownerCtx(env);
+    const p = createPatient(ctx, { name: 'Timeline Billing', gender: 'other', ageYears: 29, phone: '01511111222' });
+    const inv = createInvoice(ctx, {
+      patientId: p.id, date: '2026-09-01',
+      items: [{ description: 'Consultation', qty: 1, unitPricePaisa: 123456 }],
+    });
+    createPayment(ctx, { patientId: p.id, invoiceId: inv.id, amountPaisa: 12345, method: 'cash' });
+    const events = patientTimeline(ctx, p.id);
+    expect(events.find((e) => e.type === 'invoice')).toMatchObject({ amountPaisa: 123456 });
+    expect(events.find((e) => e.type === 'payment')).toMatchObject({ amountPaisa: 12345 });
+    expect(events.every((e) => !e.summary.includes('1234.56') && !e.summary.includes('123.45'))).toBe(true);
   });
 
   it('keeps a chronological timeline across visits', () => {

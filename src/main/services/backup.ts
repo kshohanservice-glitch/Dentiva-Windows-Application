@@ -10,6 +10,17 @@ import { AppError, validation } from '../errors';
 import { audit, requirePermission, type Ctx, type PlainCtx } from '../core/context';
 import type { AppPaths } from '../paths';
 import { ensureDir } from '../paths';
+import {
+  ARCHIVE_LIMITS,
+  ArchiveRejectedError,
+  DATABASE_ENTRY,
+  MANIFEST_ENTRY,
+  byteLimiter,
+  planArchive,
+  resolveInside,
+  validateRelativePath,
+  type ArchivePlan,
+} from './archive-safety';
 
 type OpenZip = Awaited<ReturnType<typeof unzipper.Open.file>>;
 import { nowISO } from '../../shared/currency';
@@ -27,6 +38,8 @@ export interface BackupDeps {
 }
 
 const FORMAT = 'dentiva-backup';
+/** Tables every restorable database must contain (see migrations/001_init.ts). */
+const REQUIRED_TABLES = ['users', 'roles', 'patients', 'appointments', 'invoices', 'payments', 'attachments', 'settings', 'backups'];
 const FORMAT_VERSION = 1;
 
 function stamp(): string {
@@ -72,6 +85,8 @@ function uniquePath(dir: string, base: string, ext: string): string {
 
 export function createBackupService(deps: BackupDeps) {
   const { paths, holder } = deps;
+
+  let restoreInProgress = false;
 
   function rowToDTO(r: any): BackupRecordDTO {
     return {
@@ -209,144 +224,234 @@ export function createBackupService(deps: BackupDeps) {
   async function restoreBackup(ctx: Ctx, filePath: string, typedConfirm: string): Promise<{ ok: true; restoredAt: string }> {
     requirePermission(ctx, 'backup.restore');
     if (typedConfirm !== 'RESTORE') throw validation('Type RESTORE to confirm restoring this backup.');
-    if (!filePath || !fs.existsSync(filePath)) throw new AppError('RESTORE', 'Backup file not found.');
+    if (restoreInProgress) throw new AppError('RESTORE', 'Another restore is already in progress.');
+    if (!filePath || typeof filePath !== 'string' || !fs.existsSync(filePath) || !fs.statSync(filePath).isFile()) {
+      throw new AppError('RESTORE', 'Backup file not found.');
+    }
+    if (fs.statSync(filePath).size > ARCHIVE_LIMITS.maxArchiveBytes) {
+      throw new AppError('RESTORE', 'The backup file is larger than the supported limit.');
+    }
 
-    // 1. Validate container
+    restoreInProgress = true;
+    const staging = path.join(paths.tempDir, `restore-${Date.now()}-${crypto.randomBytes(4).toString('hex')}`);
+    try {
+      return await restoreFrom(ctx, filePath, staging);
+    } finally {
+      restoreInProgress = false;
+      // Only ever remove the unique staging folder created above.
+      try { fs.rmSync(staging, { recursive: true, force: true }); } catch { /* best effort */ }
+    }
+  }
+
+  async function restoreFrom(ctx: Ctx, filePath: string, staging: string): Promise<{ ok: true; restoredAt: string }> {
+    // 1. Open the container and validate the full entry listing before extracting anything.
     let zip: OpenZip;
     try {
       zip = await unzipper.Open.file(filePath);
     } catch {
       throw new AppError('RESTORE', 'The selected file is not a readable Dentiva Pro backup.');
     }
-    const manifestEntry = zip.files.find((f) => f.path === 'manifest.json');
-    if (!manifestEntry) throw new AppError('RESTORE', 'Backup is incomplete: manifest.json is missing.');
+    if (!zip.files.some((f) => f.path === MANIFEST_ENTRY)) {
+      throw new AppError('RESTORE', 'Backup is incomplete: manifest.json is missing.');
+    }
+    if (!zip.files.some((f) => f.path === DATABASE_ENTRY || f.path === 'database\\dentiva.db')) {
+      throw new AppError('RESTORE', 'Backup is incomplete: database file is missing.');
+    }
+    let plan: ArchivePlan;
+    try {
+      plan = planArchive(zip.files.map((f) => ({
+        path: f.path, type: f.type, uncompressedSize: f.uncompressedSize, compressedSize: f.compressedSize,
+        externalFileAttributes: (f as any).externalFileAttributes,
+      })));
+    } catch (e) {
+      throw new AppError('RESTORE', e instanceof ArchiveRejectedError ? e.message : 'The backup archive is not valid.');
+    }
+    const entryByPath = new Map(zip.files.map((f) => [f.path, f] as const));
+    const manifestEntry = entryByPath.get(MANIFEST_ENTRY)!;
+    const dbEntry = entryByPath.get(plan.database.info.path)!;
+
+    // 2. Manifest: format, version and checksum policy.
     let manifest: any;
     try {
       manifest = JSON.parse((await manifestEntry.buffer()).toString('utf8'));
     } catch {
       throw new AppError('RESTORE', 'Backup manifest is corrupt.');
     }
-    if (manifest.format !== FORMAT || manifest.formatVersion > FORMAT_VERSION) {
+    if (!manifest || manifest.format !== FORMAT || !Number.isInteger(manifest.formatVersion) || manifest.formatVersion > FORMAT_VERSION) {
       throw new AppError('RESTORE', 'This backup was created by an unsupported version.');
     }
-    const dbEntry = zip.files.find((f) => f.path === 'database/dentiva.db' || f.path === 'database\\dentiva.db');
-    if (!dbEntry) throw new AppError('RESTORE', 'Backup is incomplete: database file is missing.');
-
+    if (typeof manifest.dbSha256 !== 'string' || !/^[0-9a-f]{64}$/.test(manifest.dbSha256)) {
+      throw new AppError('RESTORE', 'Backup manifest has no valid database checksum.');
+    }
     const currentSchema = schemaVersionOf(holder.get());
+    if (!Number.isInteger(manifest.schemaVersion) || manifest.schemaVersion < 1) {
+      throw new AppError('RESTORE', 'Backup manifest has no valid schema version.');
+    }
     if (Number(manifest.schemaVersion) > currentSchema) {
       throw new AppError('RESTORE', 'This backup requires a newer version of Dentiva Pro.');
     }
 
-    // 2. Extract + verify outside of live data
-    const staging = path.join(paths.tempDir, `restore-${Date.now()}`);
+    // 3. Extract into the private staging folder only. Live data is untouched.
+    const stagedDb = path.join(staging, 'dentiva.db');
+    const stagedAttachments = path.join(staging, 'attachments');
     ensureDir(staging);
-    const extractedDb = path.join(staging, 'dentiva.db');
+    let extractedBytes = 0;
     try {
-      await new Promise<void>((resolve, reject) => {
-        const ws = fs.createWriteStream(extractedDb);
-        (dbEntry as any).stream().pipe(ws);
-        ws.on('finish', () => resolve());
-        ws.on('error', reject);
-      });
+      await pipeEntry(dbEntry, stagedDb, `Database`, { checkBytes: dbEntry.uncompressedSize });
+      extractedBytes += dbEntry.uncompressedSize;
 
-      if (manifest.dbSha256) {
-        const actual = await sha256File(extractedDb);
-        if (actual !== manifest.dbSha256) {
-          throw new AppError('RESTORE', 'Backup checksum mismatch — the file is corrupt or was modified.');
+      const actual = await sha256File(stagedDb);
+      if (actual !== manifest.dbSha256) {
+        throw new AppError('RESTORE', 'Backup checksum mismatch — the file is corrupt or was modified.');
+      }
+
+      for (const att of plan.attachments) {
+        if (att.info.type === 'Directory') continue;
+        const dest = resolveInside(stagedAttachments, att.relPath!);
+        ensureDir(path.dirname(dest));
+        const entry = entryByPath.get(att.info.path)!;
+        await pipeEntry(entry, dest, `Attachment "${att.relPath}"`, { checkBytes: entry.uncompressedSize });
+        extractedBytes += entry.uncompressedSize;
+        if (extractedBytes > ARCHIVE_LIMITS.maxTotalUncompressedBytes) {
+          throw new AppError('RESTORE', 'Backup expands beyond the supported size limit.');
         }
       }
-      const integrity = fullIntegrityCheck(extractedDb);
+      ensureDir(stagedAttachments);
+
+      // 4. Validate the staged database: integrity, schema, required tables and attachment references.
+      const integrity = fullIntegrityCheck(stagedDb);
       if (!integrity.ok) {
         throw new AppError('RESTORE', `Backup database failed integrity check: ${integrity.errors.join('; ')}`);
       }
+      verifyStagedDatabase(stagedDb, currentSchema, stagedAttachments);
+    } catch (e) {
+      if (e instanceof AppError) throw e;
+      if (e instanceof ArchiveRejectedError) throw new AppError('RESTORE', e.message);
+      throw new AppError('RESTORE', `Backup could not be read: ${(e as Error)?.message ?? 'unknown error'}`);
+    }
 
-      // 3. Mandatory pre-restore backup of CURRENT state
-      const preRecord = await runBackup({ db: holder.get() }, paths.backupsDir, 'pre_restore');
+    // 5. Mandatory pre-restore backup of CURRENT state, then swap with rollback protection.
+    const preRecord = await runBackup({ db: holder.get() }, paths.backupsDir, 'pre_restore');
 
-      // 4. Swap with rollback protection
-      const dbFile = paths.dbFile;
-      const rollbackDb = `${dbFile}.rollback-${Date.now()}`;
-      const attachmentsDir = paths.attachmentsDir;
-      const rollbackAtt = `${attachmentsDir}.rollback-${Date.now()}`;
+    const dbFile = paths.dbFile;
+    const stamp = Date.now();
+    const rollbackDb = `${dbFile}.rollback-${stamp}`;
+    const attachmentsDir = paths.attachmentsDir;
+    const rollbackAtt = `${attachmentsDir}.rollback-${stamp}`;
 
-      fs.copyFileSync(dbFile, rollbackDb);
-      if (fs.existsSync(attachmentsDir)) fs.renameSync(attachmentsDir, rollbackAtt);
+    // A consistent snapshot (not a raw file copy, which can miss WAL contents).
+    await holder.get().backup(rollbackDb);
+    if (fs.existsSync(attachmentsDir)) fs.renameSync(attachmentsDir, rollbackAtt);
 
-      let restoredAt = nowISO();
-      const oldDb = holder.get();
+    try {
+      holder.get().close();
+      for (const suffix of ['-wal', '-shm']) {
+        if (fs.existsSync(dbFile + suffix)) fs.rmSync(dbFile + suffix, { force: true });
+      }
+      fs.copyFileSync(stagedDb, dbFile);
+      if (fs.existsSync(stagedAttachments)) fs.renameSync(stagedAttachments, attachmentsDir);
+      else ensureDir(attachmentsDir);
+
+      // 5b. Reopen + verify; any failure below triggers the rollback path.
+      const { db: newDb } = openDatabase(dbFile);
+      holder.set(newDb);
+      // Re-insert the pre-restore backup row into the restored database so it
+      // remains visible in BackupHistory (the pre-swap copy of the table was
+      // replaced along with everything else).
+      newDb
+        .prepare(
+          `INSERT INTO backups (filename, path, created_at, size_bytes, schema_version, kind, status, error, checksum)
+           VALUES (?, ?, ?, ?, ?, 'pre_restore', ?, NULL, ?)`,
+        )
+        .run(preRecord.filename, preRecord.path, preRecord.createdAt, preRecord.sizeBytes, preRecord.schemaVersion, preRecord.status, preRecord.checksum);
+    } catch (swapErr: any) {
       try {
-        oldDb.close();
+        const current = holder.get();
+        if (current.open) current.close();
+      } catch { /* ignore */ }
+      try {
+        if (fs.existsSync(dbFile)) fs.rmSync(dbFile, { force: true });
         for (const suffix of ['-wal', '-shm']) {
           if (fs.existsSync(dbFile + suffix)) fs.rmSync(dbFile + suffix, { force: true });
         }
-        fs.copyFileSync(extractedDb, dbFile);
-
-        ensureDir(attachmentsDir);
-        // Extract any attachments/* files
-        let extractedFiles = 0;
-        for (const entry of zip.files) {
-          const p = entry.path.replace(/\\/g, '/');
-          if (!p.startsWith('attachments/') || entry.type !== 'File') continue;
-          const rel = p.slice('attachments/'.length);
-          if (!rel || rel.includes('..')) continue;
-          const dest = path.join(attachmentsDir, rel);
-          ensureDir(path.dirname(dest));
-          await new Promise<void>((resolve, reject) => {
-            const ws = fs.createWriteStream(dest);
-            (entry as any).stream().pipe(ws);
-            ws.on('finish', () => resolve());
-            ws.on('error', reject);
-          });
-          extractedFiles++;
-        }
-        void extractedFiles;
-
-        // 5. Reopen + verify; rollback on failure
-        const { db: newDb } = openDatabase(dbFile);
-        holder.set(newDb);
-        // Re-insert the pre-restore backup row into the restored database so it
-        // remains visible in BackupHistory (the pre-swap copy of the table was
-        // replaced along with everything else).
-        newDb
-          .prepare(
-            `INSERT INTO backups (filename, path, created_at, size_bytes, schema_version, kind, status, error, checksum)
-             VALUES (?, ?, ?, ?, ?, 'pre_restore', ?, NULL, ?)`,
-          )
-          .run(preRecord.filename, preRecord.path, preRecord.createdAt, preRecord.sizeBytes, preRecord.schemaVersion, preRecord.status, preRecord.checksum);
-      } catch (swapErr: any) {
-        // rollback
-        try {
-          const current = holder.get();
-          if (current.open) current.close();
-        } catch { /* ignore */ }
-        try {
-          if (fs.existsSync(dbFile)) fs.rmSync(dbFile, { force: true });
-          for (const suffix of ['-wal', '-shm']) {
-            if (fs.existsSync(dbFile + suffix)) fs.rmSync(dbFile + suffix, { force: true });
-          }
-          fs.copyFileSync(rollbackDb, dbFile);
-          if (fs.existsSync(attachmentsDir)) fs.rmSync(attachmentsDir, { recursive: true, force: true });
-          if (fs.existsSync(rollbackAtt)) fs.renameSync(rollbackAtt, attachmentsDir);
-          holder.set(openDatabase(dbFile).db);
-        } catch {
-          throw new AppError('RESTORE', `Restore failed and rollback also failed: ${swapErr?.message ?? swapErr}. Manual intervention required — previous data is preserved at ${rollbackDb}.`);
-        }
-        throw new AppError('RESTORE', `Restore failed and was rolled back: ${swapErr?.message ?? swapErr}`);
+        fs.copyFileSync(rollbackDb, dbFile);
+        if (fs.existsSync(attachmentsDir)) fs.rmSync(attachmentsDir, { recursive: true, force: true });
+        if (fs.existsSync(rollbackAtt)) fs.renameSync(rollbackAtt, attachmentsDir);
+        holder.set(openDatabase(dbFile).db);
+      } catch {
+        throw new AppError('RESTORE', `Restore failed and rollback also failed: ${swapErr?.message ?? swapErr}. Manual intervention required — previous data is preserved at ${rollbackDb}.`);
       }
-
-      // Success: clean rollback artifacts
-      try { fs.rmSync(rollbackDb, { force: true }); } catch { /* best effort */ }
-      try { fs.rmSync(rollbackAtt, { recursive: true, force: true }); } catch { /* best effort */ }
-
-      // ctx.db still points at the pre-restore handle we just closed — audit
-      // against the freshly reopened database instead.
-      audit({ ...ctx, db: holder.get() }, { action: 'backup.restore', entityType: 'backup', entityId: null, summary: `Restored from ${path.basename(filePath)}` });
-      deps.notify({ key: `restore-${Date.now()}`, kind: 'backup', severity: 'success', title: 'Restore completed', body: `Data was restored from ${path.basename(filePath)}.` });
-      restoredAt = nowISO();
-      return { ok: true, restoredAt };
-    } finally {
-      try { fs.rmSync(staging, { recursive: true, force: true }); } catch { /* best effort */ }
+      throw new AppError('RESTORE', `Restore failed and was rolled back: ${swapErr?.message ?? swapErr}`);
     }
+
+    // Success: clean rollback artifacts (only the files created above).
+    try { fs.rmSync(rollbackDb, { force: true }); } catch { /* best effort */ }
+    try { fs.rmSync(rollbackAtt, { recursive: true, force: true }); } catch { /* best effort */ }
+
+    // ctx.db still points at the pre-restore handle we just closed — audit
+    // against the freshly reopened database instead.
+    audit({ ...ctx, db: holder.get() }, { action: 'backup.restore', entityType: 'backup', entityId: null, summary: `Restored from ${path.basename(filePath)}` });
+    deps.notify({ key: `restore-${Date.now()}`, kind: 'backup', severity: 'success', title: 'Restore completed', body: `Data was restored from ${path.basename(filePath)}.` });
+    return { ok: true, restoredAt: nowISO() };
+  }
+
+  /** Stream one archive entry to disk, enforcing its declared size. */
+  async function pipeEntry(entry: any, dest: string, label: string, opts: { checkBytes: number }): Promise<void> {
+    const limiter = byteLimiter(opts.checkBytes, label);
+    await new Promise<void>((resolve, reject) => {
+      const src = entry.stream();
+      const ws = fs.createWriteStream(dest, { flags: 'wx' });
+      src.on('error', reject);
+      ws.on('error', reject);
+      limiter.stream.on('error', reject);
+      ws.on('finish', () => resolve());
+      src.pipe(limiter.stream).pipe(ws);
+    });
+    if (limiter.bytes() !== opts.checkBytes) {
+      throw new ArchiveRejectedError(`${label} does not match its declared size; the backup is corrupt.`);
+    }
+  }
+
+  /** Verify an extracted database BEFORE it can replace live data. */
+  function verifyStagedDatabase(stagedDb: string, currentSchema: number, stagedAttachments: string): void {
+    const { db, schemaVersion } = openDatabase(stagedDb); // applies pending migrations to the staged copy only
+    try {
+      if (schemaVersion > currentSchema) {
+        throw new AppError('RESTORE', 'This backup requires a newer version of Dentiva Pro.');
+      }
+      const tables = new Set(
+        (db.prepare("SELECT name FROM sqlite_master WHERE type = 'table'").all() as { name: string }[]).map((r) => r.name),
+      );
+      for (const required of REQUIRED_TABLES) {
+        if (!tables.has(required)) throw new AppError('RESTORE', `Backup database is missing required table "${required}".`);
+      }
+      const rows = db.prepare('SELECT stored_name, size, sha256 FROM attachments').all() as { stored_name: string; size: number; sha256: string }[];
+      let missing = 0;
+      for (const row of rows) {
+        // Windows builds store stored_name with backslashes; normalise before validating.
+        let rel: string;
+        try {
+          rel = validateRelativePath(String(row.stored_name).replace(/\\/g, '/'), { maxDepth: ARCHIVE_LIMITS.maxAttachmentDepth });
+        } catch {
+          throw new AppError('RESTORE', 'Backup database references an unsafe attachment path.');
+        }
+        const file = resolveInside(stagedAttachments, rel);
+        if (!fs.existsSync(file)) { missing++; continue; }
+        const st = fs.statSync(file);
+        if (st.size !== Number(row.size) || sha256Sync(file) !== row.sha256) {
+          throw new AppError('RESTORE', `Attachment "${rel}" does not match the backup's records.`);
+        }
+      }
+      if (missing > 0) {
+        throw new AppError('RESTORE', `Backup is missing ${missing} attachment file(s) referenced by its records. Restore was cancelled; your current data is unchanged.`);
+      }
+    } finally {
+      db.close();
+    }
+  }
+
+  function sha256Sync(file: string): string {
+    return crypto.createHash('sha256').update(fs.readFileSync(file)).digest('hex');
   }
 
   /** Returns true when an automatic backup was due and has been attempted. */

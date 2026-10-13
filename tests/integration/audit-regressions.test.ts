@@ -9,15 +9,14 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { cleanupEnv, createTestEnv, ownerCtx, sessionWith, type TestEnv } from '../helpers';
+import { cleanupEnv, createTestEnv, futureISO, ownerCtx, sessionWith, type TestEnv } from '../helpers';
 import { createPatient } from '../../src/main/services/patients';
 import { createInvoice, createPayment, getInvoice, paidNetFor } from '../../src/main/services/billing';
 import { patientCsvRows } from '../../src/main/services/patients';
 import { toCsv, neutralizeFormula } from '../../src/shared/csv';
 import { saveUser, resetPassword, listAudit } from '../../src/main/services/users';
 import { addAttachment, attachmentPath, listAttachments } from '../../src/main/services/attachments';
-import { createAppointment, updateAppointment, markNoShow, cancelAppointment, arriveAppointment } from '../../src/main/services/appointments';
-import { addQueueEntry, performQueueAction } from '../../src/main/services/queue';
+import { createAppointment, updateAppointment, markNoShow, cancelAppointment } from '../../src/main/services/appointments';
 import { createVisit, getVisit } from '../../src/main/services/visits';
 import { createPrescription } from '../../src/main/services/prescriptions';
 import { createBackupService } from '../../src/main/services/backup';
@@ -235,19 +234,22 @@ describe('ISS-013 date validation', () => {
 });
 
 describe('ISS-016/017 appointment state consistency', () => {
-  it('cancelling a queued patient also cancels the linked appointment', () => {
+  it('cancelling an appointment records the cancelled status and blocks later cancellation', () => {
     const ctx = ownerCtx(env);
     const p = patient(ctx, '01700000106');
     const d = seedDentist();
     const appt = createAppointment(ctx, {
-      patientId: p.id, dentistId: d, date: '2026-09-28', time: '10:00',
+      patientId: p.id, dentistId: d, date: futureISO(30), time: '10:00',
       durationMin: 15, type: 'checkup', status: 'scheduled',
     });
-    const arrived = arriveAppointment(ctx, appt.id);
-    expect(arrived.appointment.status).toBe('in_queue');
-    performQueueAction(ctx, arrived.queue.id, 'cancel');
+    cancelAppointment(ctx, appt.id, 'patient request');
     const row = env.db.prepare('SELECT status FROM appointments WHERE id = ?').get(appt.id) as { status: string };
     expect(row.status).toBe('cancelled');
+    // A repeated cancel is a no-op: still cancelled, and no second audit row is written.
+    const again = cancelAppointment(ctx, appt.id);
+    expect(again.status).toBe('cancelled');
+    const audits = env.db.prepare("SELECT COUNT(*) c FROM audit_log WHERE action = 'appointment.cancel' AND entity_id = ?").get(String(appt.id)) as { c: number };
+    expect(Number(audits.c)).toBe(1);
   });
 
   it('completed appointments cannot be marked no-show', () => {
@@ -255,7 +257,7 @@ describe('ISS-016/017 appointment state consistency', () => {
     const p = patient(ctx, '01700000107');
     const d = seedDentist();
     const appt = createAppointment(ctx, {
-      patientId: p.id, dentistId: d, date: '2026-09-28', time: '11:00',
+      patientId: p.id, dentistId: d, date: futureISO(30), time: '11:00',
       durationMin: 15, type: 'checkup', status: 'scheduled',
     });
     updateAppointment(ctx, appt.id, { status: 'completed' });
@@ -342,23 +344,6 @@ describe('ISS-033 owner resetPassword guard & minPasswordLength enforcement', ()
     await expect(resetPassword(owner, adminId, 'short123')).rejects.toThrow(/at least 12 characters/i);
     const ok = await resetPassword(owner, adminId, 'ValidLongPass123');
     expect(ok.ok).toBe(true);
-  });
-});
-
-describe('ISS-035 queue pause on waiting & targeted call_next', () => {
-  it('allows pausing a waiting patient and calling a specific waiting row via call_next', () => {
-    const ctx = ownerCtx(env);
-    const p1 = patient(ctx, '01700000131');
-    const p2 = patient(ctx, '01700000132');
-    const q1 = addQueueEntry(ctx, { patientId: p1.id });
-    const q2 = addQueueEntry(ctx, { patientId: p2.id });
-
-    const paused = performQueueAction(ctx, q1.id, 'pause');
-    expect(paused.status).toBe('paused');
-
-    const called = performQueueAction(ctx, q2.id, 'call_next');
-    expect(called.id).toBe(q2.id);
-    expect(called.status).toBe('called');
   });
 });
 

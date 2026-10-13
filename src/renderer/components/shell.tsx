@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Money, MoneyRevealToggle } from './money';
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { api, useAsync } from '../api';
 import { useApp } from '../state/app-context';
@@ -14,7 +15,6 @@ export const Icon = {
   dashboard: <svg width={I.size} height={I.size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><rect x="3" y="3" width="7.5" height="7.5" rx="1.5" /><rect x="13.5" y="3" width="7.5" height="7.5" rx="1.5" /><rect x="3" y="13.5" width="7.5" height="7.5" rx="1.5" /><rect x="13.5" y="13.5" width="7.5" height="7.5" rx="1.5" /></svg>,
   patients: <svg width={I.size} height={I.size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><circle cx="12" cy="8" r="4" /><path d="M4 20c0-3.5 3.6-6 8-6s8 2.5 8 6" /></svg>,
   appointments: <svg width={I.size} height={I.size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><rect x="3" y="5" width="18" height="16" rx="2" /><path d="M3 9h18M8 3v4M16 3v4" /></svg>,
-  queue: <svg width={I.size} height={I.size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M4 6h16M4 12h10M4 18h7" /><circle cx="18" cy="15" r="3.5" /></svg>,
   treatments: <svg width={I.size} height={I.size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M12 3c3 0 6 2 6 6 0 3-1.5 5-2.5 8-.6 1.8-1.4 4-3.5 4s-2.9-2.2-3.5-4C7.5 14 6 12 6 9c0-4 3-6 6-6z" /></svg>,
   prescriptions: <svg width={I.size} height={I.size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><rect x="5" y="3" width="14" height="18" rx="2" /><path d="M9 8h6M9 12h6M9 16h4" /></svg>,
   invoice: <svg width={I.size} height={I.size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M6 3h12v18l-3-2-3 2-3-2-3 2V3z" /><path d="M9 8h6M9 12h6" /></svg>,
@@ -56,7 +56,6 @@ const NAV: NavGroup[] = [
       { to: '/', label: 'Dashboard', icon: Icon.dashboard, permission: 'dashboard.view' },
       { to: '/patients', label: 'Patients', icon: Icon.patients, permission: 'patients.view' },
       { to: '/appointments', label: 'Appointments', icon: Icon.appointments, permission: 'appointments.view' },
-      { to: '/queue', label: 'Queue', icon: Icon.queue, permission: 'queue.view' },
     ],
   },
   {
@@ -185,7 +184,7 @@ function GlobalSearch({ open, onClose }: { open: boolean; onClose: () => void })
               <span className="kind">{h.kind}</span>
               <span className="flex-1">
                 <span className="title">{h.title}</span>
-                <div className="sub">{h.subtitle}{h.meta ? ` · ${h.meta}` : ''}</div>
+                <div className="sub">{h.subtitle}{h.meta ? ` · ${h.meta}` : ''}{h.amountPaisa !== undefined && <> · <Money paisa={h.amountPaisa} noToggle /></>}</div>
               </span>
             </button>
           ))}
@@ -416,6 +415,7 @@ export function AppShell() {
             <div>{`${now.toLocaleDateString('en-GB', { weekday: 'short' }).replace(',', '')} ${formatDate(now)}`}</div>
             <div className="num">{now.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })}</div>
           </div>
+          <MoneyRevealToggle />
           <NotificationBell />
           {!demo && <IconButton icon={Icon.lock} title="Lock application (Ctrl+L)" onClick={lock} />}
           <div className="row gap-2" style={{ paddingLeft: 4, borderLeft: '1px solid var(--line)' }}>

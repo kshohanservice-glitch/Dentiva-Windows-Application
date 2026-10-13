@@ -2,6 +2,8 @@ import type { Ctx } from '../core/context';
 import type { DashboardDTO } from '../../shared/types';
 import { hasPermission, requirePermission } from '../core/context';
 import { todayISO } from '../../shared/currency';
+import { ACTIVE_APPOINTMENT_SQL, SELECT_APPT, runAppointmentExpiry, toDTO, type ApptRow } from './appointments';
+import { ALL_OPEN_STATUSES } from './appointment-rules';
 
 function readSetting<T>(ctx: Ctx, key: string, fallback: T): T {
   const row = ctx.db.prepare('SELECT value_json FROM settings WHERE key = ?').get(key) as { value_json: string } | undefined;
@@ -12,8 +14,8 @@ function readSetting<T>(ctx: Ctx, key: string, fallback: T): T {
 export function getDashboard(ctx: Ctx): DashboardDTO {
   requirePermission(ctx, 'dashboard.view');
   const today = todayISO();
+  runAppointmentExpiry(ctx.db, today);
   const canFinance = hasPermission(ctx, 'dashboard.finance') && hasPermission(ctx, 'finance.view');
-  const canQueue = hasPermission(ctx, 'queue.view');
   const canClinical = hasPermission(ctx, 'clinical.view');
   const canAppts = hasPermission(ctx, 'appointments.view');
   const canInventory = hasPermission(ctx, 'inventory.view');
@@ -31,11 +33,13 @@ export function getDashboard(ctx: Ctx): DashboardDTO {
     today,
   );
 
+  // Same predicate as the agenda and reminders (see appointments.ts / notifications.ts).
   const todayAppointments = canAppts
-    ? scalar(`SELECT COUNT(*) n FROM appointments WHERE date = ? AND deleted_at IS NULL AND status NOT IN ('cancelled','no_show')`, today)
-    : 0;
-  const waitingQueue = canQueue
-    ? scalar(`SELECT COUNT(*) n FROM queue_entries WHERE day = ? AND status IN ('waiting','called','paused','in_treatment')`, today)
+    ? scalar(
+        `SELECT COUNT(*) n FROM appointments a WHERE a.date = ? AND ${ACTIVE_APPOINTMENT_SQL}
+           AND a.status NOT IN ('cancelled','no_show','rescheduled')`,
+        today,
+      )
     : 0;
   const completedVisits = canClinical
     ? scalar(`SELECT COUNT(*) n FROM visits WHERE date(datetime, 'localtime') = ? AND deleted_at IS NULL AND status = 'closed'`, today)
@@ -54,14 +58,11 @@ export function getDashboard(ctx: Ctx): DashboardDTO {
   const upcomingAppointments = canAppts
     ? (ctx.db
         .prepare(
-          `SELECT a.*, p.name patient_name, p.code patient_code, p.phone phone, d.name dentist_name,
-             (SELECT q.queue_no FROM queue_entries q WHERE q.appointment_id = a.id AND q.status NOT IN ('completed','cancelled')) queue_no
-           FROM appointments a JOIN patients p ON p.id = a.patient_id
-           LEFT JOIN dentists d ON d.id = a.dentist_id
-           WHERE a.deleted_at IS NULL AND a.date >= ? AND a.status IN ('scheduled','confirmed','arrived','in_queue')
-           ORDER BY a.date, a.time LIMIT 8`,
+          `${SELECT_APPT} WHERE ${ACTIVE_APPOINTMENT_SQL} AND a.date >= ?
+             AND a.status IN (${ALL_OPEN_STATUSES.map(() => '?').join(',')})
+           ORDER BY a.date, a.time, a.id LIMIT 8`,
         )
-        .all(today) as any[])
+        .all(today, ...ALL_OPEN_STATUSES) as ApptRow[]).map((r) => toDTO(r, today))
     : [];
 
   let financial: DashboardDTO['financial'];
@@ -156,9 +157,6 @@ export function getDashboard(ctx: Ctx): DashboardDTO {
     if (inventory.expired > 0) alerts.push({ severity: 'danger', kind: 'inventory', title: `${inventory.expired} expired batch(es)`, body: 'Remove or write off expired stock.' });
     else if (inventory.expiringSoon > 0) alerts.push({ severity: 'warning', kind: 'inventory', title: `${inventory.expiringSoon} batch(es) expiring within 30 days`, body: 'Review expiry dates.' });
   }
-  if (waitingQueue > 0 && notifSettings.appointments !== false) {
-    alerts.push({ severity: 'info', kind: 'queue', title: `${waitingQueue} patient(s) in queue`, body: 'Open Queue to manage flow.' });
-  }
   if (canFinance && financial && financial.outstandingDuePaisa > 0 && notifSettings.dues !== false) {
     alerts.push({ severity: 'warning', kind: 'billing', title: 'Outstanding dues', body: 'Some invoices have unpaid balances.' });
   }
@@ -168,15 +166,9 @@ export function getDashboard(ctx: Ctx): DashboardDTO {
   if (failedBackups > 0) alerts.push({ severity: 'danger', kind: 'backup', title: 'Recent backup failure', body: 'A backup failed in the last 24 hours. Check Settings → Backup.' });
 
   return {
-    todayPatients, todayAppointments, waitingQueue, completedVisits, noShows,
+    todayPatients, todayAppointments, completedVisits, noShows,
     recentPatients: recentPatients.map((p) => ({ id: p.id, name: p.name, code: p.code, at: p.created_at })),
-    upcomingAppointments: upcomingAppointments.map((r) => ({
-      id: r.id, patientId: r.patient_id, patientName: r.patient_name, patientCode: r.patient_code,
-      phone: r.phone, dentistId: r.dentist_id, dentistName: r.dentist_name,
-      date: r.date, time: r.time, durationMin: r.duration_min, type: r.type,
-      status: r.status, notes: r.notes, createdBy: r.created_by, createdAt: r.created_at,
-      visitId: r.visit_id, queueNo: r.queue_no,
-    })),
+    upcomingAppointments,
     financial,
     inventory,
     alerts,

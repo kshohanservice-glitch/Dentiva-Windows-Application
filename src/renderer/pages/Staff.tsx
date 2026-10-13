@@ -1,12 +1,13 @@
 import React, { useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
+import { Money } from '../components/money';
 import { api, useAsync } from '../api';
 import { useApp } from '../state/app-context';
 import { Badge, Button, Card, ConfirmDialog, ErrorState, Modal, Spinner, Tabs, useToast } from '../components/primitives';
 import { Field, Input, Select, Textarea } from '../components/forms';
 import { DataTable, TableToolbar, type Column } from '../components/table';
 import { Icon } from '../components/shell';
-import { bdt, formatDate } from '../format';
+import { formatDate } from '../format';
 import type { DentistDTO, StaffDTO } from '../../shared/types';
 
 function StaffModal(props: { open: boolean; initial?: StaffDTO | null; onClose: () => void; onSaved: () => void }) {
@@ -241,7 +242,7 @@ export function StaffPage() {
     { key: 'dept', label: 'Department', render: (s) => s.department ?? '—' },
     { key: 'phone', label: 'Phone', render: (s) => <span className="mono">{s.phone ?? '—'}</span> },
     { key: 'joining', label: 'Joined', render: (s) => (s.joiningDate ? formatDate(s.joiningDate) : '—') },
-    ...(can('staff.salary.view') ? [{ key: 'salary', label: 'Salary', align: 'right' as const, render: (s: StaffDTO) => (s.salaryPaisa != null ? <span className="num">{bdt(s.salaryPaisa)}</span> : '—') }] : []),
+    ...(can('staff.salary.view') ? [{ key: 'salary', label: 'Salary', align: 'right' as const, render: (s: StaffDTO) => (s.salaryPaisa != null ? <span className="num"><Money paisa={s.salaryPaisa} /></span> : '—') }] : []),
     { key: 'status', label: 'Status', render: (s) => <Badge tone={s.status === 'active' ? 'success' : 'neutral'}>{s.status}</Badge> },
     {
       key: 'actions', label: '', align: 'right',

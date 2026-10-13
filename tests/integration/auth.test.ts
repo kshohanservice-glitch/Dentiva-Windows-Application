@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { cleanupEnv, createTestEnv, type TestEnv } from '../helpers';
 import { completeSetup, login, changePassword, loadSessionUser, needsSetup } from '../../src/main/services/auth';
 import { hashPassword, verifyPassword, dummyVerify } from '../../src/main/core/passwords';
+import { SessionManager } from '../../src/main/core/session';
 import { ALL_PERMISSIONS } from '../../src/shared/permissions';
 
 let env: TestEnv;
@@ -26,6 +27,26 @@ beforeEach(async () => {
 
 afterEach(() => {
   cleanupEnv(env);
+});
+
+describe('window privacy on session exit', () => {
+  it('closes sensitive secondary windows on logout as well as lock', async () => {
+    let closes = 0;
+    const mgr = new SessionManager({
+      db: () => env.db,
+      securityPolicy: () => ({ maxFailedLogins: 5, minPasswordLength: 8 }),
+      onLock: () => { closes++; },
+    });
+    expect((await mgr.signIn('owner', SETUP.admin.password)).ok).toBe(true);
+    mgr.signOut();
+    expect(closes).toBe(1);
+    expect(mgr.current()).toBeNull();
+    mgr.signOut();
+    expect(closes).toBe(1);
+    expect((await mgr.signIn('owner', SETUP.admin.password)).ok).toBe(true);
+    mgr.lock();
+    expect(closes).toBe(2);
+  });
 });
 
 describe('password hashing (Argon2id)', () => {

@@ -1,75 +1,17 @@
-# Dentiva Pro — Printing & PDF Architecture
+# Dentiva Pro — printing and PDF (implementation status)
 
-Printing is a first-class subsystem: one document model → renderer templates → Chromium
-print engine (interactive print dialog or printToPDF).
+This describes the current print path; see `RELEASE_EXECUTION_JOURNAL.md` for tests and blockers. It is **not** a certification of printer/DPI output.
 
-## Pipeline
+## Runtime path
 
-1. **Document data** (invoice/prescription/report view-model) prepared by service layer
-   with permission checks.
-2. Renderer opens a dedicated **print window** (offscreen-hidden BrowserWindow, one per job)
-   at route `/print/<doc>/<id>?profile=<printerProfileId>` with all fonts/assets local.
-3. Print window waits for `document.fonts.ready` + layout, then:
-   - **Interactive print:** `webContents.print({ silent, deviceName, copies, margins })`
-     using a printer from `getPrintersAsync()` (Windows printer list — includes network,
-     wireless and Bluetooth printers exposed by Windows, plus "Microsoft Print to PDF").
-   - **Save as PDF:** dialog → `webContents.printToPDF({ pageSize, margins, printBackground })`
-     → file write with result verification.
-4. Success reported only after the API callback/PDF write confirms; failures surface real errors.
+The main process opens a sandboxed, context-isolated Electron BrowserWindow at `#print/<kind>/<id>`. The renderer retrieves the document data through authenticated, permission-gated IPC and shows a print preview. Supported routes include invoice, receipt, prescription, visit summary, appointment card, stock labels and reports.
 
-## Paper formats
+The print toolbar selects a saved profile and offers Print and Save PDF. Profiles contain document type, paper dimensions/orientation, margins, scale, printer name and copies. `PrintPage.tsx` computes the page width/height and inline padding from the selected profile; `@page` uses the same dimensions without a second native margin. `src/main/print.ts` calls Electron's `webContents.print` or `printToPDF` and returns errors/cancellation rather than claiming an unsuccessful export succeeded. For actual supported fields and formats, consult `src/shared/types.ts` (`PrintProfile`) and `src/renderer/pages/PrintPage.tsx`.
 
-| Profile | Page geometry |
-|---|---|
-| A4 | 210 × 297 mm |
-| A5 | 148 × 210 mm |
-| Custom | user-defined width × height (mm) |
+## Privacy boundary
 
-Implemented with per-template `@page { size: W H; margin: … }` CSS injected from the
-selected **printer profile**; layout **reflows** (flex/grid + container-driven), it is not
-simply scaled. Prescriptions fall back to A5-class layout for widths < 110 mm.
+Money amounts in the **on-screen** preview are masked `****` by default and can be revealed locally or globally. Print and Save PDF are intentional sensitive-data exports: CSS print media contains the original financial values, not the screen placeholders. Exported files, OS print dialogs, physical pages and report CSV are **not masked** and must be handled as clinic records. The print window closes on lock or logout, and the print IPC requires a live session. Screen and print media differ deliberately here; WYSIWYG claims about sensitive values would be misleading.
 
-## Printer profiles (stored in settings)
+## Verification still required
 
-Fields: name, documentType (prescription|invoice|report|receipt), printerName (or
-`default`), paperSize (a4|a5|custom), widthMm, heightMm, orientation, marginsMm
-{t,r,b,l}, scale (fit/100%), copies, color. Seeded defaults: Prescription-A4, Prescription-A5,
-Invoice-A4, Receipt-A4.
-
-## Document templates
-
-- **Prescription:** clinic header (logo, name, address, phones) / patient row
-  (name, code, sex/age, date) / two-column clinical body (left: C/C, O/E, R/E, Diagnosis,
-  Treatment, Advice — labels **configurable in Settings**; right: numbered medicine table)
-  / footer message + visiting hours / **reserved blank signature area** (≥25 mm height,
-  no content rendered inside).
-- **Invoice:** clinic header only (no signature), invoice meta, line table, totals block,
-  paid/due/status, payment method summary, footer note.
-- **Reports:** consistent header/scope/footer for all printable reports (patient list,
-  payments, dues, income/expense, inventory, audit…).
-
-## Bengali & fonts
-
-- Bundled local fonts (OFL): Noto Sans Bengali (Bengali), Noto Sans (Latin fallback) —
-  no CDN. Font stack order guarantees mixed en/bn runs shape correctly.
-- Verified by render tests capturing print-window screenshots/PDF text extraction
-  containing Bengali glyphs (tests/printing).
-
-## Page-break & multipage rules
-
-- `break-inside: avoid` on rows/blocks, repeating header via template re-render logic,
-  footer with page numbers via `@page` margin boxes where supported; overflow verified
-  with long-content fixtures (50+ medicines, 80+ invoice lines, long Bengali names).
-
-## Preview
-
-Print preview = the actual print window in preview mode (same DOM as output → parity),
-with controls: printer, paper, orientation, margins, copies, scale/fit, range (where
-supported by driver), plus Save-as-PDF. Preview renders exactly what will print
-(same CSS media) — WYSIWYG by construction.
-
-## Failure handling
-
-- No printer → friendly error + Save-as-PDF fallback offered.
-- Print cancel (user cancels dialog) → status "cancelled", not "printed".
-- PDF write failure (locked/disk full) → actual error, file not claimed saved.
+Automated unit checks cover print dimensions/format helpers; Windows Electron E2E includes opening print windows. Physical printer, PDF content, Bengali glyph shaping, long-page overflow, paper sizes, orientation, screen-reader handling of masked amounts and DPI/layout have **not** been verified in this sandbox. Before release, run these checks on a Windows device using disposable patient data. Do not claim successful printer or PDF output solely because the renderer build passes.

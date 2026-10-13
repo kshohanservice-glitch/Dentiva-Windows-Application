@@ -1,6 +1,7 @@
 import React from 'react';
 import { HashRouter, Navigate, Route, Routes, useLocation } from 'react-router-dom';
 import { AppProvider, useApp } from './state/app-context';
+import { MoneyRevealProvider } from './components/money';
 import { ToastProvider, useToast } from './components/primitives';
 import { AppShell, BootSplash, LockOverlay } from './components/shell';
 import { LoginPage } from './pages/Login';
@@ -8,7 +9,6 @@ import { SetupWizard } from './pages/SetupWizard';
 import { DashboardPage } from './pages/Dashboard';
 import { PatientsPage, PatientProfilePage } from './pages/Patients';
 import { AppointmentsPage } from './pages/Appointments';
-import { QueuePage } from './pages/Queue';
 import { TreatmentsPage } from './pages/Treatments';
 import { PrescriptionsPage } from './pages/Prescriptions';
 import { InvoicesPage, PaymentsPage } from './pages/Invoices';
@@ -69,7 +69,8 @@ function Root() {
           <Route path="patients" element={<Guarded permission="patients.view"><PatientsPage /></Guarded>} />
           <Route path="patients/:id" element={<Guarded permission="patients.view"><PatientProfilePage /></Guarded>} />
           <Route path="appointments" element={<Guarded permission="appointments.view"><AppointmentsPage /></Guarded>} />
-          <Route path="queue" element={<Guarded permission="queue.view"><QueuePage /></Guarded>} />
+          {/* Queue was retired in 3.1: old links land on Appointments instead of a dead screen. */}
+          <Route path="queue" element={<Navigate to="/appointments" replace />} />
           <Route path="treatments" element={<Guarded permission="treatments.view"><TreatmentsPage /></Guarded>} />
           <Route path="prescriptions" element={<Guarded permission="clinical.view"><PrescriptionsPage /></Guarded>} />
           <Route path="invoices" element={<Guarded permission="billing.invoice.view"><InvoicesPage /></Guarded>} />
@@ -96,7 +97,9 @@ export function App() {
     <ToastProvider>
       <HashRouter>
         <AppProvider>
-          <Root />
+          <MoneyRevealProvider>
+            <Root />
+          </MoneyRevealProvider>
         </AppProvider>
       </HashRouter>
     </ToastProvider>

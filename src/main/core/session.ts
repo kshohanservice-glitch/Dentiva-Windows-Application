@@ -58,6 +58,7 @@ export class SessionManager {
   }
 
   signOut(): void {
+    if (this.user) this.deps.onLock(); // close other windows before forgetting the session
     this.user = null;
     this.locked = false;
   }

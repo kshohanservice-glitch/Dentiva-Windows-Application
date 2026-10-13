@@ -110,33 +110,35 @@ export interface PrescriptionDTO {
 
 /* -------------------------- Appointments ---------------------------- */
 
+/** Statuses written by Dentiva Pro 3.1. `arrived`, `in_queue`, `in_treatment` and `rescheduled` are legacy (read-only history). */
 export type AppointmentStatus =
-  | 'scheduled' | 'confirmed' | 'arrived' | 'in_queue' | 'in_treatment'
-  | 'completed' | 'cancelled' | 'no_show' | 'rescheduled';
+  | 'scheduled' | 'confirmed' | 'completed' | 'cancelled' | 'no_show'
+  | 'arrived' | 'in_queue' | 'in_treatment' | 'rescheduled';
+
+/** Derived timing relative to the clinic's local date. `expired` = open and its day has passed. */
+export type AppointmentTiming = 'expired' | 'today' | 'upcoming' | 'closed';
 
 export interface AppointmentDTO {
   id: number; patientId: number; patientName: string; patientCode: string; phone: string | null;
   dentistId: number | null; dentistName: string | null;
   date: string; time: string; durationMin: number; type: string;
-  status: AppointmentStatus; notes: string | null; createdBy: number;
-  createdAt: string; visitId: number | null; queueNo: number | null;
+  status: AppointmentStatus; notes: string | null; plannedTreatments: string | null;
+  createdBy: number; createdAt: string; updatedAt: string; visitId: number | null;
+  expiredAt: string | null; timing: AppointmentTiming; legacyStatus: boolean;
 }
 
 export interface AppointmentInput {
   patientId: number; dentistId: number | null; date: string; time: string;
-  durationMin: number; type: string; notes?: string | null; status?: AppointmentStatus;
-  allowConflict?: boolean;
+  durationMin: number; type: string; notes?: string | null; plannedTreatments?: string | null;
+  status?: AppointmentStatus; allowConflict?: boolean;
 }
 
-/* ----------------------------- Queue -------------------------------- */
-
-export type QueueStatus = 'waiting' | 'called' | 'in_treatment' | 'paused' | 'completed' | 'cancelled';
-
-export interface QueueEntryDTO {
-  id: number; queueNo: number; patientId: number; patientName: string; patientCode: string;
-  appointmentId: number | null; dentistId: number | null; dentistName: string | null;
-  arrivedAt: string; waitingMin: number; status: QueueStatus; priority: number;
-  startedAt: string | null; finishedAt: string | null;
+export interface AppointmentAgendaFilter {
+  view: 'today' | 'next7' | 'next30' | 'upcoming';
+  dentistId?: number;
+  status?: string;
+  reason?: string;
+  search?: string;
 }
 
 /* ----------------------------- Billing ------------------------------ */
@@ -270,7 +272,7 @@ export interface NotificationDTO {
 /* ------------------------------ Dashboard --------------------------- */
 
 export interface DashboardDTO {
-  todayPatients: number; todayAppointments: number; waitingQueue: number;
+  todayPatients: number; todayAppointments: number;
   completedVisits: number; noShows: number; recentPatients: { id: number; name: string; code: string; at: string }[];
   upcomingAppointments: AppointmentDTO[];
   financial?: {
@@ -333,6 +335,8 @@ export interface SearchHit {
   kind: 'patient' | 'appointment' | 'invoice' | 'payment' | 'prescription' | 'treatment' |
         'staff' | 'dentist' | 'inventory' | 'expense' | 'visit';
   id: number; title: string; subtitle: string; meta?: string;
+  /** Integer paisa for money hits; the renderer masks it (never formatted server-side). */
+  amountPaisa?: number;
 }
 
 /* ------------------------------ Activation -------------------------- */

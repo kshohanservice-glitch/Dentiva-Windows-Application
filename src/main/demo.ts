@@ -102,11 +102,8 @@ export async function seedDemoDatabase(db: DB): Promise<void> {
     const ap=db.prepare('INSERT INTO appointments(patient_id,dentist_id,date,time,duration_min,type,status,notes,created_by,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?)');
     ap.run(pid('P-1001'),d1,today,'10:30',30,'Follow-up','confirmed','Demo follow-up appointment',userId,now,now);
     ap.run(pid('P-1002'),d1,today,'11:30',45,'Scaling','scheduled','Demo hygiene appointment',userId,now,now);
-    ap.run(pid('P-1005'),d2,today,'15:00',90,'Root Canal','arrived','Demo RCT appointment',userId,now,now);
+    ap.run(pid('P-1005'),d2,today,'15:00',90,'Root Canal','confirmed','Demo RCT appointment',userId,now,now);
     ap.run(pid('P-1006'),d1,day(1),'16:00',30,'Consultation','scheduled','Demo orthodontic screening',userId,now,now);
-    const arrived=db.prepare("SELECT id FROM appointments WHERE patient_id=? AND date=?").get<{id:number}>(pid('P-1005'),today)!.id;
-    const qe=db.prepare('INSERT INTO queue_entries(day,queue_no,patient_id,appointment_id,dentist_id,arrived_at,status,priority,created_by) VALUES(?,?,?,?,?,?,?,?,?)');
-    qe.run(today,1,pid('P-1005'),arrived,d2,at(0,14,40),'in_treatment',1,userId); qe.run(today,2,pid('P-1002'),null,d1,at(0,11,10),'waiting',0,userId);
 
     const rx=db.prepare('INSERT INTO prescriptions(number,patient_id,visit_id,dentist_id,date,c_c,o_e,r_e,diagnosis,treatment,advice,follow_up,created_by,created_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)');
     const rx1=Number(rx.run('RX-2026-0042',pid('P-1001'),v1,d1,day(-2),'Sensitivity in upper right molar','Old restoration with recurrent caries','IOPA taken','Recurrent caries 16','Composite restoration','Use desensitizing toothpaste twice daily.',day(14),userId,at(-2,11,15)).lastInsertRowid);

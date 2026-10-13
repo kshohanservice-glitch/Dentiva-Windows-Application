@@ -10,7 +10,6 @@ export const PERMISSION_GROUPS = {
   clinical: 'Clinical',
   treatments: 'Treatments',
   appointments: 'Appointments',
-  queue: 'Queue',
   billing: 'Billing & Payments',
   finance: 'Finance',
   inventory: 'Inventory',
@@ -48,9 +47,6 @@ export const ALL_PERMISSIONS = [
   'appointments.view',
   'appointments.manage',
   'appointments.override', // double-booking override
-  // Queue
-  'queue.view',
-  'queue.manage',
   // Billing
   'billing.invoice.view',
   'billing.invoice.create',
@@ -109,7 +105,6 @@ export const BUILTIN_ROLES: Record<string, { name: string; description: string; 
       'clinical.prescription.create', 'clinical.prescription.print', 'clinical.referral.manage',
       'treatments.view', 'treatments.manage',
       'appointments.view', 'appointments.manage', 'appointments.override',
-      'queue.view', 'queue.manage',
       'billing.invoice.view', 'billing.invoice.create', 'billing.invoice.edit', 'billing.invoice.void',
       'billing.payment.view', 'billing.payment.create', 'billing.payment.refund',
       'finance.view',
@@ -133,7 +128,6 @@ export const BUILTIN_ROLES: Record<string, { name: string; description: string; 
       'clinical.prescription.create', 'clinical.prescription.print', 'clinical.referral.manage',
       'treatments.view',
       'appointments.view', 'appointments.manage',
-      'queue.view',
       'billing.invoice.view',
       'billing.payment.view',
       'data.export',
@@ -141,7 +135,7 @@ export const BUILTIN_ROLES: Record<string, { name: string; description: string; 
   },
   assistant: {
     name: 'Dental Assistant',
-    description: 'Supports clinical flow: patients, visits, queue, chart entries with dentist supervision.',
+    description: 'Supports clinical flow: patients, visits, appointments, chart entries with dentist supervision.',
     permissions: [
       'dashboard.view',
       'patients.view', 'patients.create', 'patients.edit',
@@ -149,21 +143,19 @@ export const BUILTIN_ROLES: Record<string, { name: string; description: string; 
       'clinical.prescription.print',
       'treatments.view',
       'appointments.view', 'appointments.manage',
-      'queue.view', 'queue.manage',
       'inventory.view',
       'data.export',
     ],
   },
   receptionist: {
     name: 'Receptionist',
-    description: 'Registration, appointments, queue, invoicing and payment collection. No clinical notes, no accounting.',
+    description: 'Registration, appointments, invoicing and payment collection. No clinical notes, no accounting.',
     permissions: [
       'dashboard.view', 'dashboard.finance',
       'patients.view', 'patients.create', 'patients.edit', 'patients.sensitive',
       'clinical.view',
       'treatments.view',
       'appointments.view', 'appointments.manage', 'appointments.override',
-      'queue.view', 'queue.manage',
       'billing.invoice.view', 'billing.invoice.create', 'billing.invoice.edit',
       'billing.payment.view', 'billing.payment.create',
       'finance.view',

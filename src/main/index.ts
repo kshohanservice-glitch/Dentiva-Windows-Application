@@ -9,6 +9,7 @@ import { SessionManager } from './core/session';
 import { ActivationStore, weakCipher, type Cipher } from './core/activation';
 import { createBackupService, type DbHolder } from './services/backup';
 import { insertNotification, refreshNotifications } from './services/notifications';
+import { runAppointmentExpiry } from './services/appointments';
 import { registerRouter } from './ipc/router';
 import { resolveWindowIcon } from './print';
 import { IPC } from '../shared/ipc';
@@ -24,12 +25,16 @@ const APP_VERSION = ((): string => {
 })();
 
 let mainWindow: BrowserWindow | null = null;
+let scheduleTimer: NodeJS.Timeout | null = null;
 
 function buildCipher(): Cipher {
   if (safeStorage.isEncryptionAvailable()) {
     return { encrypt: (b) => safeStorage.encryptString(b.toString('utf8')), decrypt: (b) => Buffer.from(safeStorage.decryptString(b), 'utf8') };
   }
-  logger.warn('OS secure storage unavailable — using reduced-strength activation container.');
+  if (process.platform === 'win32' && app.isPackaged) {
+    throw new Error('Windows secure storage is unavailable. Activation cannot be opened safely on this device. Enable the Windows user profile encryption service and restart. Clinic data has not been changed.');
+  }
+  logger.warn('OS secure storage unavailable — using reduced-strength activation container (development/non-Windows only).');
   return weakCipher;
 }
 
@@ -37,8 +42,8 @@ function createWindow(): void {
   mainWindow = new BrowserWindow({
     width: 1440,
     height: 900,
-    minWidth: 960,
-    minHeight: 640,
+    minWidth: 1180, // documented shell minimum (docs/UX_SYSTEM.md); supports the 1280×720 target
+    minHeight: 680,
     show: false,
     backgroundColor: '#f6f8fa',
     title: 'Dentiva Pro',
@@ -74,6 +79,17 @@ async function boot(): Promise<void> {
   Menu.setApplicationMenu(null);
   const demoBuild = isDemoBuild();
   const paths = getPaths();
+
+  // Validate OS encryption before opening/migrating any clinic database. A
+  // packaged Windows installation must never migrate data and then fail to
+  // access its activation state due to unavailable secure storage.
+  let cipher: Cipher;
+  try {
+    cipher = buildCipher();
+  } catch (err) {
+    fatal('Secure storage unavailable', err instanceof Error ? err.message : 'Activation storage could not be initialized.');
+    return;
+  }
 
   // --- Database open with integrity guard -------------------------------
   let db: DB;
@@ -138,7 +154,13 @@ async function boot(): Promise<void> {
   }
 
   // --- Activation --------------------------------------------------------
-  const activation = new ActivationStore(path.join(paths.activationDir, 'state.bin'), buildCipher());
+  let activation: ActivationStore;
+  try {
+    activation = new ActivationStore(path.join(paths.activationDir, 'state.bin'), cipher);
+  } catch (err) {
+    fatal('Secure storage unavailable', err instanceof Error ? err.message : 'Activation storage could not be initialized.');
+    return;
+  }
 
   // --- Backup service ----------------------------------------------------
   const backup = createBackupService({
@@ -192,7 +214,33 @@ async function boot(): Promise<void> {
     logger.error('Unhandled rejection', { error: reason instanceof Error ? reason.message : String(reason) });
   });
 
-  // Post-ready maintenance: automatic backup + notification refresh (non-blocking)
+  // Maintenance: appointment expiry + reminder sync run at startup and every
+  // 5 minutes, so they survive restarts and catch up after the PC was asleep.
+  // Both are idempotent; reads also re-derive expiry from the local date.
+  const runScheduleMaintenance = () => {
+    try {
+      runAppointmentExpiry(holder.get());
+    } catch (e) {
+      logger.warn('Appointment expiry failed', { error: e instanceof Error ? e.message : String(e) });
+    }
+    try {
+      const row = holder.get().prepare("SELECT value_json FROM settings WHERE key = 'notifications'").get<{ value_json: string }>();
+      const prefs = row ? JSON.parse(row.value_json) : {};
+      refreshNotifications(holder.get(), {
+        lowStock: prefs.lowStock !== false, dues: prefs.dues !== false,
+        backup: prefs.backup !== false, appointments: prefs.appointments !== false,
+      });
+    } catch (e) {
+      logger.warn('Notification refresh failed', { error: e instanceof Error ? e.message : String(e) });
+    }
+  };
+  if (!demoBuild) {
+    runScheduleMaintenance();
+    scheduleTimer = setInterval(runScheduleMaintenance, 5 * 60 * 1000);
+    scheduleTimer.unref();
+  }
+
+  // Post-ready maintenance: automatic backup (non-blocking)
   if (demoBuild) return;
   setTimeout(() => {
     void (async () => {
@@ -201,14 +249,6 @@ async function boot(): Promise<void> {
       } catch (e) {
         logger.warn('Auto-backup check failed', { error: e instanceof Error ? e.message : String(e) });
       }
-      try {
-        const row = holder.get().prepare("SELECT value_json FROM settings WHERE key = 'notifications'").get<{ value_json: string }>();
-        const prefs = row ? JSON.parse(row.value_json) : {};
-        refreshNotifications(holder.get(), {
-          lowStock: prefs.lowStock !== false, dues: prefs.dues !== false,
-          backup: prefs.backup !== false, appointments: prefs.appointments !== false,
-        });
-      } catch { /* non-fatal */ }
     })();
   }, 2500);
 }

@@ -14,8 +14,8 @@ import * as visits from '../services/visits';
 import * as chart from '../services/chart';
 import * as treatments from '../services/treatments';
 import * as prescriptions from '../services/prescriptions';
+import * as clinicalTemplates from '../services/clinical-templates';
 import * as appointments from '../services/appointments';
-import * as queueSvc from '../services/queue';
 import * as billing from '../services/billing';
 import * as inventory from '../services/inventory';
 import * as accounting from '../services/accounting';
@@ -81,8 +81,8 @@ export function registerRouter(deps: RouterDeps): void {
     IPC.visitsCreate, IPC.visitsUpdate, IPC.visitsDelete, IPC.chartSet,
     IPC.treatmentsSave, IPC.treatmentsSetActive, IPC.treatmentsDelete,
     IPC.prescriptionsCreate, IPC.prescriptionsDelete, IPC.prescriptionsSaveTemplate, IPC.prescriptionsDeleteTemplate,
-    IPC.appointmentsCreate, IPC.appointmentsUpdate, IPC.appointmentsCancel, IPC.appointmentsDelete, IPC.appointmentsNoShow, IPC.appointmentsArrive,
-    IPC.queueAdd, IPC.queueAction, IPC.queueDelete, IPC.queueReorder,
+    IPC.clinicalTemplatesSave, IPC.clinicalTemplatesDelete,
+    IPC.appointmentsCreate, IPC.appointmentsUpdate, IPC.appointmentsCancel, IPC.appointmentsDelete, IPC.appointmentsNoShow,
     IPC.invoicesCreate, IPC.invoicesVoid, IPC.invoicesDelete, IPC.paymentsCreate, IPC.paymentsDelete,
     IPC.inventorySaveItem, IPC.inventoryDeleteItem, IPC.inventoryDeleteBatch, IPC.inventoryStock, IPC.inventorySaveSupplier, IPC.inventoryDeleteSupplier,
     IPC.accountingAddExpense, IPC.accountingDeleteExpense, IPC.accountingAddIncome, IPC.accountingDeleteIncome, IPC.accountingSaveCategory,
@@ -231,21 +231,22 @@ export function registerRouter(deps: RouterDeps): void {
   handle(IPC.prescriptionsSaveTemplate, { auth: true, fn: (p, ctx) => prescriptions.saveTemplate(ctx!, String(p?.name), p?.items) });
   handle(IPC.prescriptionsDeleteTemplate, { auth: true, fn: (p, ctx) => prescriptions.deleteTemplate(ctx!, Number(p)) });
 
-  /* -------------------------- appointments ----------------------------- */
-  handle(IPC.appointmentsList, { auth: true, fn: (p, ctx) => appointments.listAppointments(ctx!, p) });
-  handle(IPC.appointmentsCreate, { auth: true, fn: (p, ctx) => appointments.createAppointment(ctx!, p) });
-  handle(IPC.appointmentsUpdate, { auth: true, fn: (p, ctx) => appointments.updateAppointment(ctx!, Number(p?.id), p) });
-  handle(IPC.appointmentsCancel, { auth: true, fn: (p, ctx) => appointments.cancelAppointment(ctx!, Number(p?.id), p?.reason) });
-  handle(IPC.appointmentsDelete, { auth: true, fn: (p, ctx) => appointments.deleteAppointment(ctx!, Number(p)) });
-  handle(IPC.appointmentsNoShow, { auth: true, fn: (p, ctx) => appointments.markNoShow(ctx!, Number(p)) });
-  handle(IPC.appointmentsArrive, { auth: true, fn: (p, ctx) => appointments.arriveAppointment(ctx!, Number(p)) });
+  /* ------------------------ clinical templates ------------------------- */
+  handle(IPC.clinicalTemplatesList, { auth: true, fn: (kind, ctx) => clinicalTemplates.listClinicalTemplates(ctx!, kind) });
+  handle(IPC.clinicalTemplatesSave, { auth: true, fn: (input, ctx) => clinicalTemplates.saveClinicalTemplate(ctx!, input) });
+  handle(IPC.clinicalTemplatesDelete, { auth: true, fn: (id, ctx) => clinicalTemplates.deleteClinicalTemplate(ctx!, id) });
 
-  /* ------------------------------- queue -------------------------------- */
-  handle(IPC.queueList, { auth: true, fn: (p, ctx) => queueSvc.listQueue(ctx!, String(p)) });
-  handle(IPC.queueAdd, { auth: true, fn: (p, ctx) => queueSvc.addQueueEntry(ctx!, p) });
-  handle(IPC.queueAction, { auth: true, fn: (p, ctx) => queueSvc.performQueueAction(ctx!, p?.id != null ? Number(p.id) : null, p?.action, p?.payload) });
-  handle(IPC.queueDelete, { auth: true, fn: (p, ctx) => queueSvc.deleteQueueEntry(ctx!, Number(p)) });
-  handle(IPC.queueReorder, { auth: true, fn: (p, ctx) => queueSvc.reorderQueue(ctx!, p) });
+  /* -------------------------- appointments ----------------------------- */
+  // Mutations re-sync reminders immediately so notifications never lag the schedule.
+  const afterAppointmentChange = <T>(value: T): T => { deps.refreshNotifications(); return value; };
+  handle(IPC.appointmentsList, { auth: true, fn: (p, ctx) => appointments.listAppointments(ctx!, p) });
+  handle(IPC.appointmentsAgenda, { auth: true, fn: (p, ctx) => appointments.listAgenda(ctx!, p ?? undefined) });
+  handle(IPC.appointmentsGet, { auth: true, fn: (p, ctx) => appointments.getAppointment(ctx!, Number(p)) });
+  handle(IPC.appointmentsCreate, { auth: true, fn: (p, ctx) => afterAppointmentChange(appointments.createAppointment(ctx!, p)) });
+  handle(IPC.appointmentsUpdate, { auth: true, fn: (p, ctx) => afterAppointmentChange(appointments.updateAppointment(ctx!, Number(p?.id), p ?? {})) });
+  handle(IPC.appointmentsCancel, { auth: true, fn: (p, ctx) => afterAppointmentChange(appointments.cancelAppointment(ctx!, Number(p?.id), p?.reason)) });
+  handle(IPC.appointmentsDelete, { auth: true, fn: (p, ctx) => afterAppointmentChange(appointments.deleteAppointment(ctx!, Number(p))) });
+  handle(IPC.appointmentsNoShow, { auth: true, fn: (p, ctx) => afterAppointmentChange(appointments.markNoShow(ctx!, Number(p))) });
 
   /* ------------------------------ billing ------------------------------ */
   handle(IPC.invoicesList, { auth: true, fn: (p, ctx) => billing.listInvoices(ctx!, p) });
