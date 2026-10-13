@@ -8,6 +8,11 @@ describe('formatted report money segmentation', () => {
       { text: 'Cash: ' }, { paisa: 123456 }, { text: ' · Refund: ' }, { paisa: -700 },
     ]);
   });
+  it('also masks legacy audit summaries written with a BDT suffix', () => {
+    expect(splitFormattedMoney('Payment 123.45 BDT via cash; refund -2.00 BDT')).toEqual([
+      { text: 'Payment ' }, { paisa: 12345 }, { text: ' via cash; refund ' }, { paisa: -200 },
+    ]);
+  });
   it('keeps patient IDs, counts, plain numbers and text unchanged', () => {
     expect(splitFormattedMoney('P-1234, age 45')).toEqual([{ text: 'P-1234, age 45' }]);
     expect(splitFormattedMoney(42)).toEqual([{ text: '42' }]);

@@ -13,14 +13,21 @@ no record-count limits beyond storage.
 - PKs: `INTEGER PRIMARY KEY AUTOINCREMENT` unless a stable business key is better.
 - Timestamps: `TEXT` ISO-8601 UTC (`2026-09-27T12:00:00.000Z`); dates `TEXT` `YYYY-MM-DD`.
 - Money: stored as **integer paisa** (`amount_paisa INTEGER`) to avoid float drift;
-  presented as BDT (৳) with 2 decimals. (Bangladeshi Taka has no minor unit in practice;
-  paisa fields keep future-proof precision.)
-- Soft delete: `deleted_at TEXT NULL` for patients/staff/items where reversible archive is
-  required; financial/clinical rows are **never** hard-deleted by application code.
+  presented as BDT (৳) with 2 decimals, masked by default in supported UI surfaces.
+  Printed/exported financial documents intentionally retain real values.
+- Deletion behavior varies by entity: patient and clinical/financial history is
+  preserved where business rules require it; some explicit delete operations remove
+  payments or attachments and write an audit record. Do not assume a universal
+  soft-delete rule. Restore must preserve records in the selected snapshot.
 - All FKs declared; `ON DELETE RESTRICT` for anything referenced by history,
   `CASCADE` only for pure child-of-child rows.
 
-## Entity map (tables)
+## Entity map (selected tables)
+
+The list below is an architectural overview, not a complete, verified schema.
+Consult numbered migrations under `src/main/db/migrations/` for actual columns,
+constraints and delete behavior. In particular, historical v3.0.3 records are
+retained across migrations 003/004.
 
 ### Identity & access
 - `users` — username (unique, lowercased), password_hash (Argon2id PHC string), role_id,
@@ -60,13 +67,16 @@ no record-count limits beyond storage.
 - `treatments` — code, name, bengali_name, category, description, default_price_paisa,
   duration_min, active.
 
-### Appointments & queue
+### Appointments (legacy queue archive)
 - `appointments` — patient_id, dentist_id, date, time, duration_min, type, status,
   notes, reminder, created_by, created_at, rescheduled_from_id?, visit_id?.
   Index: (dentist_id, date, time), (patient_id, date).
-- `queue_entries` — queue_no (per-day sequence), appointment_id?, patient_id, dentist_id,
-  arrived_at, priority, status(waiting/called/in_treatment/paused/completed/cancelled),
-  started_at?, finished_at?, transferred_to?.
+- `queue_entries` remains in migrated databases **only as historical archive**.
+  Migration 003 removes Queue permissions and application routes, not queue rows.
+  No new queue data is written. See `QUEUE_REMOVAL.md`.
+- Migration 004 adds `expired_at` (local-midnight expiry marker) and
+  `planned_treatments` to existing appointments without rewriting old rows.
+  Rescheduling retains the original appointment ID.
 
 ### Prescriptions
 - `prescriptions` — patient_id, visit_id?, dentist_id, date, c_c, o_e, r_e, diagnosis,
@@ -128,7 +138,8 @@ no record-count limits beyond storage.
 - patients: `(code)`, `(name)`, `(phone)`, `(created_at)`, `(deleted_at)`
 - visits: `(patient_id, datetime)`, `(dentist_id, datetime)`
 - appointments: `(date, dentist_id, time)`, `(patient_id, date)`, `(status, date)`
-- queue: `(status, arrived_at)`
+- legacy queue indexes may remain for historical rows, but the application no
+  longer queries or mutates Queue data.
 - invoices: `(patient_id, date)`, `(number)`, `(status, date)`
 - payments: `(paid_at)`, `(patient_id, paid_at)`, `(invoice_id)`
 - audit_log: `(at)`, `(user_id, at)`, `(entity_type, entity_id)`
@@ -140,5 +151,6 @@ no record-count limits beyond storage.
 1. Catalog price changes never touch old invoices (price snapshot columns).
 2. Patient field edits do not rewrite visits (visit rows carry their own captured text).
 3. Tooth conditions append/supersede; old rows keep `superseded_at` → full per-visit history.
-4. Payments never edited: corrections = refund rows + new payment rows.
+4. Payments are never directly edited. A permitted manual deletion is audited;
+   corrections can also use refund rows and new payment rows.
 5. Invoice lines immutable after issue: corrections = void + reissue.

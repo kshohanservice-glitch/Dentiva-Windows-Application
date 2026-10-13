@@ -19,7 +19,9 @@ engineering (see §6 Activation honesty).
 - Session lives in main process memory only; renderer receives non-sensitive profile info.
 - Manual **Lock** (Ctrl+L) and **Auto-lock** (5/10/15/30 min, default 10; disable only via
   settings policy) → lock overlay requires password re-auth; cached patient/financial views
-  are cleared beneath the overlay.
+  are covered by the overlay; secondary print windows are closed. On logout
+  secondary print windows close too. Clearing every mounted component and all OS
+  print/PDF previews has not been independently verified.
 - Logout clears session + audit.
 
 ## 3. Authorization (RBAC)
@@ -40,14 +42,21 @@ engineering (see §6 Activation honesty).
 
 - Prepared statements only (no string-concat SQL) → SQLi defense.
 - Audit log insert-only via SQLite triggers (UPDATE/DELETE rejected at DB level).
-- Sensitive settings/activation state encrypted with Electron `safeStorage`
-  (DPAPI on Windows).
-- Attachments stored outside DB with generated UUID paths; original filename sanitized
+- Activation state uses Electron `safeStorage` (DPAPI on Windows). A packaged
+  Windows build refuses to start if OS secure storage is unavailable; development
+  and non-Windows builds retain a reduced-strength fallback. Ordinary settings
+  and the SQLite database are not encrypted at rest by this claim.
+- Attachments stored outside DB with generated random-suffix paths; original filename sanitized
   (strip path separators, control chars, reserved Windows names, length cap); path
   resolution validated to remain inside the attachments root (path-traversal defense);
-  extension allowlist + MIME sniff (magic bytes) for images/PDF/docs; size limit (100 MB default).
-- Backup files: validated manifest + SHA-256 checksum on restore; restore only after
-  integrity_check on the extracted copy and automatic pre-restore backup.
+  extension allowlist + magic-byte checks for images/PDF and executables; document
+  formats are extension-checked, not full MIME-sniffed; size limit 100 MB. Entity
+  permissions and active-target checks apply to add/list/open/rename/delete. This
+  is not protection against a local administrator modifying the data directory.
+- Backup restore stages and validates the manifest, path containment, file counts,
+  database hash and SQLite integrity before swap. It takes a pre-restore backup and
+  has rollback coverage on forced mid-swap failure. Test only on disposable data
+  until Windows/device verification is complete.
 
 ## 5. Renderer hardening
 
@@ -55,7 +64,8 @@ engineering (see §6 Activation honesty).
 - CSP: `default-src 'self'; img-src 'self' data: file:; style-src 'self' 'unsafe-inline';
   font-src 'self'; connect-src 'none'` (no network at runtime).
 - No `eval`, no remote content, no shell exposure via IPC; every IPC channel allowlisted.
-- Error surfaces show friendly text + correlation id; stack traces only in redacted local logs.
+- Error surfaces show friendly text + correlation id; logs and every clinical
+  field still require a dedicated privacy review before release.
 
 ## 6. Activation (offline) — honest design
 
@@ -65,7 +75,8 @@ engineering (see §6 Activation honesty).
   config, asset, test fixture, log, or error string. The verifier itself is stored
   XOR-sharded/assembled at runtime (not a single obvious literal) and compared with
   `crypto.timingSafeEqual`.
-- Activation state stored encrypted via safeStorage (DPAPI on Windows) + flag file.
+- Activation state is encrypted via safeStorage (DPAPI on packaged Windows) +
+  flag file. Startup fails closed on packaged Windows when safeStorage is unavailable.
 - **Honest limitation (documented in About/SECURITY.md):** because the app is fully offline
   and the activation secret is fixed, no purely local scheme makes the secret impossible to
   recover by sufficiently capable reverse engineering. We minimize attack surface, avoid
@@ -89,3 +100,17 @@ engineering (see §6 Activation honesty).
 - Delete/restore/business-reset flows: permission check → explicit warning dialog →
   typed confirmation (`DELETE`, clinic name, or amount) → transactional execution →
   audit record. Pre-restore automatic backup mandatory.
+
+## 10. Money display and intentional exports (in progress)
+
+- Financial amounts on supported screens default to `****`, with per-amount and
+  global reveal buttons; reveal state is in memory and reset on lock/logout.
+  Legacy report and audit summaries using BDT-formatted text are segmented before
+  rendering. This is a visual privacy affordance, **not encryption** or RBAC.
+- Print-window *screen previews* mask financial values by default. The Print and
+  Save PDF actions are explicit exports: their documents contain real numbers.
+  Users must treat printed pages and saved PDF/CSV files as sensitive patient and
+  financial data. OS print dialogs, exported CSV/PDF, audit databases and backups
+  are not masked.
+- Electron E2E, accessibility and physical print verification remain release gates;
+  see `RELEASE_EXECUTION_JOURNAL.md`.
