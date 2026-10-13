@@ -31,7 +31,7 @@ A task is `VERIFIED` only after its required checks actually passed in this envi
 - Playwright E2E requires an Electron display and the packaged app; it has not been run in this session.
 
 ## Checkpoint (2026-10-13, attachment and timeline phase)
-- Branch: `arena/b7b220b0-dentiva-windows-application`; previous commit `a571111`. This checkpoint is pending a commit; no version bump, new tag, installer, or release exists. **Not release-ready.**
+- Branch: `arena/b7b220b0-dentiva-windows-application`; latest commit `fcbf456`; no version bump, new tag, installer, or release exists. **Not release-ready.**
 - Added entity-specific attachment permissions, storage symlink/traversal checks, cleanup on failed insert, and quarantine/rollback on database-delete failure; 11 attachment security tests pass. File unlink failure and hostile concurrent filesystem mutation are not fully covered.
 - Packaged Windows now rejects activation startup if OS secure storage is unavailable; development/non-Windows still uses the reduced-strength fallback. Windows behaviour has not been exercised.
 - Patient timeline invoice/payment amounts are separate integer-paisa fields rendered by `<Money>`; integration regression test added. Print preview remains a known money-masking gap: `PrintPage.tsx` formats values directly; exported/printed financial documents also need an explicit privacy policy and test.
