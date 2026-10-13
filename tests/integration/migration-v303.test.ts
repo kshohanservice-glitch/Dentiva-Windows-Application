@@ -70,6 +70,7 @@ describe('upgrade from v3.0.3 to the current schema', () => {
     try {
       expect(schemaVersion).toBe(CURRENT);
       expect(db.pragma('foreign_key_check') as unknown[]).toHaveLength(0);
+      expect((db.prepare('SELECT COUNT(*) n FROM clinical_templates').get() as { n: number }).n).toBe(0);
     } finally {
       db.close();
     }
@@ -185,6 +186,7 @@ describe('backup and restore across the schema change', () => {
     const file = await v303Backup();
     await service.restoreBackup(ownerCtx(env), file, 'RESTORE');
     expect(schemaVersionOf(env.db)).toBe(CURRENT);
+    expect((env.db.prepare('SELECT COUNT(*) n FROM clinical_templates').get() as { n: number }).n).toBe(0);
     expect(listPatients(ownerCtx(env), { range: 'all' }).total).toBe(2);
     expect(fullIntegrityCheck(env.paths.dbFile).ok).toBe(true);
   });

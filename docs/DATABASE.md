@@ -84,7 +84,10 @@ retained across migrations 003/004.
 - `prescription_items` — prescription_id, seq, medicine_name, generic, form, strength,
   dosage, frequency, morning, afternoon, night, timing(before/after/na), duration,
   qty, instruction, instruction_bn, note.
-- `medicine_templates` — name, items_json (staff-defined quick templates).
+- `medicine_templates` — existing prescription medicine quick templates.
+- `clinical_templates` (migration 005) — kind, case-insensitive name, validated
+  JSON body, author and timestamps. Kind-specific permissions guard list/save/delete.
+  Applying a template fills a draft, never rewrites an existing record.
 
 ### Billing
 - `invoices` — number (unique, yearly sequence), patient_id, date, status

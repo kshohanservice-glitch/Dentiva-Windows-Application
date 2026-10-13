@@ -184,6 +184,41 @@ test('creates an invoice and receives full payment', async () => {
   await page.getByRole('button', { name: /Hide amounts/ }).click();
 });
 
+test('clinician templates fill visit and invoice drafts without creating records', async () => {
+  await page.getByRole('link', { name: 'Patients' }).click();
+  await page.getByPlaceholder('Search name, phone, patient ID, tag…').fill('E2E Test Patient');
+  await page.getByRole('cell', { name: 'E2E Test Patient' }).click();
+  await page.getByRole('button', { name: 'New visit', exact: true }).first().click();
+  const visit = page.locator('.modal[role="dialog"]', { hasText: 'Record visit' });
+  await visit.getByLabel('Treatment plan', { exact: true }).fill('Review options at next visit');
+  const plan = visit.locator('.form-section', { hasText: 'Treatment plan templates' });
+  await plan.getByPlaceholder('New template name').fill('E2E reusable plan');
+  await plan.getByRole('button', { name: 'Save current draft' }).click();
+  await expect(plan.getByRole('option', { name: 'E2E reusable plan' })).toBeAttached();
+  await visit.getByLabel('Treatment plan', { exact: true }).fill('');
+  await plan.getByLabel('Treatment plan templates').selectOption({ label: 'E2E reusable plan' });
+  await plan.getByRole('button', { name: 'Apply to draft' }).click();
+  await expect(visit.getByLabel('Treatment plan', { exact: true })).toHaveValue('Review options at next visit');
+  await visit.getByRole('button', { name: 'Cancel' }).click();
+  await page.getByRole('button', { name: 'Discard changes' }).click();
+
+  await page.getByRole('link', { name: 'Invoice', exact: true }).click();
+  await page.getByRole('button', { name: 'New invoice' }).first().click();
+  const invoice = page.locator('.modal[role="dialog"]', { hasText: 'Create invoice' });
+  await invoice.getByPlaceholder('Treatment or item').fill('Template consultation');
+  await invoice.getByLabel('Unit price (৳)').fill('125');
+  const items = invoice.locator('.form-section', { hasText: 'Invoice item templates' });
+  await items.getByPlaceholder('New template name').fill('E2E invoice items');
+  await items.getByRole('button', { name: 'Save current draft' }).click();
+  await expect(items.getByRole('option', { name: 'E2E invoice items' })).toBeAttached();
+  await invoice.getByPlaceholder('Treatment or item').fill('');
+  await items.getByLabel('Invoice item templates').selectOption({ label: 'E2E invoice items' });
+  await items.getByRole('button', { name: 'Apply to draft' }).click();
+  await expect(invoice.getByPlaceholder('Treatment or item')).toHaveValue('Template consultation');
+  await invoice.getByRole('button', { name: 'Cancel' }).click();
+  await page.getByRole('button', { name: 'Discard changes' }).click();
+});
+
 test('shows developer credit on the About page', async () => {
   await page.getByRole('link', { name: 'About' }).click();
   await expect(page.getByText('Shohan Khan')).toBeVisible();

@@ -273,7 +273,7 @@ export async function resetBusiness(ctx: Ctx, input: { typedConfirm: string; pas
     'visit_treatments', 'tooth_conditions', 'visits', 'referrals',
     'invoice_items', 'payments', 'invoices', 'inventory_txns', 'inventory_batches', 'inventory_items', 'suppliers',
     'expenses', 'incomes', 'attachments', 'patient_tags', 'tags', 'patient_histories', 'patients',
-    'notifications', 'medicine_templates',
+    'notifications', 'medicine_templates', 'clinical_templates',
   ];
   const APPEND_ONLY_TRIGGERS = [
     'trg_payments_no_update', 'trg_payments_no_delete',

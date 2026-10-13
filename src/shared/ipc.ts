@@ -13,6 +13,7 @@ import type {
   SettingsDTO, StaffDTO, StockInput, TreatmentDTO, UserDTO, VisitDTO,
 } from './types';
 import type { PermissionKey } from './permissions';
+import type { ClinicalTemplate, ClinicalTemplateKind, ClinicalTemplateBody } from './clinical-templates';
 
 /** Appointment edit payload. Moving the date or time requires `confirmReschedule: true`. */
 export interface AppointmentUpdatePayload {
@@ -88,6 +89,11 @@ export interface DentivaApi {
   'prescriptions/templates'(): Promise<{ id: number; name: string; items: any[] }[]>;
   'prescriptions/save-template'(payload: { name: string; items: any[] }): Promise<{ id: number }>;
   'prescriptions/delete-template'(id: number): Promise<{ ok: boolean }>;
+
+  /* reusable clinician-authored templates (no patient-specific data) */
+  'clinical-templates/list'(kind: ClinicalTemplateKind): Promise<ClinicalTemplate[]>;
+  'clinical-templates/save'(payload: { kind: ClinicalTemplateKind; name: string; body: ClinicalTemplateBody }): Promise<ClinicalTemplate>;
+  'clinical-templates/delete'(id: number): Promise<{ ok: true }>;
 
   /* appointments (reminder-only schedule) */
   'appointments/list'(filter: { from: string; to: string; dentistId?: number; status?: string }): Promise<AppointmentDTO[]>;
@@ -346,6 +352,10 @@ export const IPC = {
   prescriptionsTemplates: 'prescriptions/templates',
   prescriptionsSaveTemplate: 'prescriptions/save-template',
   prescriptionsDeleteTemplate: 'prescriptions/delete-template',
+
+  clinicalTemplatesList: 'clinical-templates/list',
+  clinicalTemplatesSave: 'clinical-templates/save',
+  clinicalTemplatesDelete: 'clinical-templates/delete',
 
   appointmentsList: 'appointments/list',
   appointmentsAgenda: 'appointments/agenda',

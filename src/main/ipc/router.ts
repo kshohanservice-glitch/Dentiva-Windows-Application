@@ -14,6 +14,7 @@ import * as visits from '../services/visits';
 import * as chart from '../services/chart';
 import * as treatments from '../services/treatments';
 import * as prescriptions from '../services/prescriptions';
+import * as clinicalTemplates from '../services/clinical-templates';
 import * as appointments from '../services/appointments';
 import * as billing from '../services/billing';
 import * as inventory from '../services/inventory';
@@ -80,6 +81,7 @@ export function registerRouter(deps: RouterDeps): void {
     IPC.visitsCreate, IPC.visitsUpdate, IPC.visitsDelete, IPC.chartSet,
     IPC.treatmentsSave, IPC.treatmentsSetActive, IPC.treatmentsDelete,
     IPC.prescriptionsCreate, IPC.prescriptionsDelete, IPC.prescriptionsSaveTemplate, IPC.prescriptionsDeleteTemplate,
+    IPC.clinicalTemplatesSave, IPC.clinicalTemplatesDelete,
     IPC.appointmentsCreate, IPC.appointmentsUpdate, IPC.appointmentsCancel, IPC.appointmentsDelete, IPC.appointmentsNoShow,
     IPC.invoicesCreate, IPC.invoicesVoid, IPC.invoicesDelete, IPC.paymentsCreate, IPC.paymentsDelete,
     IPC.inventorySaveItem, IPC.inventoryDeleteItem, IPC.inventoryDeleteBatch, IPC.inventoryStock, IPC.inventorySaveSupplier, IPC.inventoryDeleteSupplier,
@@ -228,6 +230,11 @@ export function registerRouter(deps: RouterDeps): void {
   handle(IPC.prescriptionsTemplates, { auth: true, fn: (_p, ctx) => prescriptions.listTemplates(ctx!) });
   handle(IPC.prescriptionsSaveTemplate, { auth: true, fn: (p, ctx) => prescriptions.saveTemplate(ctx!, String(p?.name), p?.items) });
   handle(IPC.prescriptionsDeleteTemplate, { auth: true, fn: (p, ctx) => prescriptions.deleteTemplate(ctx!, Number(p)) });
+
+  /* ------------------------ clinical templates ------------------------- */
+  handle(IPC.clinicalTemplatesList, { auth: true, fn: (kind, ctx) => clinicalTemplates.listClinicalTemplates(ctx!, kind) });
+  handle(IPC.clinicalTemplatesSave, { auth: true, fn: (input, ctx) => clinicalTemplates.saveClinicalTemplate(ctx!, input) });
+  handle(IPC.clinicalTemplatesDelete, { auth: true, fn: (id, ctx) => clinicalTemplates.deleteClinicalTemplate(ctx!, id) });
 
   /* -------------------------- appointments ----------------------------- */
   // Mutations re-sync reminders immediately so notifications never lag the schedule.
