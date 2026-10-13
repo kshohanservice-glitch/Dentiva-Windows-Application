@@ -37,6 +37,29 @@ function dto(r: any): AttachmentDTO {
   };
 }
 
+/** Entity-specific RBAC; a guessed attachment id must never bypass its owner's permission. */
+const ENTITY_PERMISSIONS = {
+  patient: { read: 'patients.view', write: 'patients.edit' },
+  visit: { read: 'clinical.view', write: 'clinical.visit.edit' },
+  staff: { read: 'staff.view', write: 'staff.manage' },
+  invoice: { read: 'billing.invoice.view', write: 'billing.invoice.edit' },
+  referral: { read: 'clinical.view', write: 'clinical.referral.manage' },
+  prescription: { read: 'clinical.view', write: 'clinical.prescription.create' },
+  appointment: { read: 'appointments.view', write: 'appointments.manage' },
+} as const;
+
+function requireEntityRead(ctx: Ctx, entityType: string): void {
+  const access = ENTITY_PERMISSIONS[entityType as keyof typeof ENTITY_PERMISSIONS];
+  if (!access) throw validation('Unknown attachment target.');
+  requirePermission(ctx, access.read);
+}
+
+function requireEntityWrite(ctx: Ctx, entityType: string): void {
+  const access = ENTITY_PERMISSIONS[entityType as keyof typeof ENTITY_PERMISSIONS];
+  if (!access) throw validation('Unknown attachment target.');
+  requirePermission(ctx, access.write);
+}
+
 function assertEntity(ctx: Ctx, entityType: string, entityId: number): void {
   const table: Record<string, string> = {
     patient: 'patients', visit: 'visits', staff: 'staff', invoice: 'invoices',
@@ -44,34 +67,39 @@ function assertEntity(ctx: Ctx, entityType: string, entityId: number): void {
   };
   const t = table[entityType];
   if (!t) throw validation('Unknown attachment target.');
-  const row = ctx.db.prepare(`SELECT id FROM ${t} WHERE id = ?`).get(entityId);
+  if (!Number.isSafeInteger(entityId) || entityId < 1) throw validation('Invalid attachment target.');
+  const active = entityType === 'referral' ? '' : ' AND deleted_at IS NULL';
+  const row = ctx.db.prepare(`SELECT id FROM ${t} WHERE id = ?${active}`).get(entityId);
   if (!row) throw notFound('Attachment target not found.');
 }
 
-function requireEntityRead(ctx: Ctx, entityType: string): void {
-  if (entityType === 'invoice') {
-    requirePermission(ctx, 'billing.invoice.view');
-    return;
+/** Existing paths are checked via realpath too: do not follow a storage symlink out of the root. */
+function storedPath(ctx: Ctx, storedName: string): string {
+  if (typeof storedName !== 'string' || storedName.includes('\0') || path.win32.isAbsolute(storedName) || /^[a-z]:/i.test(storedName)) {
+    throw validation('Invalid attachment storage path.');
   }
-  if (entityType === 'staff') {
-    requirePermission(ctx, 'staff.view');
-    return;
+  const rel = storedName.replace(/\\/g, '/'); // old Windows databases store backslash-separated paths
+  if (rel.startsWith('/') || rel.split('/').some((part) => !part || part === '.' || part === '..' || part.endsWith('.') || part.endsWith(' ') || /[<>:"|?*]/.test(part))) {
+    throw validation('Invalid attachment storage path.');
   }
-  requirePermission(ctx, 'patients.view');
-}
-
-/** Attachments are writes — gated by the write permission of their owning domain. */
-function requireEntityWrite(ctx: Ctx, entityType: string): void {
-  if (entityType === 'invoice') {
-    requirePermission(ctx, 'billing.invoice.view');
-    requirePermission(ctx, 'billing.invoice.edit');
-    return;
+  const root = fs.realpathSync(ctx.paths.attachmentsDir);
+  const parts = rel.split('/');
+  const dest = safeResolve(root, ...parts);
+  // Never traverse a symlink in any path component, even if it currently points inside the root.
+  let component = root;
+  for (const part of parts) {
+    component = path.join(component, part);
+    if (fs.existsSync(component) && fs.lstatSync(component).isSymbolicLink()) throw validation('Attachment path escapes storage.');
   }
-  if (entityType === 'staff') {
-    requirePermission(ctx, 'staff.manage');
-    return;
+  if (fs.existsSync(dest)) {
+    const actual = fs.realpathSync(dest);
+    const within = path.relative(root, actual);
+    if (!within || within === '..' || within.startsWith(`..${path.sep}`) || path.isAbsolute(within)) {
+      throw validation('Attachment path escapes storage.');
+    }
+    if (!fs.lstatSync(dest).isFile()) throw validation('Attachment is not a regular file.');
   }
-  requirePermission(ctx, 'patients.edit');
+  return dest;
 }
 
 export function listAttachments(ctx: Ctx, entityType: string, entityId: number): AttachmentDTO[] {
@@ -94,7 +122,8 @@ export function addAttachment(ctx: Ctx, entityType: string, entityId: number, so
   assertEntity(ctx, entityType, entityId);
 
   if (!fs.existsSync(sourcePath)) throw new AppError('FILE', 'The selected file could not be found.');
-  const stat = fs.statSync(sourcePath);
+  const stat = fs.lstatSync(sourcePath);
+  if (stat.isSymbolicLink()) throw validation('Symbolic links cannot be attached.');
   if (!stat.isFile()) throw validation('The selected path is not a file.');
   if (stat.size === 0) throw validation('The selected file is empty.');
   if (stat.size > MAX_BYTES) throw validation('File is too large (maximum 100 MB).');
@@ -123,9 +152,12 @@ export function addAttachment(ctx: Ctx, entityType: string, entityId: number, so
   const storedRel = path.join(entityType, String(entityId), `${Date.now()}-${crypto.randomBytes(6).toString('hex')}-${original}`);
   const dest = safeResolve(ctx.paths.attachmentsDir, storedRel);
   ensureDir(path.dirname(dest));
-  fs.copyFileSync(sourcePath, dest);
-
-  const id = tx(ctx.db, () => {
+  // Exclusive creation prevents collisions. If the database transaction fails,
+  // remove only this newly created file; never leave an unreferenced patient file.
+  fs.copyFileSync(sourcePath, dest, fs.constants.COPYFILE_EXCL);
+  let id: number;
+  try {
+    id = tx(ctx.db, () => {
     const info = ctx.db
       .prepare(
         `INSERT INTO attachments (entity_type, entity_id, stored_name, original_name, mime, size, sha256, uploaded_by, uploaded_at)
@@ -135,7 +167,11 @@ export function addAttachment(ctx: Ctx, entityType: string, entityId: number, so
     const attId = Number(info.lastInsertRowid);
     audit(ctx, { action: 'attachment.add', entityType: 'attachment', entityId: attId, summary: `Attached "${original}" to ${entityType} #${entityId}` });
     return attId;
-  });
+    });
+  } catch (e) {
+    fs.rmSync(dest, { force: true });
+    throw e;
+  }
 
   const row = ctx.db
     .prepare('SELECT a.*, u.display_name uploaded_by_name FROM attachments a LEFT JOIN users u ON u.id = a.uploaded_by WHERE a.id = ?')
@@ -146,7 +182,9 @@ export function addAttachment(ctx: Ctx, entityType: string, entityId: number, so
 export function renameAttachment(ctx: Ctx, id: number, name: string): AttachmentDTO {
   const row = ctx.db.prepare('SELECT * FROM attachments WHERE id = ?').get(id) as any;
   if (!row) throw notFound('Attachment not found.');
+  requireEntityRead(ctx, row.entity_type);
   requireEntityWrite(ctx, row.entity_type);
+  assertEntity(ctx, row.entity_type, row.entity_id);
   const safe = sanitizeFilename(reqString(name, 'File name', { max: 120 }));
   tx(ctx.db, () => {
     ctx.db.prepare('UPDATE attachments SET original_name = ? WHERE id = ?').run(safe, id);
@@ -158,17 +196,25 @@ export function renameAttachment(ctx: Ctx, id: number, name: string): Attachment
 export function removeAttachment(ctx: Ctx, id: number): { ok: boolean } {
   const row = ctx.db.prepare('SELECT * FROM attachments WHERE id = ?').get(id) as any;
   if (!row) throw notFound('Attachment not found.');
+  requireEntityRead(ctx, row.entity_type);
   requireEntityWrite(ctx, row.entity_type);
-  tx(ctx.db, () => {
-    ctx.db.prepare('DELETE FROM attachments WHERE id = ?').run(id);
-    audit(ctx, { action: 'attachment.delete', entityType: 'attachment', entityId: id, summary: `Deleted attachment "${row.original_name}"` });
-  });
+  assertEntity(ctx, row.entity_type, row.entity_id);
+  const abs = storedPath(ctx, row.stored_name);
+  const present = fs.existsSync(abs);
+  const quarantine = `${abs}.delete-${crypto.randomBytes(8).toString('hex')}`;
+  if (present) fs.renameSync(abs, quarantine);
   try {
-    const abs = safeResolve(ctx.paths.attachmentsDir, row.stored_name);
-    if (fs.existsSync(abs)) fs.rmSync(abs, { force: true });
-  } catch {
-    /* file removal is best-effort; DB no longer references it */
+    tx(ctx.db, () => {
+      ctx.db.prepare('DELETE FROM attachments WHERE id = ?').run(id);
+      audit(ctx, { action: 'attachment.delete', entityType: 'attachment', entityId: id, summary: `Deleted attachment "${row.original_name}"` });
+    });
+  } catch (e) {
+    if (present) fs.renameSync(quarantine, abs);
+    throw e;
   }
+  // Metadata and file were removed consistently. In case of an OS unlink error,
+  // the inaccessible quarantined copy remains for administrator recovery only.
+  if (present) fs.rmSync(quarantine, { force: true });
   return { ok: true };
 }
 
@@ -177,7 +223,8 @@ export function attachmentPath(ctx: Ctx, id: number): { abs: string; originalNam
   const row = ctx.db.prepare('SELECT * FROM attachments WHERE id = ?').get(id) as any;
   if (!row) throw notFound('Attachment not found.');
   requireEntityRead(ctx, row.entity_type);
-  const abs = safeResolve(ctx.paths.attachmentsDir, row.stored_name);
+  assertEntity(ctx, row.entity_type, row.entity_id);
+  const abs = storedPath(ctx, row.stored_name);
   if (!fs.existsSync(abs)) throw new AppError('FILE', 'The attachment file is missing from storage.');
   return { abs, originalName: row.original_name };
 }

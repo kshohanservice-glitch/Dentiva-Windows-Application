@@ -31,7 +31,10 @@ function buildCipher(): Cipher {
   if (safeStorage.isEncryptionAvailable()) {
     return { encrypt: (b) => safeStorage.encryptString(b.toString('utf8')), decrypt: (b) => Buffer.from(safeStorage.decryptString(b), 'utf8') };
   }
-  logger.warn('OS secure storage unavailable — using reduced-strength activation container.');
+  if (process.platform === 'win32' && app.isPackaged) {
+    throw new Error('Windows secure storage is unavailable. Activation cannot be opened safely on this device. Enable the Windows user profile encryption service and restart. Clinic data has not been changed.');
+  }
+  logger.warn('OS secure storage unavailable — using reduced-strength activation container (development/non-Windows only).');
   return weakCipher;
 }
 
@@ -140,7 +143,13 @@ async function boot(): Promise<void> {
   }
 
   // --- Activation --------------------------------------------------------
-  const activation = new ActivationStore(path.join(paths.activationDir, 'state.bin'), buildCipher());
+  let activation: ActivationStore;
+  try {
+    activation = new ActivationStore(path.join(paths.activationDir, 'state.bin'), buildCipher());
+  } catch (err) {
+    fatal('Secure storage unavailable', err instanceof Error ? err.message : 'Activation storage could not be initialized.');
+    return;
+  }
 
   // --- Backup service ----------------------------------------------------
   const backup = createBackupService({

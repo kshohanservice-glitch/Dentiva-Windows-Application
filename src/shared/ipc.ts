@@ -255,6 +255,7 @@ export interface RoleSavePayload {
 
 export interface PatientTimelineEvent {
   at: string; type: string; title: string; summary: string;
+  amountPaisa?: number; // monetary history is structured so the renderer can mask it
   linkEntity: string | null; linkId: number | null; actor: string | null;
 }
 

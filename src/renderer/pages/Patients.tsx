@@ -941,7 +941,7 @@ function TimelineTab(props: { patientId: number; refreshKey?: number }) {
               <span className="timeline-title">{ev.title}</span>
               <span className="timeline-time">{`${formatDate(ev.at)} ${new Date(ev.at).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}`}</span>
             </div>
-            {ev.summary && <div className="timeline-summary">{ev.summary}</div>}
+            {(ev.summary || ev.amountPaisa !== undefined) && <div className="timeline-summary">{ev.summary} {ev.amountPaisa !== undefined && <Money paisa={ev.amountPaisa} />}</div>}
           </div>
         </div>
       ))}
