@@ -1,7 +1,13 @@
 /** Formatting helpers shared by renderer pages (BDT money, dates). */
 
+import { formatBdt as formatBdtPaisa } from '../shared/currency';
+
+/**
+ * Display formatting for BDT paisa. Delegates to the shared integer-exact
+ * formatter so screen, print and export output can never drift apart.
+ */
 export function bdt(paisa: number): string {
-  return `৳${(paisa / 100).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  return formatBdtPaisa(paisa);
 }
 
 export function bdtShort(paisa: number): string {

@@ -32,7 +32,10 @@ function clinicLogoDataUrl(ctx: Ctx, logoPath?: string | null): string | null {
   if (!logoPath) return null;
   try {
     const full = safeResolve(ctx.paths.dataDir, logoPath);
-    if (!fs.existsSync(full)) return null;
+    if (!fs.existsSync(full) || !fs.statSync(full).isFile()) return null;
+    // Defensive ceiling: a logo is at most a few MB (see uploadLogo). Never
+    // ship an unbounded blob through IPC.
+    if (fs.statSync(full).size > 8 * 1024 * 1024) return null;
     const ext = path.extname(full).toLowerCase();
     const mime = ext === '.svg' ? 'image/svg+xml'
       : ext === '.jpg' || ext === '.jpeg' ? 'image/jpeg'
@@ -215,14 +218,45 @@ function clampNum(v: unknown, min: number, max: number, fallback: number): numbe
   return Math.max(min, Math.min(max, n));
 }
 
+/**
+ * Verify the file's leading bytes really are the image type its extension
+ * claims. A truncated or mislabelled file would otherwise be stored and then
+ * render as a broken image on the login screen and every printed document.
+ */
+function hasExpectedImageSignature(file: string, ext: string): boolean {
+  let fd: number | null = null;
+  try {
+    fd = fs.openSync(file, 'r');
+    const head = Buffer.alloc(32);
+    const read = fs.readSync(fd, head, 0, head.length, 0);
+    const bytes = head.subarray(0, read);
+    if (ext === '.png') return bytes.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]));
+    if (ext === '.jpg' || ext === '.jpeg') return bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff;
+    if (ext === '.webp') return bytes.subarray(0, 4).toString('ascii') === 'RIFF' && bytes.subarray(8, 12).toString('ascii') === 'WEBP';
+    if (ext === '.svg') {
+      const text = bytes.toString('utf8').replace(/^\uFEFF/, '').trimStart();
+      return text.startsWith('<?xml') || text.startsWith('<svg') || text.startsWith('<!DOCTYPE svg');
+    }
+    return false;
+  } catch {
+    return false;
+  } finally {
+    if (fd !== null) { try { fs.closeSync(fd); } catch { /* best effort */ } }
+  }
+}
+
 /** Copy a logo/clinic image into managed storage; returns relative path. */
 export function uploadLogo(ctx: Ctx, sourcePath: string): string {
   requirePermission(ctx, 'settings.manage');
   if (!fs.existsSync(sourcePath)) throw validation('Logo file not found.');
   const stat = fs.statSync(sourcePath);
+  if (!stat.isFile()) throw validation('Logo must be a file.');
   if (stat.size > 5 * 1024 * 1024) throw validation('Logo must be smaller than 5 MB.');
   const ext = path.extname(sourcePath).toLowerCase();
   if (!['.png', '.jpg', '.jpeg', '.svg', '.webp'].includes(ext)) throw validation('Logo must be a PNG, JPG, WEBP or SVG file.');
+  if (!hasExpectedImageSignature(sourcePath, ext)) {
+    throw validation('That file is not a valid image of the selected type. Choose a different PNG, JPG, WEBP or SVG file.');
+  }
   const rel = path.join('branding', `logo-${Date.now()}${ext}`);
   const dest = safeResolve(ctx.paths.dataDir, rel);
   ensureDir(path.dirname(dest));

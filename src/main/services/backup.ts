@@ -58,7 +58,7 @@ function sha256File(file: string): Promise<string> {
   });
 }
 
-function zipDirectory(attachmentsDir: string, outFile: string, manifest: Buffer, dbStagedPath: string): Promise<void> {
+function zipDirectory(attachmentsDir: string, brandingDir: string, outFile: string, manifest: Buffer, dbStagedPath: string): Promise<void> {
   return new Promise((resolve, reject) => {
     const output = fs.createWriteStream(outFile);
     const archive = archiver('zip', { zlib: { level: 6 } });
@@ -69,8 +69,16 @@ function zipDirectory(attachmentsDir: string, outFile: string, manifest: Buffer,
     archive.file(dbStagedPath, { name: 'database/dentiva.db' });
     archive.append(manifest, { name: 'manifest.json' });
     if (fs.existsSync(attachmentsDir)) archive.directory(attachmentsDir, 'attachments');
+    // Clinic branding is part of the clinic's configuration, not of the business
+    // data: archiving it keeps the logo working after a restore.
+    if (fs.existsSync(brandingDir)) archive.directory(brandingDir, 'branding');
     void archive.finalize();
   });
+}
+
+/** Managed storage for clinic branding assets (see services/settings.ts uploadLogo). */
+function brandingDir(paths: AppPaths): string {
+  return path.join(paths.dataDir, 'branding');
 }
 
 function uniquePath(dir: string, base: string, ext: string): string {
@@ -151,7 +159,7 @@ export function createBackupService(deps: BackupDeps) {
         'utf8',
       );
 
-      await zipDirectory(paths.attachmentsDir, outPath, manifest, stagedDb);
+      await zipDirectory(paths.attachmentsDir, brandingDir(paths), outPath, manifest, stagedDb);
 
       const size = fs.statSync(outPath).size;
       if (size <= 0) throw new AppError('BACKUP', 'Backup file was not written correctly.');
@@ -294,6 +302,7 @@ export function createBackupService(deps: BackupDeps) {
     // 3. Extract into the private staging folder only. Live data is untouched.
     const stagedDb = path.join(staging, 'dentiva.db');
     const stagedAttachments = path.join(staging, 'attachments');
+    const stagedBranding = path.join(staging, 'branding');
     ensureDir(staging);
     let extractedBytes = 0;
     try {
@@ -318,6 +327,18 @@ export function createBackupService(deps: BackupDeps) {
       }
       ensureDir(stagedAttachments);
 
+      for (const asset of plan.branding) {
+        if (asset.info.type === 'Directory') continue;
+        const dest = resolveInside(stagedBranding, asset.relPath!);
+        ensureDir(path.dirname(dest));
+        const entry = entryByPath.get(asset.info.path)!;
+        await pipeEntry(entry, dest, `Branding asset "${asset.relPath}"`, { checkBytes: entry.uncompressedSize });
+        extractedBytes += entry.uncompressedSize;
+        if (extractedBytes > ARCHIVE_LIMITS.maxTotalUncompressedBytes) {
+          throw new AppError('RESTORE', 'Backup expands beyond the supported size limit.');
+        }
+      }
+
       // 4. Validate the staged database: integrity, schema, required tables and attachment references.
       const integrity = fullIntegrityCheck(stagedDb);
       if (!integrity.ok) {
@@ -338,10 +359,13 @@ export function createBackupService(deps: BackupDeps) {
     const rollbackDb = `${dbFile}.rollback-${stamp}`;
     const attachmentsDir = paths.attachmentsDir;
     const rollbackAtt = `${attachmentsDir}.rollback-${stamp}`;
+    const brandDir = brandingDir(paths);
+    const rollbackBranding = `${brandDir}.rollback-${stamp}`;
 
     // A consistent snapshot (not a raw file copy, which can miss WAL contents).
     await holder.get().backup(rollbackDb);
     if (fs.existsSync(attachmentsDir)) fs.renameSync(attachmentsDir, rollbackAtt);
+    if (fs.existsSync(brandDir)) fs.renameSync(brandDir, rollbackBranding);
 
     try {
       holder.get().close();
@@ -351,6 +375,8 @@ export function createBackupService(deps: BackupDeps) {
       fs.copyFileSync(stagedDb, dbFile);
       if (fs.existsSync(stagedAttachments)) fs.renameSync(stagedAttachments, attachmentsDir);
       else ensureDir(attachmentsDir);
+      if (fs.existsSync(stagedBranding)) fs.renameSync(stagedBranding, brandDir);
+      else ensureDir(brandDir);
 
       // 5b. Reopen + verify; any failure below triggers the rollback path.
       const { db: newDb } = openDatabase(dbFile);
@@ -377,6 +403,8 @@ export function createBackupService(deps: BackupDeps) {
         fs.copyFileSync(rollbackDb, dbFile);
         if (fs.existsSync(attachmentsDir)) fs.rmSync(attachmentsDir, { recursive: true, force: true });
         if (fs.existsSync(rollbackAtt)) fs.renameSync(rollbackAtt, attachmentsDir);
+        if (fs.existsSync(brandDir)) fs.rmSync(brandDir, { recursive: true, force: true });
+        if (fs.existsSync(rollbackBranding)) fs.renameSync(rollbackBranding, brandDir);
         holder.set(openDatabase(dbFile).db);
       } catch {
         throw new AppError('RESTORE', `Restore failed and rollback also failed: ${swapErr?.message ?? swapErr}. Manual intervention required — previous data is preserved at ${rollbackDb}.`);
@@ -387,6 +415,7 @@ export function createBackupService(deps: BackupDeps) {
     // Success: clean rollback artifacts (only the files created above).
     try { fs.rmSync(rollbackDb, { force: true }); } catch { /* best effort */ }
     try { fs.rmSync(rollbackAtt, { recursive: true, force: true }); } catch { /* best effort */ }
+    try { fs.rmSync(rollbackBranding, { recursive: true, force: true }); } catch { /* best effort */ }
 
     // ctx.db still points at the pre-restore handle we just closed — audit
     // against the freshly reopened database instead.

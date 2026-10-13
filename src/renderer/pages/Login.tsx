@@ -3,6 +3,9 @@ import { useNavigate } from 'react-router-dom';
 import { useApp } from '../state/app-context';
 import { Button, useToast } from '../components/primitives';
 import { Field, Input } from '../components/forms';
+import { ClinicLogo, ClinicName } from '../components/clinic-brand';
+import { PRODUCT_NAME } from '../../shared/branding';
+import type { ClinicSettings } from '../../shared/types';
 import { api, useAsync } from '../api';
 
 export function LoginPage() {
@@ -14,7 +17,9 @@ export function LoginPage() {
   const navigate = useNavigate();
   const toast = useToast();
   const { data: publicSettings } = useAsync(() => api['settings/get'](), []);
-  const clinic = (publicSettings as any)?.clinic?.clinicName as string | undefined;
+  // Branding is the only thing the unauthenticated settings endpoint exposes.
+  const clinic: ClinicSettings | undefined =
+    publicSettings && 'clinic' in publicSettings ? publicSettings.clinic : undefined;
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -48,10 +53,13 @@ export function LoginPage() {
     <div className="auth-screen">
       <form className="auth-card" onSubmit={submit}>
         <div className="auth-brand">
-          <div className="brand-mark" style={{ width: 52, height: 52, fontSize: 24, borderRadius: 16 }}>D</div>
-          <div>
-            <div className="auth-title">Dentiva Pro</div>
-            <div className="auth-sub">{clinic ? clinic : 'Dental Clinic Management'}</div>
+          {/* The clinic's own identity leads; the product stays the subtitle. */}
+          <ClinicLogo clinic={clinic} size={52} rounded={16} />
+          <div style={{ minWidth: 0 }}>
+            <div className="auth-title">
+              <ClinicName clinic={clinic} />
+            </div>
+            <div className="auth-sub">{PRODUCT_NAME} · Dental Clinic Management</div>
           </div>
         </div>
 

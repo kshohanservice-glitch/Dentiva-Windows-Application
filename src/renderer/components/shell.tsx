@@ -1,10 +1,13 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Money, MoneyRevealToggle } from './money';
+import { MoneyRevealToggle } from './money';
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { api, useAsync } from '../api';
 import { useApp } from '../state/app-context';
+import { ClinicLogo, ClinicName } from './clinic-brand';
+import { PRODUCT_NAME } from '../../shared/branding';
 import { Badge, Button, ErrorState, IconButton, Kbd, Spinner, useToast } from './primitives';
 import { Input } from './forms';
+import { SearchHitRow } from '../components/search-hit-row';
 import type { NotificationDTO, SearchHit } from '../../shared/types';
 import { formatDate } from '../format';
 
@@ -180,13 +183,7 @@ function GlobalSearch({ open, onClose }: { open: boolean; onClose: () => void })
             </div>
           )}
           {hits.map((h, i) => (
-            <button key={`${h.kind}-${h.id}`} className={`search-hit ${i === selected ? 'selected' : ''}`} onClick={() => go(h)} type="button">
-              <span className="kind">{h.kind}</span>
-              <span className="flex-1">
-                <span className="title">{h.title}</span>
-                <div className="sub">{h.subtitle}{h.meta ? ` · ${h.meta}` : ''}{h.amountPaisa !== undefined && <> · <Money paisa={h.amountPaisa} noToggle /></>}</div>
-              </span>
-            </button>
+            <SearchHitRow key={`${h.kind}-${h.id}`} hit={h} selected={i === selected} onOpen={go} />
           ))}
         </div>
         <div className="search-footer">
@@ -264,7 +261,7 @@ function NotificationBell() {
 /* ---------------------------- Lock overlay --------------------------- */
 
 export function LockOverlay() {
-  const { user, unlock } = useApp();
+  const { user, settings, unlock } = useApp();
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
@@ -288,7 +285,7 @@ export function LockOverlay() {
   return (
     <div className="lock-overlay">
       <form className="lock-card" onSubmit={submit}>
-        <div className="brand-mark" style={{ width: 52, height: 52, fontSize: 24, borderRadius: 16 }}>D</div>
+        <ClinicLogo clinic={settings?.clinic} size={52} rounded={16} />
         <div>
           <h3>Application locked</h3>
           <p className="small muted mt-2">
@@ -375,7 +372,9 @@ export function AppShell() {
     [can],
   );
 
-  const clinicName = demo ? 'BrightSmile Dental Clinic — Demo' : (settings?.clinic.clinicName || 'Your clinic');
+  // The header shows the clinic identity first and keeps the product name as the
+  // subtitle, so the clinic name is never duplicated in the same header.
+  const brandSubtitle = demo ? 'Dentiva Pro Demo' : PRODUCT_NAME;
 
   const persistCollapse = async (next: boolean) => {
     setCollapsed(next);
@@ -390,10 +389,11 @@ export function AppShell() {
     <div className="shell">
       <header className="app-header">
         <div className="brand">
-          <div className="brand-mark">D</div>
+          {/* The clinic's own identity leads; the product name stays the subtitle. */}
+          <ClinicLogo clinic={settings?.clinic} size={30} rounded={8} />
           <div style={{ minWidth: 0 }}>
-            <div className="brand-name">Dentiva Pro</div>
-            <div className="brand-clinic" title={clinicName}>{clinicName}</div>
+            <div className="brand-name"><ClinicName clinic={settings?.clinic} /></div>
+            <div className="brand-clinic" title={brandSubtitle}>{brandSubtitle}</div>
           </div>
         </div>
 
