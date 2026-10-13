@@ -146,6 +146,8 @@ describe('search stylesheet contract', () => {
     expect(block).toContain('overflow: hidden');
     expect(block).toContain('text-overflow: ellipsis');
     expect(block).toContain('white-space: nowrap');
+    // The width bound below assumes the badge is rendered in small caps.
+    expect(block).toContain('text-transform: uppercase');
   });
 
   it('lets the content column shrink instead of widening the row', () => {

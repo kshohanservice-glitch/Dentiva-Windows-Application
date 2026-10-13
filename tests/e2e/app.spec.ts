@@ -445,6 +445,8 @@ test('global search keeps category labels and result titles in separate columns'
   const count = await rows.count();
   expect(count).toBeGreaterThan(1);
 
+  // DOM labels (the badge is presented in small caps by CSS, so read the DOM
+  // value rather than the rendered text).
   const knownLabels = ['Patient', 'Appointment', 'Invoice', 'Payment', 'Prescription', 'Treatment', 'Staff', 'Dentist', 'Inventory', 'Expense', 'Visit', 'Result'];
   const modalBox = (await modal.boundingBox())!;
 
@@ -456,13 +458,21 @@ test('global search keeps category labels and result titles in separate columns'
     );
     expect(columns).toEqual(['kind', 'hit-body']);
 
-    const label = (await row.locator('.kind').innerText()).trim();
+    const label = ((await row.locator('.kind').textContent()) ?? '').trim();
     expect(knownLabels).toContain(label);
 
     // The label column and the content column must not overlap.
     const labelBox = (await row.locator('.kind').boundingBox())!;
     const bodyBox = (await row.locator('.hit-body').boundingBox())!;
     expect(labelBox.x + labelBox.width).toBeLessThanOrEqual(bodyBox.x + 0.5);
+
+    // The badge must never be ellipsised: the fixed column is wide enough for
+    // the longest category label.
+    const labelClipped = await row.evaluate((el) => {
+      const kind = el.querySelector('.kind') as HTMLElement;
+      return kind.scrollWidth <= kind.clientWidth + 1;
+    });
+    expect(labelClipped).toBe(true);
 
     // Nothing may be clipped horizontally out of the modal.
     const rowBox = (await row.boundingBox())!;
