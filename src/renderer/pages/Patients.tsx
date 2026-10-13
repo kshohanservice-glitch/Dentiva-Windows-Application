@@ -1642,7 +1642,7 @@ export function InvoiceFormModal(props: { patientId: number; visitId?: number | 
       </div>
 
       <ClinicalTemplatePicker kind="invoice_items" label="Invoice item" getBody={() => ({
-        items: values.items.filter((line) => line.description.trim()),
+        items: values.items,
       })} onApply={(body) => {
         if (Array.isArray(body.items)) set('items', body.items.map((item: InvoiceTemplateItem) => ({
           ...item,

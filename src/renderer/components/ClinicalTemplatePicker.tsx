@@ -2,7 +2,7 @@ import { useId, useRef, useState } from 'react';
 import { api, useAsync } from '../api';
 import { Button, ConfirmDialog, useToast } from './primitives';
 import { Input, Select } from './forms';
-import type { ClinicalTemplateBody, ClinicalTemplateKind } from '../../shared/clinical-templates';
+import { hasTemplateDraftContent, type ClinicalTemplateBody, type ClinicalTemplateKind } from '../../shared/clinical-templates';
 
 /** Reusable authoring control. Applying a template only fills the draft: it never saves a patient record. */
 export function ClinicalTemplatePicker(props: {
@@ -15,7 +15,7 @@ export function ClinicalTemplatePicker(props: {
   const [name, setName] = useState('');
   const [pending, setPending] = useState(false);
   const inFlight = useRef(false);
-  const [confirm, setConfirm] = useState<'delete' | 'replace' | null>(null);
+  const [confirm, setConfirm] = useState<'delete' | 'replace' | 'apply' | null>(null);
   const id = useId();
   const toast = useToast();
   const item = data?.find((t) => String(t.id) === selected);
@@ -32,6 +32,12 @@ export function ClinicalTemplatePicker(props: {
       reload();
     } catch (error) { toast.fromError(error, 'Template could not be saved'); }
     finally { inFlight.current = false; setPending(false); setConfirm(null); }
+  };
+  const apply = () => {
+    if (!item) return;
+    props.onApply(item.body);
+    toast.success('Template applied', item.name);
+    setConfirm(null);
   };
   const remove = async () => {
     if (!item || inFlight.current) return;
@@ -56,8 +62,9 @@ export function ClinicalTemplatePicker(props: {
           options={(data ?? []).map((t) => ({ value: String(t.id), label: t.name }))} />
         <Button size="sm" variant="secondary" disabled={!item || pending} onClick={() => {
           if (!item) return;
-          props.onApply(item.body);
-          toast.success('Template applied', item.name);
+          const current = props.getBody();
+          if (hasTemplateDraftContent(current) && JSON.stringify(current) !== JSON.stringify(item.body)) setConfirm('apply');
+          else apply();
         }}>Apply to draft</Button>
         <Button size="sm" variant="ghost" disabled={!item || pending} onClick={() => setConfirm('delete')}>Delete</Button>
       </div>
@@ -71,12 +78,14 @@ export function ClinicalTemplatePicker(props: {
       </div>
       <div className="xsmall muted mt-2">Templates are shared with staff who can create this kind of record. Do not save patient-specific details.</div>
       {confirm && <ConfirmDialog
-        title={confirm === 'delete' ? 'Delete template?' : 'Replace saved template?'}
-        body={confirm === 'delete' ? `Delete “${item?.name}”? Existing clinical records remain unchanged.` : `Replace the saved “${name}” template with the current draft? Existing records remain unchanged.`}
-        confirmLabel={confirm === 'delete' ? 'Delete template' : 'Replace template'}
+        title={confirm === 'delete' ? 'Delete template?' : confirm === 'apply' ? 'Replace entered draft fields?' : 'Replace saved template?'}
+        body={confirm === 'delete' ? `Delete “${item?.name}”? Existing clinical records remain unchanged.` :
+          confirm === 'apply' ? `Applying “${item?.name}” will replace entered fields in this unsaved draft. Saved records remain unchanged.` :
+            `Replace the saved “${name}” template with the current draft? Existing records remain unchanged.`}
+        confirmLabel={confirm === 'delete' ? 'Delete template' : confirm === 'apply' ? 'Replace draft fields' : 'Replace template'}
         danger={confirm === 'delete'} pending={pending}
         onCancel={() => setConfirm(null)}
-        onConfirm={() => void (confirm === 'delete' ? remove() : save())}
+        onConfirm={() => void (confirm === 'delete' ? remove() : confirm === 'apply' ? apply() : save())}
       />}
     </div>
   );

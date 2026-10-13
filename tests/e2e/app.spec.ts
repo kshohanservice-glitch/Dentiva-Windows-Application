@@ -214,6 +214,7 @@ test('clinician templates fill visit and invoice drafts without creating records
   await invoice.getByPlaceholder('Treatment or item').fill('');
   await items.getByLabel('Invoice item templates').selectOption({ label: 'E2E invoice items' });
   await items.getByRole('button', { name: 'Apply to draft' }).click();
+  await page.getByRole('button', { name: 'Replace draft fields' }).click();
   await expect(invoice.getByPlaceholder('Treatment or item')).toHaveValue('Template consultation');
   await invoice.getByRole('button', { name: 'Cancel' }).click();
   await page.getByRole('button', { name: 'Discard changes' }).click();
@@ -377,6 +378,14 @@ test('invoice print window uses standard profiles and closes with Back', async (
     'Receipt A4',
   ]);
   await expect(printWin.locator('.print-doc .doc-title', { hasText: 'Invoice' })).toBeVisible({ timeout: 60_000 });
+  const printedAmount = printWin.locator('.print-doc .print-money').first();
+  await expect(printedAmount.locator('.print-money-screen')).toContainText('****');
+  await expect(printedAmount.locator('.print-money-paper')).toBeHidden();
+  // An intentional print/PDF export contains the real amount, not asterisks.
+  await printWin.emulateMedia({ media: 'print' });
+  await expect(printedAmount.locator('.print-money-paper')).toBeVisible();
+  await expect(printedAmount.locator('.print-money-paper')).toContainText('৳500.00');
+  await printWin.emulateMedia({ media: 'screen' });
 
   await Promise.all([
     printWin.waitForEvent('close'),
