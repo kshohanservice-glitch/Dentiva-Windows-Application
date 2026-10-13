@@ -5,7 +5,7 @@
  * missing/invalid image, the stylesheet contract for long clinic names, and
  * (integration) that the clinic logo survives a backup → restore cycle.
  */
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import fs from 'node:fs';

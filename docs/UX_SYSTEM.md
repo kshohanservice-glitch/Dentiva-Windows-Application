@@ -36,9 +36,12 @@ Status is **never color-only** — badges pair color + icon + label.
   `prefers-reduced-motion` and Settings → Appearance → Animations off.
 
 ## Shell
-- **Header (56 px):** brand mark + Dentiva Pro · clinic name · date (and time) · global
-  search (Ctrl+K) · notification bell (unread count) · user chip (name, role badge) ·
-  lock button · user menu (profile, settings, about, logout).
+- **Header (56 px):** clinic logo (falling back to the product mark) + configured
+  clinic name with `Dentiva Pro` as the sub-line · date (and time) · global search
+  (Ctrl+K) · notification bell (unread count) · user chip (name, role badge) ·
+  lock button · user menu (profile, settings, about, logout). Long clinic names
+  ellipsise and the column shrinks (`min-width: 0`) so the header never overflows;
+  the full name is available in the native tooltip.
 - **Sidebar (240 px collapsible → 64 px):** grouped nav (Practice / Clinical / Billing /
   Administration) per spec §15; persists collapse state; active indicator; tooltips when
   collapsed; keyboard reachable; text never overflows (min-width 0 + ellipsis).
@@ -71,6 +74,25 @@ typing in inputs (except Ctrl+K/L).
 - WCAG 2.1 AA contrast, visible focus ring (2 px brand outline), semantic landmarks,
   labelled controls, `aria-live` for toasts, dialogs as `role=dialog aria-modal`,
   tables with `<th scope>`, no focus traps outside modals, 32 px min hit target (36 default).
+
+## Global search (Ctrl+K)
+- Result rows are a CSS grid with a **fixed 104 px category column** and a fluid
+  body column (`minmax(0, 1fr)`); the label badge never wraps or overlaps the
+  title, and the title/sub-line ellipsise instead of spilling out of the modal.
+- Category labels are excluded from the shell-wide `text-transform: capitalize`
+  so `PATIENT`, `APPOINTMENT`, `PRESCRIPTION`, `INVOICE`, `PAYMENT`, … keep their
+  intended casing. Identical layout for every category; only the row `gap` is
+  tuned under 720 px.
+- Keyboard behaviour unchanged: `↑`/`↓` move the selection, `Enter` opens the hit,
+  `Esc` closes and restores focus to the invoking control.
+
+## Clinic branding
+- Login and the dashboard header show the **configured clinic name and logo**
+  (`Settings → Clinic → Branding`); the product name `Dentiva Pro` is the
+  sub-line on both, so the same identity appears in both places.
+- Fallbacks: no clinic name → generic clinic name; no/invalid/broken logo → the
+  product mark. Long names ellipsise with a tooltip. The About screen and the
+  first-run setup wizard always identify `Dentiva Pro` as the product.
 
 ## Print look
 Document templates share the token palette in print-safe form (pure white, #0B5E7B

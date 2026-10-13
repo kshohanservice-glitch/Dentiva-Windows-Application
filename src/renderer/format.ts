@@ -10,13 +10,6 @@ export function bdt(paisa: number): string {
   return formatBdtPaisa(paisa);
 }
 
-export function bdtShort(paisa: number): string {
-  const v = paisa / 100;
-  if (Math.abs(v) >= 1_000_000) return `৳${(v / 1_000_000).toFixed(2)}M`;
-  if (Math.abs(v) >= 1_000) return `৳${(v / 1_000).toFixed(1)}k`;
-  return bdt(paisa);
-}
-
 /** yyyy-MM-dd for <input type="date"> */
 export function isoDate(d: Date): string {
   const tz = d.getTimezoneOffset() * 60_000;
