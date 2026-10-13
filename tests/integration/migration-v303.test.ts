@@ -147,6 +147,10 @@ describe('upgrade from v3.0.3 to the current schema', () => {
     first.db.pragma(`user_version = ${CURRENT + 1}`);
     first.db.close();
     expect(() => openDatabase(file, { runMigrations: true })).toThrow(/newer version/i);
+    // A rejected database must not leave an open SQLite file handle on Windows.
+    const moved = `${file}.moved`;
+    fs.renameSync(file, moved);
+    expect(fs.existsSync(moved)).toBe(true);
   });
 });
 

@@ -37,17 +37,23 @@ export function migrate(db: DB): { from: number; to: number } {
 export function openDatabase(dbFile: string, opts: { runMigrations?: boolean } = {}): OpenResult {
   fs.mkdirSync(path.dirname(dbFile), { recursive: true });
   const db = new Database(dbFile);
-  applyPragmas(db);
-  if (opts.runMigrations !== false) {
-    migrate(db);
-    db.prepare("UPDATE teeth SET arch = 'upper' WHERE quadrant IN (5, 6) AND arch != 'upper'").run();
-  }
-  const integrity = db.pragma('quick_check', { simple: true });
-  if (integrity !== 'ok') {
+  try {
+    applyPragmas(db);
+    if (opts.runMigrations !== false) {
+      migrate(db);
+      db.prepare("UPDATE teeth SET arch = 'upper' WHERE quadrant IN (5, 6) AND arch != 'upper'").run();
+    }
+    const integrity = db.pragma('quick_check', { simple: true });
+    if (integrity !== 'ok') {
+      throw new AppError('INTERNAL', 'Database integrity check failed. Restore a backup from the recovery screen.', { details: { integrity } });
+    }
+    return { db, schemaVersion: Number(db.pragma('user_version', { simple: true })) };
+  } catch (error) {
+    // Failed migrations/downgrades must release the Windows file handle too.
+    // Otherwise a refused database remains locked until process exit.
     db.close();
-    throw new AppError('INTERNAL', 'Database integrity check failed. Restore a backup from the recovery screen.', { details: { integrity } });
+    throw error;
   }
-  return { db, schemaVersion: Number(db.pragma('user_version', { simple: true })) };
 }
 
 export function schemaVersionOf(db: DB): number {

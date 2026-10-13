@@ -158,6 +158,9 @@ test('creates an invoice and receives full payment', async () => {
   // onSaved opens the invoice detail modal.
   const detail = page.locator('.modal[role="dialog"]', { hasText: 'Invoice INV-' });
   await expect(detail).toBeVisible({ timeout: 30_000 });
+  // Financial amounts are private by default, but this amount can be revealed locally.
+  await expect(detail.locator('[data-masked="true"]').first()).toContainText('****');
+  await detail.getByRole('button', { name: 'Show this amount' }).first().click();
   await expect(detail.getByText('৳500.00').first()).toBeVisible();
 
   await detail.getByRole('button', { name: 'Receive payment' }).click();
@@ -175,7 +178,10 @@ test('creates an invoice and receives full payment', async () => {
   // Dashboard is live: the same payment must be reflected without a manual refresh.
   await page.getByRole('link', { name: 'Dashboard' }).click();
   const paidCard = page.locator('.stat-card', { hasText: 'Paid Today' });
+  await expect(paidCard).toContainText('****', { timeout: 10_000 });
+  await page.getByRole('button', { name: /Show amounts/ }).click();
   await expect(paidCard).toContainText('৳500.00', { timeout: 10_000 });
+  await page.getByRole('button', { name: /Hide amounts/ }).click();
 });
 
 test('shows developer credit on the About page', async () => {
