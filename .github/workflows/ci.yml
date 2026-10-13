@@ -222,6 +222,9 @@ jobs:
           $exe = Get-ChildItem dist\*.exe | Select-Object -First 1
           $hash = (Get-FileHash $exe.FullName -Algorithm SHA256).Hash.ToLower()
           "$hash  $($exe.Name)" | Out-File -Encoding ascii dist/SHA256SUMS.txt
+          if ((Get-Content dist/SHA256SUMS.txt -Raw).Trim() -ne "$hash  $($exe.Name)") { throw 'Checksum file mismatch' }
+          Write-Host "::notice title=installer SHA-256::$hash  $($exe.Name)"
+          Write-Host "::notice title=installer size::$($exe.Length) bytes"
           Get-Content dist/SHA256SUMS.txt
       - uses: actions/upload-artifact@v4
         with:
