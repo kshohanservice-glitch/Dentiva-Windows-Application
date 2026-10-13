@@ -69,3 +69,6 @@ A task is `VERIFIED` only after its required checks actually passed in this envi
 ## Windows rerun outcome — run 38426245044 (commit b109c96)
 - Windows verify **PASS** (typecheck, audit, lint, 241 Vitest tests, build). Electron E2E **FAILED** at the double-booking scenario: the test tried to book 16:00 after a 15:45, 30-minute appointment already occupied 15:45–16:15; the application's conflict detection correctly refused it. CI annotation shows the overlap with the earlier patient appointment. The test now uses 17:00 and intentionally tests the 17:15 overlap; this change is pending a new Windows run. Remaining serial E2E scenarios did not complete. Package/silent-install/checksum job **SKIPPED**. No release.
 - Local work also adds patient/financial draft-close guards, pre-database secure-storage check, and corrects printing documentation. None of this work is included in the above Windows result.
+
+## Windows run 38426811864 (commit 54213f9)
+- Branch push started [CI run 38426811864](https://github.com/kshohanservice-glitch/Dentiva-Windows-Application/actions/runs/38426811864) on Windows. Verify and E2E were running at the last check; neither success nor an installer can be claimed until results are inspected. This commit also includes the local draft guards and print-documentation update. Package version remains 3.0.3; no new tag/release.
