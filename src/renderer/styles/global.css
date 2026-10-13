@@ -30,6 +30,8 @@ body,
 .shell .patient-meta,
 .shell .timeline,
 .shell .searchbox,
+.shell .search-results,
+.shell .clinic-name,
 .shell .toast-msg,
 .shell .error-state p,
 .shell .empty-state p {
@@ -107,7 +109,9 @@ button, input, select, textarea {
   align-items: center;
   gap: var(--sp-2);
   min-width: 0;
+  flex: 0 1 auto;
 }
+.brand .clinic-name { max-width: 260px; }
 .brand-mark {
   width: 30px;
   height: 30px;
@@ -120,11 +124,34 @@ button, input, select, textarea {
   font-size: 15px;
   flex: none;
 }
+.clinic-logo {
+  flex: none;
+  object-fit: contain;
+  background: var(--surface-1);
+  border: 1px solid var(--line);
+  display: block;
+}
+.clinic-mark {
+  /* Product fallback mark when no clinic logo is configured. */
+  background: linear-gradient(145deg, var(--brand-700), var(--accent-600));
+  color: #fff;
+  display: grid;
+  place-items: center;
+  font-weight: 700;
+  line-height: 1;
+}
+.clinic-name {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 .brand-name {
   font-weight: 700;
   font-size: 15px;
   color: var(--text-1);
-  white-space: nowrap;
+  min-width: 0;
 }
 .brand-clinic {
   font-size: var(--fs-xs);
@@ -768,14 +795,22 @@ table.table {
 .notif-item .time { color: var(--text-3); font-size: var(--fs-xs); margin-top: 3px; }
 
 /* --------------------------- Global search --------------------------- */
-.search-modal { max-width: 640px; align-self: flex-start; margin-top: 8vh; }
-.search-input-wrap { display: flex; align-items: center; gap: var(--sp-3); padding: var(--sp-4) var(--sp-5); border-bottom: 1px solid var(--line); }
-.search-input-wrap input { flex: 1; border: none; outline: none; background: none; font-size: var(--fs-lg); }
-.search-results { max-height: 440px; overflow: auto; padding: 6px; }
+/* One canonical rule block for the whole search surface. Two layout columns:
+   a fixed-width category label and the result content. Long labels and long
+   titles are constrained inside their own column, so a category badge can never
+   overlap or intrude into a result title. */
+.search-modal { max-width: min(640px, 100%); align-self: flex-start; margin-top: 8vh; }
+.search-input-wrap {
+  display: flex; align-items: center; gap: 10px; padding: 14px 16px;
+  border-bottom: 1px solid var(--line); color: var(--text-3);
+}
+.search-input-wrap input { flex: 1; border: none; outline: none; background: transparent; font-size: var(--fs-lg); color: var(--text-1); }
+.search-results { max-height: 46vh; overflow-y: auto; padding: 6px; }
 .search-hit {
-  display: flex;
+  display: grid;
+  grid-template-columns: 104px minmax(0, 1fr);
   align-items: center;
-  gap: var(--sp-3);
+  gap: 4px 12px;
   width: 100%;
   padding: 10px 12px;
   background: none;
@@ -785,18 +820,37 @@ table.table {
   text-align: left;
 }
 .search-hit:hover, .search-hit.selected { background: var(--brand-50); }
+/* Column 1 — category label. Fixed width, never shrinks, never grows. */
 .search-hit .kind {
-  width: 64px;
-  flex: none;
-  font-size: 10.5px;
-  font-weight: 700;
+  min-width: 0;
+  font-size: 10px;
+  font-weight: 800;
   text-transform: uppercase;
   letter-spacing: 0.05em;
-  color: var(--text-3);
+  color: var(--text-2);
+  background: var(--surface-3);
+  padding: 3px 5px;
+  border-radius: 4px;
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
-.search-hit .title { font-weight: 600; color: var(--text-1); }
-.search-hit .sub { font-size: var(--fs-xs); color: var(--text-3); }
-.search-footer { padding: 8px 16px; border-top: 1px solid var(--line); font-size: var(--fs-xs); color: var(--text-3); display: flex; gap: 14px; }
+/* Column 2 — result content. min-width: 0 lets the column shrink instead of
+   pushing the row wider than the modal. */
+.search-hit .hit-body { min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.search-hit .title {
+  font-weight: 600; font-size: var(--fs-sm); color: var(--text-1);
+  min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.search-hit .sub {
+  font-size: var(--fs-xs); color: var(--text-3);
+  min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.search-footer {
+  display: flex; gap: 18px; padding: 10px 16px; border-top: 1px solid var(--line);
+  font-size: var(--fs-xs); color: var(--text-3); background: var(--surface-2);
+}
 kbd {
   background: var(--surface-2);
   border: 1px solid var(--line-strong);
@@ -1145,24 +1199,6 @@ tr.row-muted td { opacity: 0.55; }
 .notif-item .title { font-weight: 650; font-size: var(--fs-sm); }
 .notif-item .body { font-size: var(--fs-sm); color: var(--text-2); margin-top: 2px; }
 .notif-item .time { font-size: var(--fs-xs); color: var(--text-3); margin-top: 4px; }
-.search-input-wrap { display: flex; align-items: center; gap: 10px; padding: 14px 16px; border-bottom: 1px solid var(--line); color: var(--text-3); }
-.search-input-wrap input { flex: 1; border: none; outline: none; background: transparent; font-size: var(--fs-lg); color: var(--text-1); }
-.search-results { max-height: 46vh; overflow-y: auto; padding: 6px; }
-.search-hit {
-  display: flex; width: 100%; text-align: left; gap: 10px; align-items: center;
-  border: none; background: transparent; padding: 10px 12px; border-radius: var(--r-sm); cursor: pointer;
-}
-.search-hit:hover, .search-hit.selected { background: var(--surface-2); }
-.search-hit .kind {
-  font-size: 10px; text-transform: uppercase; letter-spacing: 0.05em; font-weight: 800;
-  background: var(--surface-3); color: var(--text-2); padding: 3px 6px; border-radius: 4px; flex: none;
-}
-.search-hit .title { font-weight: 600; font-size: var(--fs-sm); }
-.search-hit .sub { font-size: var(--fs-xs); color: var(--text-3); }
-.search-footer {
-  display: flex; gap: 18px; padding: 10px 16px; border-top: 1px solid var(--line);
-  font-size: var(--fs-xs); color: var(--text-3); background: var(--surface-2);
-}
 .badge-dot::before { content: ''; width: 7px; height: 7px; border-radius: 50%; background: currentColor; display: inline-block; margin-right: 5px; }
 
 /* Dental chart — quadrants & surfaces (FDI) */
@@ -1307,6 +1343,7 @@ kbd {
   .teeth-row .tooth { min-width: 54px; }
   .tooth-body { min-height: 38px; }
   .print-toolbar { flex-wrap: wrap; }
+  .search-hit { gap: 4px 8px; }
 }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; scroll-behavior: auto !important; }

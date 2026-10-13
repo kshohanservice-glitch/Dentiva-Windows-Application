@@ -40,6 +40,10 @@ export const ARCHIVE_LIMITS = {
 export const DATABASE_ENTRY = 'database/dentiva.db';
 export const MANIFEST_ENTRY = 'manifest.json';
 export const ATTACHMENTS_PREFIX = 'attachments/';
+/** Clinic branding (logo) lives beside the attachments folder and is archived too. */
+export const BRANDING_PREFIX = 'branding/';
+/** A single branding asset can never be larger than the 5 MB upload cap. */
+export const BRANDING_LIMITS = { maxEntryBytes: 8 * 1024 * 1024 } as const;
 
 const WINDOWS_RESERVED = /^(con|prn|aux|nul|com[0-9]|lpt[0-9])(\..*)?$/i;
 // Control characters and characters Windows forbids in file names.
@@ -77,6 +81,7 @@ export interface ArchivePlan {
   manifest: ClassifiedEntry;
   database: ClassifiedEntry;
   attachments: ClassifiedEntry[];
+  branding: ClassifiedEntry[];
 }
 
 /**
@@ -155,6 +160,7 @@ export function planArchive(entries: ArchiveEntryInfo[]): ArchivePlan {
   let manifest: ClassifiedEntry | null = null;
   let database: ClassifiedEntry | null = null;
   const attachments: ClassifiedEntry[] = [];
+  const branding: ClassifiedEntry[] = [];
 
   for (const info of entries) {
     classifySpecialEntry(info);
@@ -179,7 +185,8 @@ export function planArchive(entries: ArchiveEntryInfo[]): ArchivePlan {
     seen.add(key);
 
     if (isDir) {
-      if (normalized !== 'database' && normalized !== 'attachments' && !normalized.startsWith(ATTACHMENTS_PREFIX)) {
+      if (normalized !== 'database' && normalized !== 'attachments' && normalized !== 'branding' &&
+          !normalized.startsWith(ATTACHMENTS_PREFIX) && !normalized.startsWith(BRANDING_PREFIX)) {
         throw new ArchiveRejectedError(`Unexpected directory in backup: ${printable(info.path)}`);
       }
       continue;
@@ -197,6 +204,13 @@ export function planArchive(entries: ArchiveEntryInfo[]): ArchivePlan {
       const attRel = normalized.slice(ATTACHMENTS_PREFIX.length);
       const check = validateRelativePath(attRel, { maxDepth: ARCHIVE_LIMITS.maxAttachmentDepth });
       attachments.push({ kind: 'attachment', archivePath: normalized, relPath: check, info });
+    } else if (normalized.startsWith(BRANDING_PREFIX)) {
+      const brandRel = normalized.slice(BRANDING_PREFIX.length);
+      const check = validateRelativePath(brandRel, { maxDepth: 2 });
+      if (size > BRANDING_LIMITS.maxEntryBytes) {
+        throw new ArchiveRejectedError(`Branding asset is too large: ${printable(info.path)}`);
+      }
+      branding.push({ kind: 'attachment', archivePath: normalized, relPath: check, info });
     } else {
       throw new ArchiveRejectedError(`Unexpected file in backup: ${printable(info.path)}`);
     }
@@ -204,7 +218,7 @@ export function planArchive(entries: ArchiveEntryInfo[]): ArchivePlan {
 
   if (!manifest) throw new ArchiveRejectedError('Backup is incomplete: manifest.json is missing.');
   if (!database) throw new ArchiveRejectedError('Backup is incomplete: database file is missing.');
-  return { manifest, database, attachments };
+  return { manifest, database, attachments, branding };
 }
 
 /** Counts bytes flowing through a stream and aborts when a byte limit is exceeded. */

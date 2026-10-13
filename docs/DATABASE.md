@@ -13,8 +13,9 @@ no record-count limits beyond storage.
 - PKs: `INTEGER PRIMARY KEY AUTOINCREMENT` unless a stable business key is better.
 - Timestamps: `TEXT` ISO-8601 UTC (`2026-09-27T12:00:00.000Z`); dates `TEXT` `YYYY-MM-DD`.
 - Money: stored as **integer paisa** (`amount_paisa INTEGER`) to avoid float drift;
-  presented as BDT (৳) with 2 decimals, masked by default in supported UI surfaces.
-  Printed/exported financial documents intentionally retain real values.
+  presented as BDT (৳) with 2 decimals via the shared integer formatter. On-screen
+  UI surfaces mask amounts by default (`****`) as a privacy affordance; printed,
+  previewed and exported documents intentionally retain the real values.
 - Deletion behavior varies by entity: patient and clinical/financial history is
   preserved where business rules require it; some explicit delete operations remove
   payments or attachments and write an audit record. Do not assume a universal

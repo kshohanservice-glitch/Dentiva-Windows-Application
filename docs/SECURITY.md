@@ -107,8 +107,10 @@ engineering (see §6 Activation honesty).
   global reveal buttons; reveal state is in memory and reset on lock/logout.
   Legacy report and audit summaries using BDT-formatted text are segmented before
   rendering. This is a visual privacy affordance, **not encryption** or RBAC.
-- Print-window *screen previews* mask financial values by default. The Print and
-  Save PDF actions are explicit exports: their documents contain real numbers.
+- Masking is **screen-only by construction**. Documents (print preview, Save PDF,
+  physical pages, report CSV) render the real amount through `PrintMoney` and the
+  shared integer formatter; there is no masked node in the document tree and no
+  media query that swaps one for the other, so `****` cannot leak into an export.
   Users must treat printed pages and saved PDF/CSV files as sensitive patient and
   financial data. OS print dialogs, exported CSV/PDF, audit databases and backups
   are not masked.

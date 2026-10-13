@@ -5,7 +5,8 @@ type Argon2Api = { hash: (password: string, options: object) => Promise<string>;
 
 function loadArgon2(): Argon2Api {
   if (process.platform === 'win32' && process.arch === 'x64') {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    // The Windows x64 binding ships as a dedicated platform package so the
+    // packaged app never falls back to a foreign-ABI binary.
     const nativePath = require.resolve('@node-rs/argon2-win32-x64-msvc');
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     return require(nativePath) as Argon2Api;

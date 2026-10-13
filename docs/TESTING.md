@@ -5,8 +5,14 @@ This is a map of executable checks, **not** a claim that all device-level checks
 ## Automated local tests
 
 - `npm run typecheck` checks renderer and main TypeScript projects.
-- `npm run lint` runs ESLint (one pre-existing unused-disable warning is tracked in the journal).
-- `npm test` runs Vitest unit and integration suites against disposable migrated SQLite databases. Coverage includes v3.0.3 fixture upgrade, legacy Queue preservation, appointment expiry/reschedule, backup/restore tamper/rollback cases, money masking rules, RBAC, financial reconciliation, template permissions/validation, and a 20,000-patient synthetic query fixture. A passing 20k-patient fixture is **not** a benchmark for 60k visits or 100k invoices.
+- `npm run lint` runs ESLint (clean: 0 errors, 0 warnings).
+- `npm test` runs Vitest unit and integration suites against disposable migrated SQLite databases.
+  Regression suites for the 4.0.0 fixes live in `tests/unit/print-money.test.ts`
+  (real amounts in printed documents, no `@media` swap, no hardcoded values),
+  `tests/unit/search-hit-row.test.ts` (fixed label column, no clipping, category
+  coverage, keyboard nav) and `tests/unit/branding.test.ts` +
+  `tests/integration/branding.test.ts` (clinic identity on Login/dashboard, broken
+  logo fallback, branding round-trip through backup/restore). Coverage includes v3.0.3 fixture upgrade, legacy Queue preservation, appointment expiry/reschedule, backup/restore tamper/rollback cases, money masking rules, RBAC, financial reconciliation, template permissions/validation, and a 20,000-patient synthetic query fixture. A passing 20k-patient fixture is **not** a benchmark for 60k visits or 100k invoices.
 - `npm run build` compiles the main process and renderer.
 - `npm audit --omit=dev --audit-level=moderate` checks known production dependency advisories at the time of the run.
 
@@ -16,7 +22,7 @@ Linux installation requires the documented `npm_config_nodedir=/usr/local npm ci
 
 `.github/workflows/ci.yml` runs verify and real Electron Playwright E2E on Windows. Its package job runs **only after both pass**, builds an x64 NSIS installer, checks packaged native Argon2, silently installs the actual installer, runs `scripts/smoke-installed.mjs`, computes SHA-256 and uploads the installer/checksum as an Actions artifact. These checks are commit-specific: a passing run from before a migration or UI change does **not** verify the later commit. A branch push never publishes a release.
 
-The serial E2E suite covers activation/setup/login, patient entry and chart, invoice/payment money reveal, appointment move and override, prescription and invoice print windows, reports, visit completion, deletion and screen sizes. A new template apply/save journey and screen-versus-print money assertion must pass on the final Windows commit before they can be called verified. Tests do not replace manual accessibility review or long-content print testing.
+The serial E2E suite covers activation/setup/login, patient entry and chart, invoice/payment money reveal, appointment move and override, prescription and invoice print windows (including the real-amount/no-`****` assertion and the global-search column-overlap assertion), reports, visit completion, deletion and screen sizes. Tests do not replace manual accessibility review or long-content print testing.
 
 ## Manual release checks still needed
 

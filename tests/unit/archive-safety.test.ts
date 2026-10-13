@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   ARCHIVE_LIMITS,
   ArchiveRejectedError,
+  BRANDING_LIMITS,
   planArchive,
   resolveInside,
   validateRelativePath,
@@ -40,6 +41,34 @@ describe('planArchive — accepted archives', () => {
 
   it('accepts an archive with no attachments folder at all', () => {
     expect(planArchive(base()).attachments).toEqual([]);
+  });
+
+  it('accepts a clinic branding asset beside the attachments', () => {
+    const plan = planArchive([
+      ...base(),
+      dir('attachments/'),
+      file('attachments/patient/3/note.txt', 12),
+      dir('branding/'),
+      file('branding/logo-1700000000000.png', 2048),
+    ]);
+    expect(plan.branding.map((b) => b.relPath)).toEqual(['logo-1700000000000.png']);
+    expect(plan.attachments.map((a) => a.relPath)).toEqual(['patient/3/note.txt']);
+  });
+
+  it('accepts an archive with no branding folder (pre-4.0.0 backups)', () => {
+    expect(planArchive(base()).branding).toEqual([]);
+  });
+
+  it('rejects a branding asset that escapes its destination', () => {
+    rejects([...base(), file('branding/../settings.json', 12)], /unsafe path segment/i);
+  });
+
+  it('rejects a branding asset that is implausibly large', () => {
+    rejects([...base(), file('branding/logo.png', BRANDING_LIMITS.maxEntryBytes + 1)], /branding asset is too large/i);
+  });
+
+  it('rejects a branding asset nested too deeply', () => {
+    rejects([...base(), file('branding/a/b/c/logo.png', 12)], /nested too deeply/i);
   });
 });
 

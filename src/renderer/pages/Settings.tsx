@@ -4,6 +4,7 @@ import { api, useAsync } from '../api';
 import { useApp } from '../state/app-context';
 import { Badge, Button, Card, Kbd, Modal, Spinner, Tabs, useToast } from '../components/primitives';
 import { Field, Input, Select, Textarea } from '../components/forms';
+import { ClinicLogo } from '../components/clinic-brand';
 
 type SetTab = 'clinic' | 'security' | 'appearance' | 'notifications' | 'billing' | 'prescription' | 'print' | 'data' | 'shortcuts';
 
@@ -99,25 +100,28 @@ export function SettingsPage() {
               <Field label="Address" className="span-2">{() => <Textarea rows={2} value={form.clinic.address ?? ''} onChange={(v) => set(['clinic', 'address'], v)} />}</Field>
               <Field label="Operating hours">{() => <Input value={form.clinic.operatingHours ?? ''} onChange={(v) => set(['clinic', 'operatingHours'], v)} placeholder="10:00 – 20:00" />}</Field>
               <Field label="Visiting days">{() => <Input value={form.clinic.visitingDays ?? ''} onChange={(v) => set(['clinic', 'visitingDays'], v)} placeholder="Sat – Thu" />}</Field>
-              <Field label="Logo" hint="Shown on printed documents">
+              <Field label="Logo" hint="Shown on the sign-in screen, the app header and printed documents">
                 {() => (
-                  <div className="row gap-2">
-                    <Button
-                      variant="secondary"
-                      onClick={async () => {
-                        try {
-                          const res = await api['settings/upload-logo']();
-                          if (typeof res !== 'string') return;
-                          set(['clinic', 'logoPath'], res);
-                          toast.success('Logo updated');
-                        } catch (err) {
-                          toast.fromError(err, 'Logo upload failed');
-                        }
-                      }}
-                    >Upload logo…</Button>
-                    {form.clinic.logoPath && (
-                      <Button variant="ghost" onClick={() => set(['clinic', 'logoPath'], null)}>Remove</Button>
-                    )}
+                  <div className="row gap-3">
+                    <ClinicLogo clinic={settings?.clinic} size={44} rounded={10} />
+                    <div className="row gap-2">
+                      <Button
+                        variant="secondary"
+                        onClick={async () => {
+                          try {
+                            const res = await api['settings/upload-logo']();
+                            if (typeof res !== 'string') return;
+                            set(['clinic', 'logoPath'], res);
+                            toast.success('Logo updated');
+                          } catch (err) {
+                            toast.fromError(err, 'Logo upload failed');
+                          }
+                        }}
+                      >Upload logo…</Button>
+                      {form.clinic.logoPath && (
+                        <Button variant="ghost" onClick={() => set(['clinic', 'logoPath'], null)}>Remove</Button>
+                      )}
+                    </div>
                   </div>
                 )}
               </Field>

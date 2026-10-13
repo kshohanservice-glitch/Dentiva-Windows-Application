@@ -1,14 +1,13 @@
 /** Formatting helpers shared by renderer pages (BDT money, dates). */
 
-export function bdt(paisa: number): string {
-  return `৳${(paisa / 100).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-}
+import { formatBdt as formatBdtPaisa } from '../shared/currency';
 
-export function bdtShort(paisa: number): string {
-  const v = paisa / 100;
-  if (Math.abs(v) >= 1_000_000) return `৳${(v / 1_000_000).toFixed(2)}M`;
-  if (Math.abs(v) >= 1_000) return `৳${(v / 1_000).toFixed(1)}k`;
-  return bdt(paisa);
+/**
+ * Display formatting for BDT paisa. Delegates to the shared integer-exact
+ * formatter so screen, print and export output can never drift apart.
+ */
+export function bdt(paisa: number): string {
+  return formatBdtPaisa(paisa);
 }
 
 /** yyyy-MM-dd for <input type="date"> */

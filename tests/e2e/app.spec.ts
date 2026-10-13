@@ -393,13 +393,16 @@ test('invoice print window uses standard profiles and closes with Back', async (
   ]);
   await expect(printWin.locator('.print-doc .doc-title', { hasText: 'Invoice' })).toBeVisible({ timeout: 60_000 });
   const printedAmount = printWin.locator('.print-doc .print-money').first();
-  await expect(printedAmount.locator('.print-money-screen')).toContainText('****');
-  await expect(printedAmount.locator('.print-money-paper')).toBeHidden();
-  // An intentional print/PDF export contains the real amount, not asterisks.
+  // A printable document is a deliberate, permission-gated export: it carries the
+  // real amount on the preview screen AND in print media, never the UI mask.
+  await expect(printedAmount).toContainText('৳500.00');
+  await expect(printedAmount).not.toContainText('****');
   await printWin.emulateMedia({ media: 'print' });
-  await expect(printedAmount.locator('.print-money-paper')).toBeVisible();
-  await expect(printedAmount.locator('.print-money-paper')).toContainText('৳500.00');
+  await expect(printedAmount).toContainText('৳500.00');
+  await expect(printedAmount).not.toContainText('****');
   await printWin.emulateMedia({ media: 'screen' });
+  // No masking artifact may remain anywhere in the document.
+  await expect(printWin.locator('.print-doc')).not.toContainText('****');
 
   await Promise.all([
     printWin.waitForEvent('close'),
@@ -427,6 +430,71 @@ test('runs reports from the UI — the full catalogue contract (ISS-020 guard)',
   await page.getByRole('button', { name: 'Run report' }).click();
   await expect(page.getByText('Net', { exact: true }).first()).toBeVisible({ timeout: 30_000 });
   await expect(page.locator('.toast-title', { hasText: 'Unknown report' })).toHaveCount(0);
+});
+
+test('global search keeps category labels and result titles in separate columns', async () => {
+  await page.getByRole('link', { name: 'Dashboard', exact: true }).click();
+  await page.keyboard.press('Control+k');
+  const modal = page.locator('.search-modal');
+  await expect(modal).toBeVisible();
+  await expect(modal).toHaveAttribute('aria-label', 'Global search');
+
+  await page.getByPlaceholder('Search patients, invoices, prescriptions, staff…').fill('E2E');
+  const rows = page.locator('.search-hit');
+  await expect(rows.first()).toBeVisible({ timeout: 30_000 });
+  const count = await rows.count();
+  expect(count).toBeGreaterThan(1);
+
+  // DOM labels (the badge is presented in small caps by CSS, so read the DOM
+  // value rather than the rendered text).
+  const knownLabels = ['Patient', 'Appointment', 'Invoice', 'Payment', 'Prescription', 'Treatment', 'Staff', 'Dentist', 'Inventory', 'Expense', 'Visit', 'Result'];
+  const modalBox = (await modal.boundingBox())!;
+
+  for (let i = 0; i < count; i++) {
+    const row = rows.nth(i);
+    // Exactly two layout columns: the category label and the result content.
+    const columns = await row.evaluate((el) =>
+      Array.from(el.children).map((c) => (c as HTMLElement).className),
+    );
+    expect(columns).toEqual(['kind', 'hit-body']);
+
+    const label = ((await row.locator('.kind').textContent()) ?? '').trim();
+    expect(knownLabels).toContain(label);
+
+    // The label column and the content column must not overlap.
+    const labelBox = (await row.locator('.kind').boundingBox())!;
+    const bodyBox = (await row.locator('.hit-body').boundingBox())!;
+    expect(labelBox.x + labelBox.width).toBeLessThanOrEqual(bodyBox.x + 0.5);
+
+    // The badge must never be ellipsised: the fixed column is wide enough for
+    // the longest category label.
+    const labelClipped = await row.evaluate((el) => {
+      const kind = el.querySelector('.kind') as HTMLElement;
+      return kind.scrollWidth <= kind.clientWidth + 1;
+    });
+    expect(labelClipped).toBe(true);
+
+    // Nothing may be clipped horizontally out of the modal.
+    const rowBox = (await row.boundingBox())!;
+    expect(rowBox.x + rowBox.width).toBeLessThanOrEqual(modalBox.x + modalBox.width + 0.5);
+
+    // Long titles/subtitles must be constrained inside their own column, not
+    // push the row wider than the modal.
+    const clipped = await row.evaluate((el) => {
+      const title = el.querySelector('.title') as HTMLElement;
+      const sub = el.querySelector('.sub') as HTMLElement;
+      return [title, sub].every((n) => n.scrollWidth <= n.clientWidth + 1);
+    });
+    expect(clipped).toBe(true);
+  }
+
+  // Keyboard navigation, selection highlighting and Enter-to-open still work.
+  await page.keyboard.press('ArrowDown');
+  await expect(rows.nth(1)).toHaveClass(/selected/);
+  await page.keyboard.press('ArrowUp');
+  await expect(rows.nth(0)).toHaveClass(/selected/);
+  await page.keyboard.press('Escape');
+  await expect(modal).toBeHidden();
 });
 
 test('completes a patient visit from the profile and supports patient deletion', async () => {
