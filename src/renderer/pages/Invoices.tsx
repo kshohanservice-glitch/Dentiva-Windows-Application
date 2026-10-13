@@ -18,6 +18,7 @@ const STATUS_TONE = {
 function PaymentModal(props: { invoice: InvoiceDTO; onClose: () => void; onPaid: (invoice: InvoiceDTO) => void }) {
   const { values, set, errors, validate } = usePaymentForm();
   const [pending, setPending] = useState(false);
+  const requestInFlight = React.useRef(false);
   const toast = useToast();
   const due = props.invoice.duePaisa;
 
@@ -31,7 +32,8 @@ function PaymentModal(props: { invoice: InvoiceDTO; onClose: () => void; onPaid:
       amountPaisa: v.amountPaisa <= 0 ? 'Enter the amount received.' : v.amountPaisa > due ? 'Amount exceeds the balance due.' : '',
       method: !v.method ? 'Select a payment method.' : '',
     }));
-    if (!ok) return;
+    if (!ok || requestInFlight.current) return;
+    requestInFlight.current = true;
     setPending(true);
     try {
       const res = await api['payments/create']({
@@ -48,6 +50,7 @@ function PaymentModal(props: { invoice: InvoiceDTO; onClose: () => void; onPaid:
     } catch (err) {
       toast.fromError(err, 'Payment failed');
     } finally {
+      requestInFlight.current = false;
       setPending(false);
     }
   };

@@ -3,6 +3,9 @@ import { formatDate } from '../format';
 import { useLocation } from 'react-router-dom';
 import { api } from '../api';
 import { Button, ErrorState, Spinner, useToast } from '../components/primitives';
+import { FormattedMoney } from '../components/formatted-money';
+import { MoneyRevealToggle } from '../components/money';
+import { useApp } from '../state/app-context';
 import { Icon } from '../components/shell';
 import type { PrintProfile } from '../../shared/types';
 
@@ -109,20 +112,20 @@ function invoiceDoc(data: any): React.ReactNode {
             <tr key={l.id}>
               <td>{l.description}{l.toothNumber ? ` (Tooth ${l.toothNumber})` : ''}</td>
               <td className="right mono">{l.quantity}</td>
-              <td className="right mono">{fmtBdt(l.unitPricePaisa)}</td>
-              <td className="right mono">{fmtBdt(l.totalPaisa)}</td>
+              <td className="right mono"><FormattedMoney value={fmtBdt(l.unitPricePaisa)} printable /></td>
+              <td className="right mono"><FormattedMoney value={fmtBdt(l.totalPaisa)} printable /></td>
             </tr>
           ))}
         </tbody>
       </table>
       <table className="totals">
         <tbody>
-          <tr><td className="muted">Subtotal</td><td className="right mono">{fmtBdt(subtotal)}</td></tr>
-          {discount > 0 && <tr><td className="muted">Discount</td><td className="right mono">−{fmtBdt(discount)}</td></tr>}
-          <tr><td className="muted">VAT</td><td className="right mono">{fmtBdt(invoice.vatPaisa ?? 0)}</td></tr>
-          <tr><td className="muted">Total</td><td className="right mono">{fmtBdt(invoice.totalPaisa)}</td></tr>
-          <tr><td className="muted">Paid</td><td className="right mono">{fmtBdt(invoice.paidPaisa ?? 0)}</td></tr>
-          <tr className="grand"><td>Balance due</td><td className="right mono">{fmtBdt(invoice.duePaisa ?? 0)}</td></tr>
+          <tr><td className="muted">Subtotal</td><td className="right mono"><FormattedMoney value={fmtBdt(subtotal)} printable /></td></tr>
+          {discount > 0 && <tr><td className="muted">Discount</td><td className="right mono">−<FormattedMoney value={fmtBdt(discount)} printable /></td></tr>}
+          <tr><td className="muted">VAT</td><td className="right mono"><FormattedMoney value={fmtBdt(invoice.vatPaisa ?? 0)} printable /></td></tr>
+          <tr><td className="muted">Total</td><td className="right mono"><FormattedMoney value={fmtBdt(invoice.totalPaisa)} printable /></td></tr>
+          <tr><td className="muted">Paid</td><td className="right mono"><FormattedMoney value={fmtBdt(invoice.paidPaisa ?? 0)} printable /></td></tr>
+          <tr className="grand"><td>Balance due</td><td className="right mono"><FormattedMoney value={fmtBdt(invoice.duePaisa ?? 0)} printable /></td></tr>
         </tbody>
       </table>
       {payments?.length > 0 && (
@@ -136,7 +139,7 @@ function invoiceDoc(data: any): React.ReactNode {
                   <td>{formatDate(p.paidAt)}</td>
                   <td>{p.method}</td>
                   <td className="mono">{p.reference || '—'}</td>
-                  <td className="right mono">{fmtBdt(p.amountPaisa)}</td>
+                  <td className="right mono"><FormattedMoney value={fmtBdt(p.amountPaisa)} printable /></td>
                 </tr>
               ))}
             </tbody>
@@ -163,11 +166,11 @@ function receiptDoc(data: any): React.ReactNode {
       </div>
       <table>
         <tbody>
-          <tr><td className="muted">Amount received</td><td className="right mono"><b>{fmtBdt(lastPayment?.amountPaisa ?? 0)}</b></td></tr>
+          <tr><td className="muted">Amount received</td><td className="right mono"><b><FormattedMoney value={fmtBdt(lastPayment?.amountPaisa ?? 0)} printable /></b></td></tr>
           <tr><td className="muted">Method</td><td className="right">{lastPayment?.method ?? '—'}</td></tr>
-          <tr><td className="muted">Invoice total</td><td className="right mono">{fmtBdt(invoice.totalPaisa)}</td></tr>
-          <tr><td className="muted">Total paid to date</td><td className="right mono">{fmtBdt(invoice.paidPaisa ?? 0)}</td></tr>
-          <tr className="grand"><td>Balance due</td><td className="right mono">{fmtBdt(invoice.duePaisa ?? 0)}</td></tr>
+          <tr><td className="muted">Invoice total</td><td className="right mono"><FormattedMoney value={fmtBdt(invoice.totalPaisa)} printable /></td></tr>
+          <tr><td className="muted">Total paid to date</td><td className="right mono"><FormattedMoney value={fmtBdt(invoice.paidPaisa ?? 0)} printable /></td></tr>
+          <tr className="grand"><td>Balance due</td><td className="right mono"><FormattedMoney value={fmtBdt(invoice.duePaisa ?? 0)} printable /></td></tr>
         </tbody>
       </table>
       <div style={{ marginTop: 30 }}>
@@ -357,7 +360,7 @@ function visitSummaryDoc(data: any): React.ReactNode {
             <thead><tr><th>Tooth</th><th>Procedure</th><th>Details</th></tr></thead>
             <tbody>
               {procedures.map((p: any) => (
-                <tr key={p.id}><td className="mono">{p.toothNumber ?? '—'}</td><td>{p.treatmentName}</td><td>{p.notes || ''}</td></tr>
+                <tr key={p.id}><td className="mono">{p.toothNumber ?? '—'}</td><td>{p.treatmentName}</td><td>{p.qty} × <FormattedMoney value={fmtBdt(p.unitPricePaisa)} printable /> = <FormattedMoney value={fmtBdt(p.totalPaisa)} printable /></td></tr>
               ))}
             </tbody>
           </table>
@@ -505,7 +508,7 @@ function reportDoc(data: any): React.ReactNode {
           {r.rows.map((row: any, i: number) => (
             <tr key={i}>
               {r.columns.map((c: any) => (
-                <td key={c.key} className={c.align === 'right' ? 'right mono' : ''}>{row[c.key] ?? ''}</td>
+                <td key={c.key} className={c.align === 'right' ? 'right mono' : ''}><FormattedMoney value={row[c.key]} printable /></td>
               ))}
             </tr>
           ))}
@@ -515,7 +518,7 @@ function reportDoc(data: any): React.ReactNode {
             <tr>
               {r.columns.map((c: any, i: number) => (
                 <td key={c.key} className={c.align === 'right' ? 'right mono' : ''}>
-                  {i === 0 ? 'Total' : (r.totals[c.key] ?? '')}
+                  {i === 0 ? 'Total' : <FormattedMoney value={r.totals[c.key]} printable />}
                 </td>
               ))}
             </tr>
@@ -541,6 +544,8 @@ export function PrintPage() {
   const [error, setError] = useState<unknown>(null);
   const [loading, setLoading] = useState(true);
   const toast = useToast();
+  const { locked, user } = useApp();
+  const canOutput = !loading && !error && !locked && !!user;
 
   const activeProfile = useMemo(
     () => profiles.find((p) => p.id === selectedProfileId) ?? profiles[0] ?? DEFAULT_PRINT_PROFILES[0],
@@ -631,7 +636,8 @@ export function PrintPage() {
             id: t.id ?? i,
             toothNumber: t.tooth ?? null,
             treatmentName: t.description,
-            notes: `${t.qty} × ${fmtBdt(t.unitPricePaisa)} = ${fmtBdt(t.totalPaisa ?? t.qty * t.unitPricePaisa)}`,
+            qty: t.qty, unitPricePaisa: t.unitPricePaisa,
+            totalPaisa: t.totalPaisa ?? t.qty * t.unitPricePaisa,
           }));
           const data = {
             patient: {
@@ -706,6 +712,7 @@ export function PrintPage() {
   }, [activeProfile]);
 
   const print = async () => {
+    if (!canOutput) return;
     try {
       const res = await api['print/execute']({
         printerName: activeProfile.printerName || undefined,
@@ -726,6 +733,7 @@ export function PrintPage() {
   };
 
   const savePdf = async () => {
+    if (!canOutput) return;
     try {
       const res = await api['print/pdf']({
         suggestedName: (state?.title ?? 'dentiva-document').replace(/[^A-Za-z0-9-_ ]+/g, '').trim() || 'dentiva-document',
@@ -763,6 +771,7 @@ export function PrintPage() {
           <strong>{state?.title ?? 'Print document'}</strong>
         </div>
         <div className="row gap-2">
+          <MoneyRevealToggle />
           <select
             className="select"
             style={{ width: 220, height: 32, fontSize: 12.5 }}
@@ -775,8 +784,8 @@ export function PrintPage() {
             ))}
           </select>
           <Button variant="secondary" size="sm" onClick={() => window.close()}>Close</Button>
-          <Button variant="secondary" size="sm" onClick={() => void savePdf()} disabled={loading || !!error}>Save PDF</Button>
-          <Button variant="primary" size="sm" icon={Icon.print} onClick={() => void print()} disabled={loading || !!error}>
+          <Button variant="secondary" size="sm" onClick={() => void savePdf()} disabled={!canOutput}>Save PDF</Button>
+          <Button variant="primary" size="sm" icon={Icon.print} onClick={() => void print()} disabled={!canOutput}>
             Print
           </Button>
         </div>
@@ -788,7 +797,8 @@ export function PrintPage() {
             <ErrorState error={error} onRetry={() => { setState(null); setError(null); window.location.reload(); }} />
           </div>
         )}
-        {!loading && error == null && (
+        {(locked || !user) && !loading && <div className="card card-pad">Unlock the app to view or print this document.</div>}
+        {!loading && error == null && !locked && !!user && (
           <div className="print-doc" style={docStyle}>
             {state?.doc}
           </div>

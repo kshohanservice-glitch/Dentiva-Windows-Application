@@ -1414,6 +1414,7 @@ export function InvoiceFormModal(props: { patientId: number; visitId?: number | 
   });
   const { data: treatments } = useAsync(() => api['treatments/list'](), []);
   const [pending, setPending] = useState(false);
+  const requestInFlight = React.useRef(false);
   const toast = useToast();
   const [patientQuery, setPatientQuery] = useState('');
   const [chosenPatient, setChosenPatient] = useState<{ id: number; name: string; code: string } | null>(
@@ -1448,6 +1449,8 @@ export function InvoiceFormModal(props: { patientId: number; visitId?: number | 
     }));
     if (!ok) return;
     if (!props.patientId && !chosenPatient) { toast.warning('Select a patient', 'Search and choose the patient first.'); return; }
+    if (requestInFlight.current) return;
+    requestInFlight.current = true;
     setPending(true);
     try {
       const inv = await api['invoices/create']({
@@ -1468,6 +1471,7 @@ export function InvoiceFormModal(props: { patientId: number; visitId?: number | 
     } catch (err) {
       toast.fromError(err, 'Could not create invoice');
     } finally {
+      requestInFlight.current = false;
       setPending(false);
     }
   };

@@ -14,7 +14,11 @@
   --print-soft: #f5f8f8;
 }
 
+/* Screen privacy: print/PDF is an explicit export and carries the original amounts. */
+.print-money-paper { display: none; }
 @media print {
+  .print-money-screen { display: none !important; }
+  .print-money-paper { display: inline !important; }
   html, body, #root, .print-root {
     background: #fff !important;
     margin: 0 !important;
