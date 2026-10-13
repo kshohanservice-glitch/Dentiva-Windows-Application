@@ -3,6 +3,70 @@ import type { Ctx } from '../core/context';
 import type { NotificationDTO } from '../../shared/types';
 import { requirePermission } from '../core/context';
 import { nowISO, todayISO } from '../../shared/currency';
+import { ACTIVE_APPOINTMENT_SQL } from './appointments';
+import { ALL_OPEN_STATUSES, addDays, reminderKindFor } from './appointment-rules';
+
+/** Reminder rule: one reminder per active open appointment for today and for tomorrow. */
+const MAX_APPOINTMENT_REMINDERS = 200;
+
+/**
+ * Keep appointment reminders identical to the authoritative schedule.
+ *  - Creates one reminder per active open appointment dated today or tomorrow.
+ *  - Key = appointment id + date + time + reminder kind, so a reschedule or a
+ *    day change produces a NEW key and never reuses the old reminder.
+ *  - Dismisses (marks read) every unread appointment reminder whose key no
+ *    longer matches: deleted, cancelled, expired, rescheduled or outdated.
+ * Copy contains the patient name, time and reason only; never notes or treatments.
+ */
+export function syncAppointmentReminders(db: DB, today: string, enabled: boolean): number {
+  const desired = new Map<string, { title: string; body: string; id: number }>();
+  if (enabled) {
+    const tomorrow = addDays(today, 1);
+    const placeholders = ALL_OPEN_STATUSES.map(() => '?').join(',');
+    const rows = db
+      .prepare(
+        `SELECT a.id, a.date, a.time, a.type, p.name patient_name, d.name dentist_name
+         FROM appointments a JOIN patients p ON p.id = a.patient_id
+         LEFT JOIN dentists d ON d.id = a.dentist_id
+         WHERE ${ACTIVE_APPOINTMENT_SQL} AND p.deleted_at IS NULL
+           AND a.date IN (?, ?) AND a.status IN (${placeholders})
+         ORDER BY a.date, a.time, a.id LIMIT ?`,
+      )
+      .all(today, tomorrow, ...ALL_OPEN_STATUSES, MAX_APPOINTMENT_REMINDERS) as {
+        id: number; date: string; time: string; type: string; patient_name: string; dentist_name: string | null;
+      }[];
+    for (const r of rows) {
+      const kind = reminderKindFor(r.date, today);
+      if (!kind) continue;
+      const key = `appt:${r.id}:${r.date}:${r.time}:${kind}`;
+      const when = kind === 'today' ? 'Today' : 'Tomorrow';
+      desired.set(key, {
+        id: r.id,
+        title: `${when} ${r.time} · ${r.patient_name}`,
+        body: [r.type, r.dentist_name].filter(Boolean).join(' · '),
+      });
+    }
+  }
+
+  let created = 0;
+  for (const [key, n] of desired) {
+    if (insertNotification(db, {
+      key, kind: 'appointments', severity: 'info', title: n.title, body: n.body,
+      entityType: 'appointment', entityId: String(n.id),
+    })) created++;
+  }
+
+  const unread = db
+    .prepare("SELECT id, key FROM notifications WHERE kind = 'appointments' AND read_at IS NULL")
+    .all() as { id: number; key: string }[];
+  const dismiss = db.prepare('UPDATE notifications SET read_at = ? WHERE id = ?');
+  const at = nowISO();
+  for (const row of unread) {
+    if (!desired.has(row.key)) dismiss.run(at, row.id);
+  }
+  return created;
+}
+
 
 export interface NotificationInput {
   key: string; kind: string; severity: 'info' | 'warning' | 'danger' | 'success';
@@ -10,11 +74,12 @@ export interface NotificationInput {
 }
 
 /**
- * Insert a notification, deduplicated by `key` (already-unread same key is skipped).
- * Keys should embed the day (e.g. "lowstock:12:2026-09-27") to avoid spam.
+ * Insert a notification unless a row with the same key already exists.
+ * Deduplication covers READ rows too: a dismissed reminder must not be
+ * recreated by the next refresh (the key already embeds the day/entity).
  */
 export function insertNotification(db: DB, n: NotificationInput): boolean {
-  const existing = db.prepare('SELECT id FROM notifications WHERE key = ? AND read_at IS NULL').get(n.key);
+  const existing = db.prepare('SELECT id FROM notifications WHERE key = ?').get(n.key);
   if (existing) return false;
   db.prepare(
     `INSERT INTO notifications (key, kind, severity, title, body, entity_type, entity_id, created_at)
@@ -82,7 +147,7 @@ export function refreshNotifications(db: DB, opts: { lowStock: boolean; dues: bo
     const due = db
       .prepare(
         `SELECT COUNT(*) n FROM invoices WHERE deleted_at IS NULL AND voided_at IS NULL
-           AND (status IN ('unpaid','partial') OR (status = 'paid' AND 0))`,
+           AND status IN ('unpaid','partial')`,
       )
       .get<{ n: number }>()!;
     if (Number(due.n) > 0) {
@@ -93,19 +158,7 @@ export function refreshNotifications(db: DB, opts: { lowStock: boolean; dues: bo
     }
   }
 
-  if (opts.appointments) {
-    const tomorrow = todayISO(new Date(Date.now() + 86400000));
-    const n = Number(
-      db.prepare("SELECT COUNT(*) n FROM appointments WHERE date = ? AND status IN ('scheduled','confirmed') AND deleted_at IS NULL").get<{ n: number }>(tomorrow)!.n,
-    );
-    if (n > 0) {
-      if (insertNotification(db, {
-        key: `appts:${tomorrow}`, kind: 'appointments', severity: 'info',
-        title: `${n} appointment${n === 1 ? '' : 's'} tomorrow`,
-        body: `Review tomorrow's schedule.`,
-      })) created++;
-    }
-  }
+  created += syncAppointmentReminders(db, today, opts.appointments);
 
   return created;
 }

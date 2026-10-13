@@ -3,6 +3,7 @@ import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import unzipper from 'unzipper';
 import { cleanupEnv, createTestEnv, ownerCtx, sessionWith, type TestEnv } from '../helpers';
+import { MIGRATIONS } from '../../src/main/db/migrations';
 import { createBackupService, type DbHolder } from '../../src/main/services/backup';
 import { openDatabase, fullIntegrityCheck, type DB } from '../../src/main/db/database';
 import { createPatient, listPatients } from '../../src/main/services/patients';
@@ -49,7 +50,7 @@ describe('backup engine', () => {
     expect(rec.status).toBe('ok');
     expect(rec.filename).toMatch(/^DentivaPro_Backup_.*\.dpv$/);
     expect(rec.sizeBytes).toBeGreaterThan(0);
-    expect(rec.schemaVersion).toBe(2);
+    expect(rec.schemaVersion).toBe(MIGRATIONS.length);
     expect(rec.checksum).toMatch(/^[0-9a-f]{64}$/);
     expect(fs.existsSync(rec.path)).toBe(true);
 
@@ -61,7 +62,7 @@ describe('backup engine', () => {
 
     const manifest = JSON.parse((await zip.files.find((f) => f.path === 'manifest.json')!.buffer()).toString('utf8'));
     expect(manifest.format).toBe('dentiva-backup');
-    expect(manifest.schemaVersion).toBe(2);
+    expect(manifest.schemaVersion).toBe(MIGRATIONS.length);
     expect(manifest.dbSha256).toBe(rec.checksum);
     expect(manifest.counts.patients).toBe(1);
   });
@@ -178,7 +179,7 @@ describe('restore engine', () => {
     expect(rec.status).toBe('ok');
     // db still the same file we started with
     const reopened = openDatabase(env.paths.dbFile, { runMigrations: false });
-    expect(reopened.schemaVersion).toBe(2);
+    expect(reopened.schemaVersion).toBe(MIGRATIONS.length);
     reopened.db.close();
   });
 });

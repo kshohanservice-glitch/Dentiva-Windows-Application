@@ -95,3 +95,13 @@ export function ownerCtx(env: TestEnv): Ctx {
 export function activationCode(): string {
   return [3, 3, 5, 317, 106_315_593_061].reduce((acc, n) => acc * n, 1).toString();
 }
+
+/** ISO local date `days` after today — appointments may not be booked in the past. */
+export function futureISO(days: number): string {
+  const d = new Date();
+  return isoDateLocal(new Date(d.getFullYear(), d.getMonth(), d.getDate() + days));
+}
+
+function isoDateLocal(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}

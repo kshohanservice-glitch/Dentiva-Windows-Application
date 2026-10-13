@@ -9,7 +9,7 @@
  *     the service layer (UI hiding is bypassable) and allowed calls work.
  */
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { cleanupEnv, createTestEnv, ownerCtx, sessionWith, type TestEnv } from '../helpers';
+import { cleanupEnv, createTestEnv, futureISO, ownerCtx, sessionWith, type TestEnv } from '../helpers';
 import type { Ctx } from '../../src/main/core/context';
 import { BUILTIN_ROLES, ALL_PERMISSIONS, type PermissionKey } from '../../src/shared/permissions';
 import { createPatient } from '../../src/main/services/patients';
@@ -24,7 +24,6 @@ import { saveStaff } from '../../src/main/services/staff';
 import { saveSettings, resetBusiness } from '../../src/main/services/settings';
 import { listAudit, saveRole, removeRole, saveUser } from '../../src/main/services/users';
 import { createAppointment, cancelAppointment } from '../../src/main/services/appointments';
-import { addQueueEntry } from '../../src/main/services/queue';
 import { runReport } from '../../src/main/services/reports';
 
 let env: TestEnv;
@@ -80,14 +79,14 @@ const DENY: Record<string, string[]> = {
     'users.manage', 'roles.manage', 'backup.create', 'backup.restore', 'audit.view',
     'staff.salary.view', 'staff.manage', 'settings.manage', 'billing.invoice.create',
     'billing.invoice.edit', 'treatments.manage', 'inventory.manage', 'data.delete',
-    'appointments.manage', 'queue.manage',
+    'appointments.manage',
   ],
   inventory_manager: [
     'finance.view', 'accounting.manage', 'billing.invoice.view', 'billing.payment.view',
     'billing.payment.create', 'users.manage', 'roles.manage', 'backup.create', 'backup.restore',
     'audit.view', 'staff.salary.view', 'staff.manage', 'settings.manage',
     'clinical.view', 'clinical.visit.create', 'clinical.chart.edit', 'clinical.prescription.create',
-    'appointments.view', 'appointments.manage', 'queue.view', 'queue.manage',
+    'appointments.view', 'appointments.manage',
     'patients.create', 'patients.edit', 'data.delete',
   ],
   // administrator: operational powers by design; owner-only behaviours are
@@ -154,7 +153,7 @@ function fixtures(): Fixtures {
     .prepare("INSERT INTO account_categories (kind, name) VALUES ('expense', 'Persona cat')")
     .run().lastInsertRowid);
   const appt = createAppointment(owner, {
-    patientId: patient.id, dentistId, date: '2026-09-25', time: '09:00', durationMin: 30, type: 'consultation',
+    patientId: patient.id, dentistId, date: futureISO(30), time: '09:00', durationMin: 30, type: 'consultation',
   });
   return { patient, dentistId, treatment, item, invoice, catId, appt };
 }
@@ -179,7 +178,6 @@ describe('persona live probes (service layer, not UI)', () => {
     expect(() => createPayment(r, {
       invoiceId: f.invoice.id, patientId: f.patient.id, amountPaisa: 10000, method: 'cash',
     })).not.toThrow();
-    expect(() => addQueueEntry(r, { patientId: f.patient.id })).not.toThrow();
     // denied
     expect(() => createVisit(r, { patientId: f.patient.id, dentistId: f.dentistId, datetime: '2026-09-21T10:00' } as any)).toThrow(/permission/i);
     expect(() => setChart(r, f.patient.id, { changes: [{ tooth: '11', condition: 'caries', action: 'set' }] })).toThrow(/permission/i);

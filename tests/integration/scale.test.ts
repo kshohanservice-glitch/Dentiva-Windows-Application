@@ -8,7 +8,8 @@ import { cleanupEnv, createTestEnv, ownerCtx, type TestEnv } from '../helpers';
 import { createPatient } from '../../src/main/services/patients';
 import { createVisit } from '../../src/main/services/visits';
 import { createInvoice, createPayment } from '../../src/main/services/billing';
-import { addQueueEntry, listQueue } from '../../src/main/services/queue';
+import { createAppointment, listAgenda } from '../../src/main/services/appointments';
+import { addDays } from '../../src/main/services/appointment-rules';
 import { listPatients } from '../../src/main/services/patients';
 import { runReport } from '../../src/main/services/reports';
 import { globalSearch } from '../../src/main/services/search';
@@ -106,24 +107,39 @@ describe('scale: hundreds of synthetic records', () => {
     console.log(`[scale] seed=${seedMs}ms report=${reportMs}ms search=${searchMs}ms`);
   });
 
-  it('queue numbering stays unique and MAX+1 holds across 120 walk-ins', () => {
+  it('agenda views stay exact and fast across 120 appointments spread over 60 days', () => {
     const ctx = ownerCtx(env);
-    const ids = seedClinic(ctx, seedDentist());
-    const day = todayISO();
+    const dentistId = seedDentist();
+    const ids = seedClinic(ctx, dentistId);
+    const today = todayISO();
     const t0 = Date.now();
+    // Unique (date, slot) per appointment so the dentist never double-books.
     for (let i = 0; i < 120; i++) {
-      addQueueEntry(ctx, { patientId: ids[i] });
+      const offset = i % 60;
+      const slot = Math.floor(i / 60);
+      createAppointment(ctx, {
+        patientId: ids[i], dentistId, date: addDays(today, offset), time: `${String(9 + slot).padStart(2, '0')}:00`,
+        durationMin: 30, type: 'Check-up', status: 'scheduled',
+      });
     }
-    const rows = env.db
-      .prepare('SELECT queue_no FROM queue_entries WHERE day = ? ORDER BY queue_no')
-      .all(day) as { queue_no: number }[];
-    const nos = rows.map((r) => r.queue_no);
-    expect(nos).toHaveLength(120);
-    expect(new Set(nos).size).toBe(120); // no duplicates from MAX+1
-    expect(Math.min(...nos)).toBe(1);
-    expect(Math.max(...nos)).toBe(120);
-    const listed = listQueue(ctx, day);
-    expect(listed).toHaveLength(120);
-    console.log(`[scale] queue120 in ${Date.now() - t0}ms`);
+    const seedMs = Date.now() - t0;
+    const expectIn = (lo: number, hi: number) => {
+      let n = 0;
+      for (let i = 0; i < 120; i++) if (i % 60 >= lo && i % 60 <= hi) n++;
+      return n;
+    };
+    const t1 = Date.now();
+    const todayRows = listAgenda(ctx, { view: 'today' });
+    const next7 = listAgenda(ctx, { view: 'next7' });
+    const next30 = listAgenda(ctx, { view: 'next30' });
+    const upcoming = listAgenda(ctx, { view: 'upcoming' });
+    const queryMs = Date.now() - t1;
+    expect(todayRows).toHaveLength(expectIn(0, 0));
+    expect(next7).toHaveLength(expectIn(0, 6));
+    expect(next30).toHaveLength(expectIn(0, 29));
+    expect(upcoming).toHaveLength(120);
+    expect(next7.every((r) => r.date >= today && r.date <= addDays(today, 6))).toBe(true);
+    expect(queryMs).toBeLessThan(2000);
+    console.log(`[scale] appointments120 seed=${seedMs}ms agenda=${queryMs}ms`);
   });
 });

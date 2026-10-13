@@ -5,14 +5,22 @@
  * permission enforcement (permissions are asserted inside service methods).
  */
 import type {
-  ActivationStatus, AppointmentDTO, AppointmentInput, AttachmentDTO, AuditEntry,
+  ActivationStatus, AppointmentAgendaFilter, AppointmentDTO, AppointmentInput, AttachmentDTO, AuditEntry,
   ChartState, DentistDTO, DashboardDTO, DuplicateCandidate, ExpenseDTO, IncomeDTO,
   AccountEntryInput, InventoryBatchDTO, InventoryItemDTO, InvoiceDTO, InvoiceInput,
   NotificationDTO, Paged, PatientDetailDTO, PatientDTO, PatientFilters, PaymentDTO,
   PaymentInput, PrescriptionDTO, ReportResult, RoleDTO, SearchHit, SessionUser,
-  SettingsDTO, StaffDTO, StockInput, TreatmentDTO, UserDTO, VisitDTO, QueueEntryDTO,
+  SettingsDTO, StaffDTO, StockInput, TreatmentDTO, UserDTO, VisitDTO,
 } from './types';
 import type { PermissionKey } from './permissions';
+
+/** Appointment edit payload. Moving the date or time requires `confirmReschedule: true`. */
+export interface AppointmentUpdatePayload {
+  id: number; status?: string; allowConflict?: boolean; confirmReschedule?: boolean;
+  reschedule?: { date: string; time: string; durationMin?: number };
+  dentistId?: number | null; date?: string; time?: string; durationMin?: number;
+  notes?: string | null; plannedTreatments?: string | null; type?: string;
+}
 
 export type LoginResult = { ok: true; user: SessionUser } | { ok: false; reason: 'bad_credentials' | 'locked' | 'disabled'; retryAfterMs?: number }
 
@@ -81,21 +89,15 @@ export interface DentivaApi {
   'prescriptions/save-template'(payload: { name: string; items: any[] }): Promise<{ id: number }>;
   'prescriptions/delete-template'(id: number): Promise<{ ok: boolean }>;
 
-  /* appointments */
+  /* appointments (reminder-only schedule) */
   'appointments/list'(filter: { from: string; to: string; dentistId?: number; status?: string }): Promise<AppointmentDTO[]>;
+  'appointments/agenda'(filter: AppointmentAgendaFilter): Promise<AppointmentDTO[]>;
+  'appointments/get'(id: number): Promise<AppointmentDTO>;
   'appointments/create'(input: AppointmentInput): Promise<AppointmentDTO>;
-  'appointments/update'(payload: { id: number; status?: string; allowConflict?: boolean; reschedule?: { date: string; time: string; durationMin?: number }; dentistId?: number | null; date?: string; time?: string; durationMin?: number; notes?: string | null }): Promise<AppointmentDTO>;
+  'appointments/update'(payload: AppointmentUpdatePayload): Promise<AppointmentDTO>;
   'appointments/cancel'(payload: { id: number; reason?: string }): Promise<AppointmentDTO>;
   'appointments/delete'(id: number): Promise<{ ok: boolean }>;
   'appointments/no-show'(id: number): Promise<AppointmentDTO>;
-  'appointments/arrive'(id: number): Promise<{ appointment: AppointmentDTO; queue: QueueEntryDTO }>;
-
-  /* queue */
-  'queue/list'(date: string): Promise<QueueEntryDTO[]>;
-  'queue/add'(input: { patientId: number; dentistId?: number | null; priority?: number; appointmentId?: number }): Promise<QueueEntryDTO>;
-  'queue/action'(payload: { id: number | null; action: string; payload?: { dentistId?: number; priority?: number } }): Promise<QueueEntryDTO>;
-  'queue/delete'(id: number): Promise<{ ok: boolean }>;
-  'queue/reorder'(orderedIds: number[]): Promise<{ ok: true }>;
 
   /* billing */
   'invoices/list'(filter: { patientId?: number; range?: string; status?: string; page?: number; pageSize?: number }): Promise<Paged<InvoiceDTO>>;
@@ -345,18 +347,14 @@ export const IPC = {
   prescriptionsDeleteTemplate: 'prescriptions/delete-template',
 
   appointmentsList: 'appointments/list',
+  appointmentsAgenda: 'appointments/agenda',
+  appointmentsGet: 'appointments/get',
   appointmentsCreate: 'appointments/create',
   appointmentsUpdate: 'appointments/update',
   appointmentsCancel: 'appointments/cancel',
   appointmentsNoShow: 'appointments/no-show',
-  appointmentsArrive: 'appointments/arrive',
   appointmentsDelete: 'appointments/delete',
 
-  queueList: 'queue/list',
-  queueAdd: 'queue/add',
-  queueAction: 'queue/action',
-  queueDelete: 'queue/delete',
-  queueReorder: 'queue/reorder',
 
   invoicesList: 'invoices/list',
   invoicesGet: 'invoices/get',

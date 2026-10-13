@@ -1017,20 +1017,6 @@ kbd {
 .cal-day.active { background: var(--brand-700); border-color: var(--brand-700); color: #fff; }
 .cal-day.active .dow, .cal-day.active .cnt { color: rgba(255, 255, 255, 0.85); }
 
-/* Queue */
-.queue-row-long { background: var(--warning-bg) !important; }
-.queue-num {
-  display: inline-grid;
-  place-items: center;
-  min-width: 38px;
-  height: 30px;
-  padding: 0 6px;
-  background: var(--brand-50);
-  color: var(--brand-700);
-  font-weight: 800;
-  border-radius: var(--r-sm);
-  font-variant-numeric: tabular-nums;
-}
 
 /* Misc */
 .row { display: flex; align-items: center; gap: var(--sp-3); }
@@ -1245,7 +1231,6 @@ tr.row-muted td { opacity: 0.55; }
 .status-pill { font-size: 11px; font-weight: 750; text-transform: capitalize; }
 
 /* Buttons as full-row tap targets */
-.queue-actions { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
 
 /* Setup wizard polish */
 .setup-wrap { max-width: 880px; }
@@ -1326,3 +1311,10 @@ kbd {
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; scroll-behavior: auto !important; }
 }
+
+/* Appointments */
+.link-button { all: unset; cursor: pointer; text-align: left; border-radius: var(--r-sm); }
+.link-button:hover strong, .link-button:focus-visible strong { text-decoration: underline; color: var(--brand-700); }
+.link-button:focus-visible { outline: 2px solid var(--brand-700); outline-offset: 2px; }
+.row-expired td { color: var(--muted); }
+.row-highlight td { background: var(--brand-50, #eef6ff); }

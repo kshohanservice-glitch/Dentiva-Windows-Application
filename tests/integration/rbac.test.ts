@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { cleanupEnv, createTestEnv, ownerCtx, sessionWith, type TestEnv } from '../helpers';
+import { cleanupEnv, createTestEnv, futureISO, ownerCtx, sessionWith, type TestEnv } from '../helpers';
 import { requirePermission, hasPermission, type Ctx } from '../../src/main/core/context';
 import { AppError } from '../../src/main/errors';
 import { createPatient, listPatients } from '../../src/main/services/patients';
@@ -104,10 +104,10 @@ describe('service-layer permission enforcement', () => {
     const patient = createPatient(owner, PATIENT);
     const viewer = ctxWith(['appointments.view']);
     expect(() =>
-      createAppointment(viewer, { patientId: patient.id, dentistId: null, date: '2026-10-01', time: '10:00', durationMin: 30, type: 'Consultation' }),
+      createAppointment(viewer, { patientId: patient.id, dentistId: null, date: futureISO(30), time: '10:00', durationMin: 30, type: 'Consultation' }),
     ).toThrow(/appointments\.manage/);
     const created = createAppointment(ownerCtx(env), {
-      patientId: patient.id, dentistId: null, date: '2026-10-01', time: '10:00', durationMin: 30, type: 'Consultation',
+      patientId: patient.id, dentistId: null, date: futureISO(30), time: '10:00', durationMin: 30, type: 'Consultation',
     });
     expect(created.status).toBe('scheduled');
   });

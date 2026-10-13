@@ -191,11 +191,11 @@ test('runs a manual backup from the dashboard', async () => {
 });
 
 /* ---------------------------------------------------------------------------
- * Phase B journey expansion (ISS-005): appointment lifecycle + queue,
+ * Phase B journey expansion (ISS-005): appointment lifecycle (reminder-only),
  * prescription → print window, and the Reports UI contract (ISS-020 guard).
  * --------------------------------------------------------------------------- */
 
-test('books an appointment and walks the patient through the queue to completion', async () => {
+test('books an appointment, reschedules it with confirmation, and keeps it on the schedule', async () => {
   const today = new Date().toISOString().slice(0, 10);
   await page.getByRole('link', { name: 'Appointments' }).click();
   await expect(page.getByRole('heading', { name: 'Appointments', level: 1 })).toBeVisible();
@@ -211,29 +211,23 @@ test('books an appointment and walks the patient through the queue to completion
   await modal.getByRole('button', { name: 'Book appointment' }).click();
   await expect(page.locator('.toast-title', { hasText: 'Appointment booked' })).toBeVisible({ timeout: 30_000 });
 
-  // Patient arrives → enters the queue.
-  await page.getByRole('button', { name: 'Arrive → queue' }).first().click();
-  await expect(page.locator('.toast-title', { hasText: 'Patient arrived' })).toBeVisible({ timeout: 30_000 });
-
-  // Queue: call → start → complete.
-  await page.getByRole('link', { name: 'Queue' }).click();
-  await expect(page.getByRole('heading', { name: 'Queue', level: 1 })).toBeVisible();
-  await page.getByRole('button', { name: 'Call next' }).first().click();
-  await expect(page.locator('.toast-title', { hasText: '— call' })).toBeVisible({ timeout: 30_000 });
-  await page.getByRole('button', { name: 'Start treatment' }).first().click();
-  await expect(page.locator('.toast-title', { hasText: '— start' })).toBeVisible({ timeout: 30_000 });
-  await page.getByRole('button', { name: 'Complete' }).first().click();
-  await expect(page.locator('.toast-title', { hasText: '— complete' })).toBeVisible({ timeout: 30_000 });
-  // The finished entry lands in the completed section for the day.
-  await expect(page.getByText('Completed & removed')).toBeVisible();
-  await expect(page.locator('.card, .Card, section', { hasText: 'Completed & removed' }).getByText('E2E Test Patient').first()).toBeVisible({ timeout: 30_000 });
+  // Reschedule: the move must be confirmed explicitly before it is saved.
+  const row = page.locator('tr', { hasText: 'E2E Test Patient' }).filter({ hasText: '15:30' }).first();
+  await row.getByRole('button', { name: 'Reschedule' }).click();
+  const resModal = page.locator('.modal[role="dialog"]', { hasText: 'Reschedule appointment' });
+  await expect(resModal).toBeVisible();
+  await resModal.getByLabel('Time').fill('15:45');
+  await resModal.getByRole('button', { name: 'Save new time' }).click();
+  await page.getByRole('button', { name: 'Confirm move' }).click();
+  await expect(page.locator('.toast-title', { hasText: 'Appointment rescheduled' })).toBeVisible({ timeout: 30_000 });
+  await expect(page.locator('tr', { hasText: 'E2E Test Patient' }).filter({ hasText: '15:45' }).first()).toBeVisible();
 });
 
 test('blocks double-booking with a conflict alert and honours override permission', async () => {
   const today = new Date().toISOString().slice(0, 10);
   await page.getByRole('link', { name: 'Appointments' }).click();
 
-  // First book an active scheduled appointment at 16:00 (the earlier 15:30 slot was completed in the queue test).
+  // First book an active scheduled appointment at 16:00 (the earlier 15:45 appointment is a different slot).
   await page.getByRole('button', { name: 'New appointment' }).first().click();
   const firstModal = page.locator('.modal[role="dialog"]', { hasText: 'New appointment' });
   await expect(firstModal).toBeVisible();
@@ -400,7 +394,7 @@ test('completes a patient visit from the profile and supports patient deletion',
 test('adapts cleanly across 1280×720 and 1920×1080 viewports without horizontal overflow', async () => {
   for (const size of [{ width: 1280, height: 720 }, { width: 1920, height: 1080 }]) {
     await page.setViewportSize(size);
-    for (const nav of ['Dashboard', 'Patients', 'Appointments', 'Queue', 'Invoice', 'Inventory', 'Settings']) {
+    for (const nav of ['Dashboard', 'Patients', 'Appointments', 'Invoice', 'Inventory', 'Settings']) {
       await page.getByRole('link', { name: nav, exact: true }).click();
       const overflow = await page.evaluate(() => {
         const doc = document.documentElement;

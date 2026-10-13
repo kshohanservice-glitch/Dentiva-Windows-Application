@@ -72,8 +72,7 @@ export function DashboardPage() {
 
       <div className="grid stats-grid">
         <StatCard label="Patients today" value={String(data.todayPatients)} foot="registered & revisits" onClick={() => navigate('/patients')} />
-        <StatCard label="Appointments today" value={String(data.todayAppointments)} foot="scheduled" onClick={() => navigate('/appointments')} />
-        <StatCard label="Waiting in queue" value={String(data.waitingQueue)} foot="in queue now" onClick={() => navigate('/queue')} />
+        <StatCard label="Appointments today" value={String(data.todayAppointments)} foot="planned for today" onClick={() => navigate('/appointments')} />
         <StatCard label="Completed visits" value={String(data.completedVisits)} foot="closed today" onClick={() => navigate('/reports')} />
       </div>
 

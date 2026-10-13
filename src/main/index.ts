@@ -9,6 +9,7 @@ import { SessionManager } from './core/session';
 import { ActivationStore, weakCipher, type Cipher } from './core/activation';
 import { createBackupService, type DbHolder } from './services/backup';
 import { insertNotification, refreshNotifications } from './services/notifications';
+import { runAppointmentExpiry } from './services/appointments';
 import { registerRouter } from './ipc/router';
 import { resolveWindowIcon } from './print';
 import { IPC } from '../shared/ipc';
@@ -24,6 +25,7 @@ const APP_VERSION = ((): string => {
 })();
 
 let mainWindow: BrowserWindow | null = null;
+let scheduleTimer: NodeJS.Timeout | null = null;
 
 function buildCipher(): Cipher {
   if (safeStorage.isEncryptionAvailable()) {
@@ -192,7 +194,33 @@ async function boot(): Promise<void> {
     logger.error('Unhandled rejection', { error: reason instanceof Error ? reason.message : String(reason) });
   });
 
-  // Post-ready maintenance: automatic backup + notification refresh (non-blocking)
+  // Maintenance: appointment expiry + reminder sync run at startup and every
+  // 5 minutes, so they survive restarts and catch up after the PC was asleep.
+  // Both are idempotent; reads also re-derive expiry from the local date.
+  const runScheduleMaintenance = () => {
+    try {
+      runAppointmentExpiry(holder.get());
+    } catch (e) {
+      logger.warn('Appointment expiry failed', { error: e instanceof Error ? e.message : String(e) });
+    }
+    try {
+      const row = holder.get().prepare("SELECT value_json FROM settings WHERE key = 'notifications'").get<{ value_json: string }>();
+      const prefs = row ? JSON.parse(row.value_json) : {};
+      refreshNotifications(holder.get(), {
+        lowStock: prefs.lowStock !== false, dues: prefs.dues !== false,
+        backup: prefs.backup !== false, appointments: prefs.appointments !== false,
+      });
+    } catch (e) {
+      logger.warn('Notification refresh failed', { error: e instanceof Error ? e.message : String(e) });
+    }
+  };
+  if (!demoBuild) {
+    runScheduleMaintenance();
+    scheduleTimer = setInterval(runScheduleMaintenance, 5 * 60 * 1000);
+    scheduleTimer.unref();
+  }
+
+  // Post-ready maintenance: automatic backup (non-blocking)
   if (demoBuild) return;
   setTimeout(() => {
     void (async () => {
@@ -201,14 +229,6 @@ async function boot(): Promise<void> {
       } catch (e) {
         logger.warn('Auto-backup check failed', { error: e instanceof Error ? e.message : String(e) });
       }
-      try {
-        const row = holder.get().prepare("SELECT value_json FROM settings WHERE key = 'notifications'").get<{ value_json: string }>();
-        const prefs = row ? JSON.parse(row.value_json) : {};
-        refreshNotifications(holder.get(), {
-          lowStock: prefs.lowStock !== false, dues: prefs.dues !== false,
-          backup: prefs.backup !== false, appointments: prefs.appointments !== false,
-        });
-      } catch { /* non-fatal */ }
     })();
   }, 2500);
 }
