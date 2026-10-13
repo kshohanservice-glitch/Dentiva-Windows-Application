@@ -80,6 +80,17 @@ async function boot(): Promise<void> {
   const demoBuild = isDemoBuild();
   const paths = getPaths();
 
+  // Validate OS encryption before opening/migrating any clinic database. A
+  // packaged Windows installation must never migrate data and then fail to
+  // access its activation state due to unavailable secure storage.
+  let cipher: Cipher;
+  try {
+    cipher = buildCipher();
+  } catch (err) {
+    fatal('Secure storage unavailable', err instanceof Error ? err.message : 'Activation storage could not be initialized.');
+    return;
+  }
+
   // --- Database open with integrity guard -------------------------------
   let db: DB;
   try {
@@ -145,7 +156,7 @@ async function boot(): Promise<void> {
   // --- Activation --------------------------------------------------------
   let activation: ActivationStore;
   try {
-    activation = new ActivationStore(path.join(paths.activationDir, 'state.bin'), buildCipher());
+    activation = new ActivationStore(path.join(paths.activationDir, 'state.bin'), cipher);
   } catch (err) {
     fatal('Secure storage unavailable', err instanceof Error ? err.message : 'Activation storage could not be initialized.');
     return;

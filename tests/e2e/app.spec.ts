@@ -233,7 +233,7 @@ test('blocks double-booking with a conflict alert and honours override permissio
   const today = new Date().toISOString().slice(0, 10);
   await page.getByRole('link', { name: 'Appointments' }).click();
 
-  // First book an active scheduled appointment at 16:00 (the earlier 15:45 appointment is a different slot).
+  // First book an active scheduled appointment at 17:00 (the earlier 15:45 appointment ends before this slot).
   await page.getByRole('button', { name: 'New appointment' }).first().click();
   const firstModal = page.locator('.modal[role="dialog"]', { hasText: 'New appointment' });
   await expect(firstModal).toBeVisible();
@@ -241,11 +241,11 @@ test('blocks double-booking with a conflict alert and honours override permissio
   await firstModal.locator('.list-row', { hasText: 'E2E Test Patient' }).first().click();
   await firstModal.getByLabel('Dentist').selectOption({ label: 'Dr. E2E Dentist' });
   await firstModal.getByLabel('Date').fill(today);
-  await firstModal.getByLabel('Time').fill('16:00');
+  await firstModal.getByLabel('Time').fill('17:00');
   await firstModal.getByRole('button', { name: 'Book appointment' }).click();
   await expect(page.locator('.toast-title', { hasText: 'Appointment booked' }).last()).toBeVisible({ timeout: 30_000 });
 
-  // Now attempt an overlapping appointment at 16:15 for the same dentist.
+  // Now attempt an overlapping appointment at 17:15 for the same dentist.
   await page.getByRole('button', { name: 'New appointment' }).first().click();
   const modal = page.locator('.modal[role="dialog"]', { hasText: 'New appointment' });
   await expect(modal).toBeVisible();
@@ -253,7 +253,7 @@ test('blocks double-booking with a conflict alert and honours override permissio
   await modal.locator('.list-row', { hasText: 'E2E Test Patient' }).first().click();
   await modal.getByLabel('Dentist').selectOption({ label: 'Dr. E2E Dentist' });
   await modal.getByLabel('Date').fill(today);
-  await modal.getByLabel('Time').fill('16:15'); // overlaps the 16:00 appointment
+  await modal.getByLabel('Time').fill('17:15'); // overlaps the 17:00 appointment
   await modal.getByRole('button', { name: 'Book appointment' }).click();
   // Conflict detected (owner holds appointments.override → inline alert, not a silent double-book).
   await expect(modal.getByText('Scheduling conflict')).toBeVisible({ timeout: 30_000 });
