@@ -50,14 +50,33 @@ invoice arithmetic and saved clinic data.
 - No runtime dependency or network service is added. The application remains offline and
   local-first.
 
-## Upgrade and verification notes
+## Release verification
+
+Released on **2026-10-14** as [`v4.2.0`](https://github.com/kshohanservice-glitch/Dentiva-Windows-Application/releases/tag/v4.2.0),
+now marked Latest. The [tagged Windows CI run](https://github.com/kshohanservice-glitch/Dentiva-Windows-Application/actions/runs/38590568540)
+passed verification/build, Windows Electron E2E, and NSIS packaging with installed-artifact smoke
+testing, including the native Argon2 runtime-path check and silent installation.
+
+- Installer: [`DentivaPro-Setup-4.2.0.exe`](https://github.com/kshohanservice-glitch/Dentiva-Windows-Application/releases/download/v4.2.0/DentivaPro-Setup-4.2.0.exe)
+  (100,055,048 bytes)
+- SHA-256: `6c3a100e3874a8e9c63bf1db529993aaf8cdc615cac6e2eca3fb10831d716d9b`
+- Checksum file: [`SHA256SUMS.txt`](https://github.com/kshohanservice-glitch/Dentiva-Windows-Application/releases/download/v4.2.0/SHA256SUMS.txt)
+
+The GitHub asset digest matches the installer hash reported by the successful CI checksum step.
+No separate local asset download was performed. Physical-printer output and upgrade/restore behavior
+with real clinic data were not tested. The successful installer smoke scenario ran on a fresh Windows
+CI profile; see the [release verification report](https://github.com/kshohanservice-glitch/Dentiva-Windows-Application/blob/main/docs/RELEASE_REPORT_V4.2.0.md)
+for the exact checks and limitations.
+
+## Upgrade and data-safety notes
 
 Migration 007 is additive: an existing schema-version-6 clinic database is upgraded by adding a
 nullable prescription-item column. The migration leaves existing item data intact. As with other
 forward-only schema migrations, make and verify a separate backup before upgrading; an older
 application version is not a rollback mechanism for a database after it has advanced to schema 7.
+Confirm printed output on the target printer before relying on a customized watermark or document
+layout.
 
-The exact verification outcomes and remaining limitations are recorded in
-[`PROGRESS_V4.2.0.md`](PROGRESS_V4.2.0.md) and [`AUDIT_V4.2.0.md`](AUDIT_V4.2.0.md). In particular,
-physical-printer output and target-device behavior must not be inferred from unit tests or a
-successful build.
+The post-release audit and progress evidence are documented in
+[`AUDIT_V4.2.0.md`](https://github.com/kshohanservice-glitch/Dentiva-Windows-Application/blob/main/docs/AUDIT_V4.2.0.md)
+and [`PROGRESS_V4.2.0.md`](https://github.com/kshohanservice-glitch/Dentiva-Windows-Application/blob/main/docs/PROGRESS_V4.2.0.md).
