@@ -59,6 +59,10 @@ const NAV: NavGroup[] = [
       { to: '/', label: 'Dashboard', icon: Icon.dashboard, permission: 'dashboard.view' },
       { to: '/patients', label: 'Patients', icon: Icon.patients, permission: 'patients.view' },
       { to: '/appointments', label: 'Appointments', icon: Icon.appointments, permission: 'appointments.view' },
+      // Walk-in / Quick Documents: printable documents for one-time customers.
+      // No permission gate on the entry itself — the page lists only the
+      // document types the signed-in role may create.
+      { to: '/quick-documents', label: 'Walk-in / Quick Docs', icon: Icon.print },
     ],
   },
   {

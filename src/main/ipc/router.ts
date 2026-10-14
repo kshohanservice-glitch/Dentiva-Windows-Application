@@ -29,6 +29,7 @@ import * as searchSvc from '../services/search';
 import * as reportsSvc from '../services/reports';
 import * as referralsSvc from '../services/referrals';
 import * as whatsappSvc from '../services/whatsapp';
+import * as quickDocuments from '../services/quick-documents';
 import type { BackupService } from '../services/backup';
 import { closePrintWindow, executePrint, listPrinters, openPrintWindow, saveAsPdf } from '../print';
 import { toCsv } from '../../shared/csv';
@@ -117,6 +118,7 @@ export function registerRouter(deps: RouterDeps): void {
     IPC.attachmentsAdd, IPC.attachmentsRename, IPC.attachmentsRemove,
     IPC.backupRun, IPC.backupRestore, IPC.backupSetAuto,
     IPC.settingsSave, IPC.settingsUploadLogo, IPC.settingsResetBusiness, IPC.referralsDelete,
+    IPC.quickDocumentsPrepare,
     IPC.notificationsMarkRead, IPC.referralsSave,
   ]);
   const handle = (channel: string, opts: { auth: boolean; fn: (payload: any, ctx: Ctx | null) => any | Promise<any> }) => {
@@ -432,6 +434,17 @@ export function registerRouter(deps: RouterDeps): void {
     openPrintWindow({ type: p?.type ?? 'report', id: Number(p?.id ?? 0), reportName: p?.reportName, profileId: p?.profileId, params: p?.params });
     return { ok: true };
   } });
+  /* ---------------------- walk-in / quick documents ---------------------- */
+  // The payload is validated in the service, held in memory only, and rendered
+  // by the same print window as every other document. No patient record is
+  // created, and there is no WhatsApp surface on this path.
+  handle(IPC.quickDocumentsPrepare, { auth: true, fn: (p, ctx) => {
+    const prepared = quickDocuments.prepareQuickDocument(ctx!, p);
+    openPrintWindow({ type: 'quick', id: 0, ref: prepared.token });
+    return prepared;
+  } });
+  handle(IPC.quickDocumentsPayload, { auth: true, fn: (p, ctx) => quickDocuments.readQuickDocument(ctx!, p) });
+
   handle(IPC.printersList, { auth: true, async fn() {
     const win = activeWindow();
     if (!win) return [];

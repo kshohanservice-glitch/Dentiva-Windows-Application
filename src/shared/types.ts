@@ -1,4 +1,5 @@
 import type { PermissionKey } from './permissions';
+import type { DocumentStyleMap } from './document-styles';
 import type { GreetingRange, WhatsAppTemplateCategory } from './whatsapp';
 
 /* ----------------------------- Session ----------------------------- */
@@ -326,6 +327,12 @@ export interface SettingsDTO {
   paymentMethods: string[];
   expenseCategories: string[];
   printProfiles: PrintProfile[];
+  /**
+   * Per-document, per-element printable-document customizations
+   * (Settings → Customize Documents). Empty objects/absent keys mean “use the
+   * original document design”; see `src/shared/document-styles.ts`.
+   */
+  documentStyles: DocumentStyleMap;
 }
 
 /* ------------------------------- Reports ---------------------------- */

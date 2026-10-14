@@ -7,6 +7,8 @@ import { AppError } from './errors';
 export interface PrintDocRef {
   type: import('../shared/ipc').PrintDocKind;
   id: number;
+  /** Non-numeric reference for the print route (walk-in / quick documents). */
+  ref?: string;
   reportName?: string;
   profileId?: string;
   params?: Record<string, string>;
@@ -41,7 +43,7 @@ export function buildPrintHash(doc: PrintDocRef): string {
     }
   }
   const qs = sp.toString();
-  return `#print/${doc.type}/${doc.id}${qs ? `?${qs}` : ''}`;
+  return `#print/${doc.type}/${doc.ref ?? doc.id}${qs ? `?${qs}` : ''}`;
 }
 
 export function openPrintWindow(doc: PrintDocRef): void {
@@ -69,6 +71,14 @@ export function openPrintWindow(doc: PrintDocRef): void {
   });
   printWindow.once('ready-to-show', () => printWindow?.show());
   printWindow.on('closed', () => { printWindow = null; });
+  // Same hardening as the main window: a printable document is data, never a
+  // navigation target. Content is escaped by React and the renderer CSP blocks
+  // remote code, so opening a window or navigating away is never legitimate.
+  const wc = printWindow.webContents;
+  wc.setWindowOpenHandler(() => ({ action: 'deny' }));
+  wc.on('will-navigate', (event, url) => {
+    if (!url.startsWith('file://')) event.preventDefault();
+  });
   void printWindow.loadFile(appHtml(), { hash: hash.slice(1) });
 }
 

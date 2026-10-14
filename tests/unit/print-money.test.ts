@@ -88,7 +88,10 @@ describe('print stylesheet contract', () => {
 });
 
 describe('print document tree never imports UI masking', () => {
-  const src = read('src/renderer/pages/PrintPage.tsx');
+  // The renderers moved out of the print page into a dedicated document module
+  // (they are shared with the in-app document previews); the contract is
+  // unchanged and is asserted against the module that actually renders.
+  const src = read('src/renderer/documents/print-documents.tsx');
 
   it('imports the export money components', () => {
     expect(src).toContain("from '../components/print-money'");

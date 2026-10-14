@@ -9,6 +9,7 @@ import '@fontsource/noto-sans-bengali/600.css';
 import './styles/tokens.css';
 import './styles/global.css';
 import './styles/print.css';
+import './styles/documents.css';
 import { App } from './App';
 
 // Use Bangladesh/UK-style calendar ordering everywhere the Chromium date controls render: DD/MM/YYYY.
