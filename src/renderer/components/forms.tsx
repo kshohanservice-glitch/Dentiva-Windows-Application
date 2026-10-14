@@ -77,7 +77,7 @@ export function Select(props: {
 
 export function Textarea(props: {
   value: string; onChange: (v: string) => void; rows?: number; placeholder?: string;
-  invalid?: boolean; disabled?: boolean; id?: string; monospace?: boolean;
+  invalid?: boolean; disabled?: boolean; id?: string; monospace?: boolean; maxLength?: number;
 }) {
   return (
     <textarea
@@ -87,6 +87,7 @@ export function Textarea(props: {
       placeholder={props.placeholder}
       disabled={props.disabled}
       value={props.value}
+      maxLength={props.maxLength}
       spellCheck={false}
       style={props.monospace ? { fontFamily: 'ui-monospace, monospace' } : undefined}
       onChange={(e) => props.onChange(e.target.value)}

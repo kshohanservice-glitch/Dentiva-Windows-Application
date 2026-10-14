@@ -67,6 +67,31 @@ async function showSave(opts: SaveDialogOptions): Promise<string | null> {
   return res.filePath;
 }
 
+const copyLinkFailed = (): AppError =>
+  new AppError(
+    'FILE',
+    'Could not copy the WhatsApp link. Close any program that is holding the clipboard and try again, ' +
+      'or open the link manually in your browser.',
+  );
+
+/**
+ * Best-effort clipboard read-back for the WhatsApp recovery link.
+ *
+ * Returns `true` when the clipboard holds exactly `expected`, `false` when it
+ * holds different text (a silently dropped write), and `null` when the
+ * read-back itself is unavailable — in which case the copy cannot be confirmed
+ * and is accepted as-is rather than reported as a failure.
+ */
+function clipboardReadBackMatches(expected: string): boolean | null {
+  try {
+    const actual = clipboard.readText();
+    if (typeof actual !== 'string' || actual === '') return null;
+    return actual === expected;
+  } catch {
+    return null;
+  }
+}
+
 async function pickDirectory(title: string, defaultPath?: string): Promise<string | null> {
   return showOpen({ title, defaultPath, properties: ['openDirectory', 'createDirectory'] });
 }
@@ -454,11 +479,32 @@ export function registerRouter(deps: RouterDeps): void {
   } });
   // Recovery path when the operating system cannot open the link: the same
   // strictly validated wa.me URL is placed on the clipboard so the doctor can
-  // paste it into a browser or WhatsApp manually. Nothing else is copied.
+  // paste it into a browser or WhatsApp manually. Nothing else is copied, and
+  // no success is reported unless the write both returned and (best effort)
+  // read back as the same link.
   handle(IPC.whatsappCopyLink, { auth: true, fn: (p, ctx) => {
     requirePermission(ctx!, 'patients.view');
     const url = whatsappSvc.assertSafeWhatsAppOpenUrl(p);
-    clipboard.writeText(url);
+    try {
+      clipboard.writeText(url);
+    } catch (err) {
+      logger.error('Could not write the WhatsApp link to the clipboard', {
+        detail: err instanceof Error ? err.message : String(err),
+      });
+      throw copyLinkFailed();
+    }
+    // Windows keeps the previous clipboard contents when a write silently fails
+    // (another program holding the clipboard, for example), so the content is
+    // read back. A differing read-back is treated as a failed copy. When the
+    // read-back itself is unavailable the copy cannot be confirmed; that
+    // limitation is documented in docs/release/WHATSAPP_OPEN_FAILURE_AUDIT.md
+    // and no stronger claim is made to the doctor.
+    if (clipboardReadBackMatches(url) === false) {
+      logger.error('The clipboard did not hold the copied WhatsApp link after the write', {
+        detail: 'clipboard read-back returned different text',
+      });
+      throw copyLinkFailed();
+    }
     return { ok: true as const };
   } });
   handle(IPC.whatsappHistory, { auth: true, fn: (p, ctx) => whatsappSvc.listWhatsAppHistory(ctx!, Number(p)) });

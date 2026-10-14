@@ -9,16 +9,17 @@
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { handlers, openExternal, writeText } = vi.hoisted(() => ({
+const { handlers, openExternal, writeText, readText } = vi.hoisted(() => ({
   handlers: new Map<string, (event: unknown, payload: unknown) => Promise<any>>(),
   openExternal: vi.fn(),
   writeText: vi.fn(),
+  readText: vi.fn(),
 }));
 
 vi.mock('electron', () => ({
   ipcMain: { handle: (channel: string, fn: (event: unknown, payload: unknown) => Promise<any>) => handlers.set(channel, fn) },
   shell: { openExternal: (url: string) => openExternal(url), openPath: vi.fn() },
-  clipboard: { writeText: (text: string) => writeText(text) },
+  clipboard: { writeText: (text: string) => writeText(text), readText: () => readText() },
   dialog: { showOpenDialog: vi.fn(), showSaveDialog: vi.fn() },
   BrowserWindow: { getAllWindows: () => [], fromWebContents: vi.fn() },
   app: { getPath: () => '/tmp', getAppPath: () => '/tmp' },
@@ -40,7 +41,9 @@ let session = ownerSession();
 
 beforeEach(() => {
   openExternal.mockReset().mockResolvedValue(undefined);
-  writeText.mockReset();
+  readText.mockReset().mockReturnValue('');
+  // Default behaviour of a healthy clipboard: the read-back returns what was written.
+  writeText.mockReset().mockImplementation((text: string) => { readText.mockReturnValue(text); });
   handlers.clear();
   session = ownerSession();
   env = createTestEnv('whatsapp-open');
@@ -154,6 +157,45 @@ describe('whatsapp/copy-link recovery path', () => {
     const res = await call(COPY, url);
     expect(res).toEqual({ ok: true, data: { ok: true } });
     expect(writeText).toHaveBeenCalledWith(url);
+  });
+
+  it('never reports success when the clipboard write itself fails', async () => {
+    writeText.mockImplementation(() => { throw new Error('clipboard locked by another application'); });
+    const res = await call(COPY, buildWhatsAppUrl('8801712345678', 'hello'));
+
+    expect(res.ok).toBe(false);
+    expect(res.error.code).toBe('FILE');
+    expect(res.error.message).toMatch(/Could not copy the WhatsApp link/i);
+    expect(res.error.message).toMatch(/clipboard/i);
+    // The raw clipboard error and the generic internal text stay out of the UI.
+    expect(res.error.message).not.toContain('An unexpected error occurred');
+    expect(res.error.message).not.toContain('locked by another application');
+    expect(typeof res.error.correlationId).toBe('string');
+  });
+
+  it('detects a silently dropped write when the clipboard still holds different text', async () => {
+    // Windows keeps the previous clipboard contents when a write silently fails.
+    writeText.mockImplementation(() => undefined);
+    readText.mockReturnValue('something the doctor copied earlier');
+    const res = await call(COPY, buildWhatsAppUrl('8801712345678', 'hello'));
+
+    expect(res.ok).toBe(false);
+    expect(res.error.code).toBe('FILE');
+    expect(res.error.message).toMatch(/Could not copy the WhatsApp link/i);
+    // Neither the stale clipboard text nor the link itself is echoed back.
+    expect(res.error.message).not.toContain('something the doctor copied earlier');
+    expect(res.error.message).not.toContain('wa.me');
+  });
+
+  it('accepts the copy when the read-back is unavailable, without claiming more than it can', async () => {
+    // Documented limitation: a clipboard that cannot be read back (or is empty)
+    // cannot be verified, so the successful write call is accepted.
+    writeText.mockImplementation(() => undefined);
+    readText.mockImplementation(() => { throw new Error('clipboard unavailable'); });
+    expect(await call(COPY, buildWhatsAppUrl('8801712345678', 'a'))).toEqual({ ok: true, data: { ok: true } });
+
+    readText.mockReturnValue('');
+    expect(await call(COPY, buildWhatsAppUrl('8801712345678', 'b'))).toEqual({ ok: true, data: { ok: true } });
   });
 
   it('never copies anything but a validated https wa.me link', async () => {

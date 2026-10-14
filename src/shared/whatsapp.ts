@@ -442,10 +442,52 @@ export const MAX_WHATSAPP_MESSAGE_LENGTH = 4000;
  */
 export const MAX_WHATSAPP_LINK_LENGTH = 100 + MAX_WHATSAPP_MESSAGE_LENGTH * 9;
 
+export interface SanitizedWhatsAppText {
+  /** The text with unpaired UTF-16 surrogates replaced by U+FFFD. */
+  text: string;
+  /** True when at least one unpaired surrogate had to be replaced. */
+  changed: boolean;
+}
+
+/**
+ * Replace unpaired UTF-16 surrogates with U+FFFD (the replacement character)
+ * so `encodeURIComponent` can never throw `URIError: URI malformed` on text
+ * pasted from a damaged source. Every well-formed character is preserved
+ * byte-for-byte: valid pairs are copied as a unit, so Bengali, Arabic,
+ * Devanagari and astral characters such as emoji are never altered. The
+ * caller decides how to tell the doctor when `changed` is true.
+ */
+export function sanitizeUnpairedSurrogates(text: string): SanitizedWhatsAppText {
+  const source = String(text ?? '');
+  let out = '';
+  let changed = false;
+  for (let i = 0; i < source.length; i += 1) {
+    const code = source.charCodeAt(i);
+    if (code >= 0xd800 && code <= 0xdbff) {
+      const next = source.charCodeAt(i + 1);
+      if (next >= 0xdc00 && next <= 0xdfff) {
+        out += source[i] + source[i + 1];
+        i += 1;
+      } else {
+        out += '\uFFFD';
+        changed = true;
+      }
+    } else if (code >= 0xdc00 && code <= 0xdfff) {
+      out += '\uFFFD';
+      changed = true;
+    } else {
+      out += source[i];
+    }
+  }
+  return { text: out, changed };
+}
+
 /**
  * Build the official Click to Chat URL. Throws an English Error for an
  * invalid destination so callers can surface it; Bengali text, punctuation
- * and line breaks are percent-encoded by encodeURIComponent.
+ * and line breaks are percent-encoded by encodeURIComponent. Unpaired
+ * surrogates are replaced first, so the builder always returns a URL instead
+ * of throwing `URIError`.
  */
 export function buildWhatsAppUrl(internationalDigits: string, message?: string | null): string {
   const digits = String(internationalDigits ?? '').replace(/\D/g, '');
@@ -453,7 +495,7 @@ export function buildWhatsAppUrl(internationalDigits: string, message?: string |
     throw new Error('WhatsApp number is invalid. Check the number and try again.');
   }
   const base = `https://wa.me/${digits}`;
-  const text = (message ?? '').trim();
+  const text = sanitizeUnpairedSurrogates(String(message ?? '')).text.trim();
   return text ? `${base}?text=${encodeURIComponent(text)}` : base;
 }
 

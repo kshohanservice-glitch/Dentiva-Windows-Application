@@ -78,33 +78,77 @@ must never be rejected by Dentiva Pro.
 
 | File | Change |
 | --- | --- |
-| `src/shared/whatsapp.ts` | Added `MAX_WHATSAPP_MESSAGE_LENGTH` (4000) and `MAX_WHATSAPP_LINK_LENGTH` (derived: prefix + worst-case percent-encoding), so the message limit and the open guard can no longer disagree. |
-| `src/main/services/whatsapp.ts` | Uses both constants (message-length check and open-guard cap). URL shape validation is unchanged. |
-| `src/main/ipc/router.ts` | `whatsapp/open` wraps `shell.openExternal()`: the raw OS reason is logged, and the doctor receives an English, actionable message naming the default-browser check and the `Copy link` recovery. Added `whatsapp/copy-link`, which writes only a validated `wa.me` link to the clipboard (same permission check and same validator as `whatsapp/open`). |
+| `src/shared/whatsapp.ts` | Added `MAX_WHATSAPP_MESSAGE_LENGTH` (4000) and `MAX_WHATSAPP_LINK_LENGTH` (derived: prefix + worst-case percent-encoding), plus `sanitizeUnpairedSurrogates()` so URL encoding can never throw. The link ceiling is a guard, not a substitute for the message limit — see the review follow-up below. |
+| `src/main/services/whatsapp.ts` | Uses both shared constants everywhere (template body, custom body, message limit, open-guard cap — no duplicated literals). The message limit is enforced **after the final message is rendered**, so it covers edited text, rendered templates with patient data and Share-PDF introductions alike. URL shape validation is unchanged. |
+| `src/main/ipc/router.ts` | `whatsapp/open` wraps `shell.openExternal()`: the raw OS reason is logged, and the doctor receives an English, actionable message naming the default-browser check and the `Copy link` recovery. Added `whatsapp/copy-link`, which writes only a validated `wa.me` link to the clipboard (same permission check and same validator as `whatsapp/open`) and reports an actionable failure — never a false success — when the write throws or the read-back shows different text. |
 | `src/shared/ipc.ts` | Declares the new `whatsapp/copy-link` channel and bridge method (the preload forwards every allowlisted channel automatically). |
-| `src/renderer/components/whatsapp-hub.tsx` | `Copy link` buttons (Patient Profile hub, message composer, Share PDF dialog) and a short explanation that WhatsApp Desktop is not required. |
+| `src/renderer/components/whatsapp-hub.tsx` (and `message-templates.tsx`, `forms.tsx`) | `Copy link` buttons (Patient Profile hub, message composer, Share PDF dialog), a short explanation that WhatsApp Desktop is not required, and `maxLength={MAX_WHATSAPP_MESSAGE_LENGTH}` on the WhatsApp textareas (optional prop added to the shared `Textarea`). |
 
 Unchanged on purpose: permission checks (`patients.view`), patient-consent rules,
 URL safety validation, context isolation/sandbox, the absence of any automatic
 sending, and the absence of any paid or cloud messaging dependency.
 
+## Independent review follow-up (same branch, before any release)
+
+A second, independent pass over this diff found four further defects, all fixed
+here (commit is reported in the pull request; no release was created):
+
+1. **A clipboard write failure returned the generic internal text.** The
+   `whatsapp/copy-link` handler now catches a throwing write, logs the raw reason,
+   and returns an actionable `FILE` error; it also reads the clipboard back
+   (best effort) and treats *different* text as a failed copy, which is what
+   Windows leaves behind when a write is silently dropped.
+2. **The 4000-character limit only applied to edited text.** A stored template
+   plus a long custom body could render a 4,970-character message and a
+   44,763-character link that neither `whatsapp/open` nor `whatsapp/copy-link`
+   would accept. The limit is now enforced once, after the final message is
+   rendered, and the custom body is bounded as an input as well.
+3. **Malformed text could still produce the generic error.** A lone UTF-16
+   surrogate made `encodeURIComponent` throw `URIError: URI malformed`.
+   `sanitizeUnpairedSurrogates()` replaces only unpaired surrogates with U+FFFD
+   (valid Bengali/Devanagari/Arabic/emoji text is copied byte-for-byte) and the
+   service warns the doctor instead of failing.
+4. **Duplicated limits and an overstated claim in this document.** The template
+   body cap now uses the shared constant, the renderer textareas are bounded by
+   the same constant, and the earlier "can no longer disagree" wording was
+   replaced by what is actually guaranteed: every prepared message is ≤ 4000
+   characters and the worst case link is 36,035 characters, under the 36,100
+   guard.
+
+### Clipboard verification limitation (documented, not claimed away)
+
+Windows can leave the previous clipboard contents in place when a write fails
+silently (another program holding the clipboard). Dentiva Pro therefore reads the
+clipboard back and refuses to report success when the content differs. When the
+read-back itself is unavailable — the read throws, or returns empty — the copy
+cannot be confirmed; the successful write call is accepted but **no verification
+is claimed**. Exact clipboard behaviour on a real Windows machine (including a
+locked clipboard) is listed under the pending checks below.
+
 ## Tests actually run (Linux sandbox, 2026-10-14)
 
 | Command | Result |
 | --- | --- |
-| `npx vitest run tests/integration/whatsapp-open-ipc.test.ts` | 9 passed (new file) |
-| `npm test` (full suite) | **37 files / 365 tests passed** (was 36 / 355 before this change) |
+| `npx vitest run tests/integration/whatsapp-open-ipc.test.ts` | 12 passed (new file) |
+| `npm test` (full suite) | **37 files / 375 tests passed** (was 36 / 355 before this work) |
 | `npx tsc -p tsconfig.node.json --noEmit` | pass |
 | `npx tsc -p tsconfig.renderer.json --noEmit` | pass |
 | `npx eslint .` | pass, 0 errors |
 | `npm run build` (main + renderer) | pass |
 
-The new tests cover: the exact URL handed to the OS, an OS refusal mapped to an
+The tests cover: the exact URL handed to the OS, an OS refusal mapped to an
 actionable message (and never to the generic internal text, with no `ShellExecute`
 / `Failed to open` detail leaked), rejection of `javascript:`, `http:`, foreign
 hosts, `file:`, `whatsapp://` and non-string payloads without calling
 `shell.openExternal`, the longest Bengali message the app can build, the
-permission check, and the clipboard recovery path (validated link only).
+permission check, and the clipboard recovery path (validated link only) with its
+failure modes: a throwing write, a silently dropped write detected by the
+read-back, and an unavailable read-back. Length and Unicode behaviour is covered
+by unit tests (sanitizer, multilingual preservation, URL round-trip) and by
+integration tests at the boundary (exactly 4000 characters accepted, one more
+refused on the rendered path, on the custom-body path and on the edited-message
+path; an over-long Share-PDF introduction refused before any temporary folder is
+created).
 
 ## Windows checks — completed vs. pending
 
@@ -120,8 +164,9 @@ Completed here: everything above, which is code-level evidence only.
    new message (default-browser check plus `Copy link`), and `Failed to open: …`
    in `%APPDATA%\dentiva-pro\logs\app-<date>.log`.
 3. `Copy link` on Windows, pasted into a browser and into WhatsApp — confirms the
-   clipboard recovery path (the clipboard write itself is not exercised by the
-   Linux test, which mocks Electron's `clipboard`).
+   clipboard recovery path (the Linux tests mock Electron's `clipboard`, so the
+   real write, the read-back and the locked-clipboard message are still
+   unverified on a real machine).
 4. The Windows CI jobs (`verify`, Electron E2E, NSIS installer + installed-app
    smoke test) for this branch.
 

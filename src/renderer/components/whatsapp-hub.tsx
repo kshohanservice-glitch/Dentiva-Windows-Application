@@ -5,7 +5,7 @@ import { Badge, Button, Card, ConfirmDialog, EmptyState, ErrorState, Modal, Spin
 import { Field, Input, Select, Textarea } from './forms';
 import { Money } from './money';
 import { formatDate } from '../format';
-import { buildWhatsAppUrl, normalizeWhatsAppNumber, TEMPLATE_CATEGORY_LABELS, type WhatsAppTemplateCategory } from '../../shared/whatsapp';
+import { buildWhatsAppUrl, MAX_WHATSAPP_MESSAGE_LENGTH, normalizeWhatsAppNumber, TEMPLATE_CATEGORY_LABELS, type WhatsAppTemplateCategory } from '../../shared/whatsapp';
 import type { PatientDetailDTO, PatientDocumentDTO, WhatsAppMessageLogDTO, WhatsAppPrepareResult } from '../../shared/types';
 
 /**
@@ -636,7 +636,7 @@ function MessageComposerModal(props: ComposerProps) {
 
         {category === 'custom' && (
           <Field label="Custom message body" hint="Written into the Bengali message where the body placeholder appears.">
-            {(id) => <Textarea id={id} rows={3} value={customBody} onChange={setCustomBody} />}
+            {(id) => <Textarea id={id} rows={3} value={customBody} maxLength={MAX_WHATSAPP_MESSAGE_LENGTH} onChange={setCustomBody} />}
           </Field>
         )}
 
@@ -662,6 +662,7 @@ function MessageComposerModal(props: ComposerProps) {
               id={id}
               rows={12}
               value={message}
+              maxLength={MAX_WHATSAPP_MESSAGE_LENGTH}
               onChange={(v) => { setMessage(v); setEdited(true); }}
             />
           )}

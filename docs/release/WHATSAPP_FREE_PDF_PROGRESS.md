@@ -58,9 +58,9 @@ completion for steps that have not actually run.
 
 | Command | Result |
 | --- | --- |
-| `npx vitest run tests/unit/whatsapp.test.ts tests/integration/whatsapp.test.ts` | 45 passed (30 unit + 15 integration) — *(after the opening fix: 46 passed, 31 unit)* |
-| `npx vitest run tests/integration/whatsapp-open-ipc.test.ts` *(after the opening fix)* | 9 passed (new: OS hand-off, OS refusal, unsafe URLs, longest link, clipboard recovery) |
-| `npm test` (full suite) | **35 files / 355 tests passed** (v4.0.0 baseline: 308) — *(after the opening fix: 37 files / 365 tests passed)* |
+| `npx vitest run tests/unit/whatsapp.test.ts tests/integration/whatsapp.test.ts` | 45 passed (30 unit + 15 integration) — *(after the WhatsApp opening work: 53 passed, 34 unit + 19 integration)* |
+| `npx vitest run tests/integration/whatsapp-open-ipc.test.ts` *(after the WhatsApp opening work)* | 12 passed (new: OS hand-off, OS refusal, unsafe URLs, longest link, clipboard recovery incl. write failure / dropped write / unverifiable read-back) |
+| `npm test` (full suite) | **35 files / 355 tests passed** (v4.0.0 baseline: 308) — *(after the WhatsApp opening work: 37 files / 375 tests passed)* |
 | `npm run typecheck` (renderer + node) | pass |
 | `npm run lint` | pass, 0 errors |
 | `npm run build` | pass |
@@ -70,10 +70,13 @@ completion for steps that have not actually run.
 
 - The 4.1.0 WhatsApp opening failure reported by a clinic is not reproducible
   from this sandbox (no Windows). The audit in
-  `docs/release/WHATSAPP_OPEN_FAILURE_AUDIT.md` proves the failure path in code
-  and lists the Windows checks that are still pending. The fix is unreleased and
-  needs a new installer (for example a 4.1.1 patch) before clinics can receive
-  it; nothing was built, uploaded or published without authorisation.
+  `docs/release/WHATSAPP_OPEN_FAILURE_AUDIT.md` proves the failure path in code,
+  records the independent review follow-up (clipboard failure handling,
+  post-render length enforcement, malformed-Unicode handling, shared limits) and
+  lists the Windows checks that are still pending — including real clipboard
+  behaviour, which the Linux tests can only mock. The fix is unreleased and needs
+  a new installer (for example a 4.1.1 patch) before clinics can receive it;
+  nothing was built, uploaded or published without authorisation.
 
 - The Linux sandbox cannot download an Electron binary, so local Electron E2E and a local Windows installer build are impossible; Windows CI is the installer gate (same limitation as v4.0.0).
 
