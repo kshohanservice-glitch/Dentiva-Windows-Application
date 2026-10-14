@@ -115,7 +115,10 @@ permissions enforced in the service layer for both create and print.
 | 9 | Version + notes | `package.json` / `package-lock.json` = 4.1.2; `docs/RELEASE_NOTES_4.1.2.md` |
 | 10 | Commit + push + PR | `b86a1a3` on `arena/ed773b64-dentiva-windows-application`; PR [#28](https://github.com/kshohanservice-glitch/Dentiva-Windows-Application/pull/28) |
 | 11 | Windows CI (verify / E2E / NSIS + installed smoke test) | **all green** on `windows-latest` for `b86a1a34412e6aa293c172ad14ea53d3e6c0dd70` — run [38540067953](https://github.com/kshohanservice-glitch/Dentiva-Windows-Application/actions/runs/38540067953) (push) and [38540068591](https://github.com/kshohanservice-glitch/Dentiva-Windows-Application/actions/runs/38540068591) (PR). Installer produced: `DentivaPro-Setup-4.1.2.exe`, 100 050 200 bytes, SHA-256 `bf31fcf665a6531ae63e05b61c51eb4c4abd12d00dbe47713e1bc8f9f3310b20`; silent install + installed-application smoke test passed in the same job. |
-| 12 | Tag `v4.1.2` on the verified commit → release published | see §7 |
+| 12 | Merge to `main` | PR #28 merged 2026-10-14T09:24:15Z → merge commit `6f06351acd60f003b85a7d1dd5d4bdfb457e0287` |
+| 13 | Tag `v4.1.2` on the verified commit | annotated tag object `6c2fd1ea4d5abf7f270afdd0510d02ea424c6d34` → `b86a1a34412e6aa293c172ad14ea53d3e6c0dd70` |
+| 14 | Tag pipeline published the release | run [38542113518](https://github.com/kshohanservice-glitch/Dentiva-Windows-Application/actions/runs/38542113518) — verify ✅, Electron E2E ✅, NSIS + installed smoke test ✅, then the tag-gated publish step created [Dentiva Pro 4.1.2](https://github.com/kshohanservice-glitch/Dentiva-Windows-Application/releases/tag/v4.1.2) with `DentivaPro-Setup-4.1.2.exe` (100 050 198 bytes, SHA-256 `d60ee6af…e5c2a3`) and `SHA256SUMS.txt`. Release-asset digest == runner-computed hash. |
+| 15 | Release report | `docs/RELEASE_REPORT_V4.1.2.md` |
 
 ## 7. Release status
 
@@ -131,5 +134,8 @@ asset identifiers as each step completes:
 | CI run (branch) | [38540067953](https://github.com/kshohanservice-glitch/Dentiva-Windows-Application/actions/runs/38540067953) — verify ✅, Electron E2E ✅, NSIS + installed smoke test ✅ |
 | CI run (PR) | [38540068591](https://github.com/kshohanservice-glitch/Dentiva-Windows-Application/actions/runs/38540068591) — verify ✅, Electron E2E ✅, NSIS + installed smoke test ✅ |
 | Installer artefact (CI) | `DentivaPro-Setup-4.1.2.exe` · 100 050 200 bytes · SHA-256 `bf31fcf665a6531ae63e05b61c51eb4c4abd12d00dbe47713e1bc8f9f3310b20` |
-| Tag `v4.1.2` | _created after the merge to `main`, pointing at `b86a1a3`_ |
-| Published release | _updated by the tag pipeline; link recorded in `docs/RELEASE_REPORT_V4.1.2.md`_ |
+| Merge to `main` | PR #28 merged 2026-10-14T09:24:15Z → merge commit `6f06351acd60f003b85a7d1dd5d4bdfb457e0287` on `main` |
+| Tag `v4.1.2` | annotated tag object `6c2fd1ea4d5abf7f270afdd0510d02ea424c6d34` → commit `b86a1a34412e6aa293c172ad14ea53d3e6c0dd70` (the CI-verified commit) |
+| Tag CI run | [38542113518](https://github.com/kshohanservice-glitch/Dentiva-Windows-Application/actions/runs/38542113518) — verify ✅ (09:24:31→09:27:06Z), Electron E2E ✅ (09:24:31→09:26:53Z), NSIS + installed smoke test ✅ (09:27:08→09:30:54Z), publish ✅ |
+| Published release | [Dentiva Pro 4.1.2](https://github.com/kshohanservice-glitch/Dentiva-Windows-Application/releases/tag/v4.1.2) — published 2026-10-14T09:30:49Z, *Latest*, assets `DentivaPro-Setup-4.1.2.exe` (100 050 198 bytes, digest `sha256:d60ee6af4bb2f48059d6c8157d13eab6c6070fc7075b5b1d1f59550050e5c2a3`) and `SHA256SUMS.txt` (94 bytes, digest `sha256:3fd8cb238475b829907855bed4f8af32263fe1ea3564245e4d4217f72915381b`) |
+| Release report | `docs/RELEASE_REPORT_V4.1.2.md` (verified links only; explicit unverified list in §5) |
