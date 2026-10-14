@@ -80,6 +80,13 @@ completion for steps that have not actually run.
 
 - The Linux sandbox cannot download an Electron binary, so local Electron E2E and a local Windows installer build are impossible; Windows CI is the installer gate (same limitation as v4.0.0).
 
+## 4.1.1 release preparation (2026-10-14)
+
+- Version bumped to **4.1.1** in `package.json`, `package-lock.json` top level and the lockfile root package; the unrelated dependencies that happen to carry version 4.1.0 (`hosted-git-info`, `utif2`, `signal-exit` copy) were left untouched.
+- Release notes `docs/RELEASE_NOTES_4.1.1.md` written (patch release: actionable WhatsApp open failure, `Copy link` recovery with no false success, post-render message-length enforcement, malformed-Unicode repair; no schema change).
+- Local gates for 4.1.1 in the Linux sandbox: Vitest **37 files / 375 tests**, typecheck (main + renderer/tests), lint, production build, `npm audit --omit=dev` — all pass (see the audit document for the exact commands and results).
+- Pending at the time of writing: merge of the branch to `main`, tag `v4.1.1`, and the tagged Windows pipeline that rebuilds the installer and publishes the release. The published result (run id, installer SHA-256, asset ids) is recorded in `docs/RELEASE_EXECUTION_JOURNAL.md`.
+
 ## Exact next action
 
 Commit, push the session branch, and watch Windows CI (verify → E2E → installer + installed-app smoke test). Then open the pull request to `main`; after merge, push tag `v4.1.0` so CI publishes the release, and verify the release page, assets and SHA-256.
