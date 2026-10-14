@@ -40,7 +40,7 @@ completion for steps that have not actually run.
 - [x] Renderer: registration form field, Patient Profile "WhatsApp & Documents" hub, Settings "Message Templates"
 - [x] Version 4.1.0 + release notes (`docs/RELEASE_NOTES_4.1.0.md`)
 - [x] Unit + integration tests; full local gates (typecheck, lint, vitest, build, audit)
-- [ ] Push session branch; Windows CI (verify, E2E, installer, smoke test)
+- [x] Push session branch; Windows CI (verify, E2E, installer, smoke test) — run 38511433061 on commit `49c299d`: all three jobs **PASS**. Branch artifact `DentivaPro-Setup-4.1.0.exe` (100,025,113 bytes), SHA-256 `98c14de34076cab8f9a88ab7e68c6042aee0b3622add677a0cdce27917187d28` (the tagged release build generates its own checksum)
 - [ ] Pull request merged to `main`; tag `v4.1.0`; CI publishes release
 - [ ] Verify published release page, assets and SHA-256; verify v4.0.0 untouched
 
