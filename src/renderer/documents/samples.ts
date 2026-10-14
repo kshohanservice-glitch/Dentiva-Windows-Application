@@ -36,6 +36,7 @@ const SETTINGS = {
     labels: {
       cc: 'C/C', oe: 'O/E', re: 'R/E', diagnosis: 'Diagnosis',
       treatment: 'Treatment', advice: 'Advice', followUp: 'Follow-up',
+      medicineInstruction: 'Medicine Instruction',
     },
   },
   invoice: { nextNumber: 'INV-2026-00042', footerNote: 'Thank you for your visit.' },
@@ -77,6 +78,7 @@ const PRESCRIPTION = {
   diagnosis: 'Irreversible pulpitis 36',
   treatment: 'Root canal treatment (36), first sitting',
   advice: 'Soft diet for 24 hours. Warm salt-water rinse twice a day.',
+  medicineInstruction: 'Tab.Napa - 100MG - 1+0+1 - 7 days - after meals',
   followUp: '2026-06-22',
   items: [
     {

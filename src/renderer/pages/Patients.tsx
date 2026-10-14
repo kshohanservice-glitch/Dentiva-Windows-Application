@@ -19,6 +19,13 @@ import type { PatientInputPayload, ReferralRecord, ReferralInput } from '../../s
 import { hasInvoiceDraftChanges } from '../../shared/unsaved';
 import { WhatsAppHub } from '../components/whatsapp-hub';
 import { normalizeWhatsAppNumber } from '../../shared/whatsapp';
+import {
+  MedicineInstructionField, MedicineRowsEditor, emptyMedicineDraft, medicineDraftsFromTemplate,
+  medicineDraftsToInput, type MedicineDraft,
+} from '../components/medicine-entry';
+import {
+  CHIEF_COMPLAINT_OPTIONS, CLINICAL_OTHER_VALUE, EXAMINATION_OPTIONS, MEDICINE_INSTRUCTION_MAX,
+} from '../../shared/clinical';
 
 /* ================================ List ================================= */
 
@@ -267,6 +274,7 @@ function PatientFormModal(props: { open: boolean; initial?: (PatientDTO & Partia
               <Select
                 value={values.whatsappConsent ?? 'unknown'}
                 onChange={(v) => set('whatsappConsent', v as PatientFormValues['whatsappConsent'])}
+                ariaLabel="WhatsApp consent recorded for this patient"
                 options={[
                   { value: 'unknown', label: 'Consent not recorded' },
                   { value: 'granted', label: 'WhatsApp consent granted' },
@@ -452,11 +460,12 @@ export function PatientsPage() {
         }
       >
         <div style={{ minWidth: 260, flex: '1 1 260px' }}>
-          <Input value={query} onChange={(v) => { setQuery(v); setPage(1); }} placeholder="Search name, phone, patient ID, tag…" />
+          <Input value={query} onChange={(v) => { setQuery(v); setPage(1); }} placeholder="Search name, phone, patient ID, tag…" ariaLabel="Search patients" />
         </div>
         <Select
           value={range}
           onChange={(v) => { setRange(v); setPage(1); }}
+          ariaLabel="Filter by date range"
           options={[
             { value: 'all', label: 'All time' }, { value: 'today', label: 'Today' },
             { value: '7', label: 'Last 7 days' }, { value: '30', label: 'Last 30 days' },
@@ -466,6 +475,7 @@ export function PatientsPage() {
         <Select
           value={status}
           onChange={(v) => { setStatus(v); setPage(1); }}
+          ariaLabel="Filter by patient status"
           options={[
             { value: 'active', label: 'Active' }, { value: 'archived', label: 'Archived' },
             { value: 'blocked', label: 'Blocked' }, { value: '', label: 'Any status' },
@@ -884,6 +894,12 @@ export function RxDetailModal(props: { rx: PrescriptionDTO; onClose: () => void;
         {rx.rE && <div className="kv"><span className="k">R/E</span><span className="v">{rx.rE}</span></div>}
         {rx.treatment && <div className="kv"><span className="k">Treatment</span><span className="v">{rx.treatment}</span></div>}
         {rx.advice && <div className="kv"><span className="k">Advice</span><span className="v">{rx.advice}</span></div>}
+        {rx.medicineInstruction && (
+          <div className="kv">
+            <span className="k">Medicine instruction</span>
+            <span className="v">{rx.medicineInstruction}</span>
+          </div>
+        )}
         {rx.followUp && <div className="kv"><span className="k">Follow-up</span><span className="v">{formatDate(rx.followUp)}</span></div>}
       </div>
       <table className="table">
@@ -1159,26 +1175,35 @@ export function VisitFormModal(props: { patientId: number; onClose: () => void; 
       }
     >
       {!props.patientId && (
-        <div className="field mb-4">
-          <label>Patient <span className="req">*</span></label>
-          <Input
-            value={chosenPatient ? `${chosenPatient.name} · ${chosenPatient.code}` : patientQuery}
-            onChange={(v) => { setChosenPatient(null); setPatientQuery(v); }}
-            placeholder="Search patient by name, phone or ID…"
-            autoFocus
-          />
-          {!chosenPatient && patientMatches.length > 0 && (
-            <div className="list" style={{ border: '1px solid var(--line)', borderRadius: 6, marginTop: 6, maxHeight: 150, overflowY: 'auto' }}>
-              {patientMatches.map((m) => (
-                <div key={m.id} className="list-row clickable" style={{ padding: '8px 10px' }}
-                  onClick={() => { setChosenPatient(m); setPatientQuery(m.name); }}>
-                  <strong className="flex-1">{m.name}</strong>
-                  <span className="xsmall muted mono">{m.code}</span>
-                </div>
-              ))}
-            </div>
+        <>
+        <Field
+          label="Patient"
+          required
+          className="mb-4"
+          hint="Type at least two characters, then pick the matching patient from the list."
+        >
+          {(fieldId) => (
+            <Input
+              id={fieldId}
+              value={chosenPatient ? `${chosenPatient.name} · ${chosenPatient.code}` : patientQuery}
+              onChange={(v) => { setChosenPatient(null); setPatientQuery(v); }}
+              placeholder="Search patient by name, phone or ID…"
+              autoFocus
+            />
           )}
-        </div>
+        </Field>
+            {!chosenPatient && patientMatches.length > 0 && (
+              <div className="list" style={{ border: '1px solid var(--line)', borderRadius: 6, marginTop: 6, maxHeight: 150, overflowY: 'auto' }}>
+                {patientMatches.map((m) => (
+                  <div key={m.id} className="list-row clickable" style={{ padding: '8px 10px' }}
+                    onClick={() => { setChosenPatient(m); setPatientQuery(m.name); }}>
+                    <strong className="flex-1">{m.name}</strong>
+                    <span className="xsmall muted mono">{m.code}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+        </>
       )}
       <div className="form-grid">
         <Field label="Date & time" required error={errors.datetime}>
@@ -1253,7 +1278,12 @@ export function VisitFormModal(props: { patientId: number; onClose: () => void; 
               return (
                 <div className="list-row" key={sel.treatmentId}>
                   <span className="flex-1">{t?.name ?? `Treatment #${sel.treatmentId}`}</span>
-                  <Input value={String(sel.qty)} onChange={(v) => set('treatments', values.treatments.map((x) => x.treatmentId === sel.treatmentId ? { ...x, qty: Math.max(1, Number(v) || 1) } : x))} type="number" />
+                  <Input
+                    value={String(sel.qty)}
+                    onChange={(v) => set('treatments', values.treatments.map((x) => x.treatmentId === sel.treatmentId ? { ...x, qty: Math.max(1, Number(v) || 1) } : x))}
+                    type="number"
+                    ariaLabel={`Quantity of ${t?.name ?? `treatment ${sel.treatmentId}`}`}
+                  />
                   <span className="num small"><Money paisa={sel.qty * sel.unitPricePaisa} /></span>
                   <Button size="sm" variant="ghost" onClick={() => set('treatments', values.treatments.filter((x) => x.treatmentId !== sel.treatmentId))}>✕</Button>
                 </div>
@@ -1278,15 +1308,17 @@ export function RxFormModal(props: { patientId: number; visitId?: number | null;
   const { values, set, setMany, validate, errors } = useForm({
     dentistId: '', date: isoDate(new Date()), cC: '', oE: '', rE: '', diagnosis: '', treatment: '', advice: '', followUp: '',
     ccOther: '', oeOther: '',
-    items: [{ medicineName: '', strength: '', dosage: '', frequency: '', duration: '', generic: '', form: '', qty: '', instruction: '' }] as {
-      medicineName: string; strength: string; dosage: string; frequency: string; duration: string; generic: string; form: string; qty: string; instruction: string;
-    }[],
+    // Optional single-line medicine instruction — additive to the structured rows.
+    medicineInstruction: '',
+    items: [emptyMedicineDraft()] as MedicineDraft[],
     saveAsTemplate: '',
   });
   const { data: dentists } = useAsync(() => api['dentists/list'](), []);
   const { data: templates, reload: reloadTemplates } = useAsync(() => api['prescriptions/templates'](), []);
   const [deleteTemplate, setDeleteTemplate] = useState<{ id: number; name: string } | null>(null);
+  const [pendingTemplate, setPendingTemplate] = useState<{ id: number; name: string; action: () => void } | null>(null);
   const [pending, setPending] = useState(false);
+  const [missingMedicineNames, setMissingMedicineNames] = useState(false);
   const [discardOpen, setDiscardOpen] = useState(false);
   const requestInFlight = React.useRef(false);
   const initialSnapshot = React.useRef(JSON.stringify(values));
@@ -1296,6 +1328,14 @@ export function RxFormModal(props: { patientId: number; visitId?: number | null;
     patientId ? { id: patientId, name: '', code: '' } : null,
   );
   const [patientMatches, setPatientMatches] = useState<{ id: number; name: string; code: string }[]>([]);
+  // Explains the selected C/C and O/E abbreviation in plain words under the
+  // dropdown, so nobody has to remember what "BDR/BDC" stands for.
+  const chiefComplaintHint = CHIEF_COMPLAINT_OPTIONS.find((o) => o.value === values.cC)?.hint
+    ?? 'Pick a common complaint, or choose “Other” and type it.';
+  const examinationHint = EXAMINATION_OPTIONS.find((o) => o.value === values.oE)?.hint
+    ?? 'Pick a common finding, or choose “Other” and type it.';
+  const instructionRowCount = medicineDraftsToInput(values.items).length;
+
   const requestClose = () => {
     if (requestInFlight.current) return;
     if (JSON.stringify(values) !== initialSnapshot.current || (!props.patientId && !!patientQuery)) setDiscardOpen(true);
@@ -1313,25 +1353,34 @@ export function RxFormModal(props: { patientId: number; visitId?: number | null;
     return () => clearTimeout(t);
   }, [patientQuery, patientId]);
 
-  const setItem = (i: number, patch: Partial<typeof values.items[0]>): void => {
-    set('items', values.items.map((it, j) => (j === i ? { ...it, ...patch } : it)));
-  };
-
+  /** Replace the whole medicine list only after the operator confirmed it when
+   *  the draft already holds medicines — applying a template must never silently
+   *  discard typed rows. */
   const applyTemplate = (tplId: string): void => {
     const tpl = (templates ?? []).find((t) => String(t.id) === tplId);
     if (!tpl) return;
-    set('items', (tpl.items as any[]).map((it) => ({
-      medicineName: it.medicineName ?? '', strength: it.strength ?? '', dosage: it.dosage ?? '',
-      frequency: it.frequency ?? '', duration: it.duration ?? '', generic: it.generic ?? '',
-      form: it.form ?? '', qty: it.qty ?? '', instruction: it.instruction ?? '',
-    })));
-    toast.success('Template applied', tpl.name);
+    const rows = medicineDraftsFromTemplate(tpl.items);
+    if (rows.length === 0) {
+      toast.warning('Template is empty', `${tpl.name} contains no medicines.`);
+      return;
+    }
+    const replace = () => {
+      set('items', rows.map((row) => ({ ...row })));
+      toast.success('Template applied', `${tpl.name} · ${rows.length} medicine${rows.length === 1 ? '' : 's'}`);
+    };
+    if (medicineDraftsToInput(values.items).length === 0) replace();
+    else setPendingTemplate({ id: tpl.id, name: tpl.name, action: replace });
   };
 
   const submit = async () => {
+    const hasUnnamedRow = values.items.some((i) => !i.medicineName.trim());
+    setMissingMedicineNames(hasUnnamedRow);
     const ok = validate((v) => ({
       dentistId: !v.dentistId ? 'Select the prescribing dentist.' : '',
       items: v.items.some((i) => !i.medicineName.trim()) ? 'Every medicine row needs a name.' : '',
+      medicineInstruction: v.medicineInstruction.trim().length > MEDICINE_INSTRUCTION_MAX
+        ? `The medicine instruction must be ${MEDICINE_INSTRUCTION_MAX} characters or fewer.`
+        : '',
     }));
     if (!ok) return;
     if (!patientId && !chosenPatient) { toast.warning('Select a patient', 'Search and choose the patient first.'); return; }
@@ -1344,11 +1393,12 @@ export function RxFormModal(props: { patientId: number; visitId?: number | null;
         visitId: props.visitId ?? null,
         dentistId: Number(values.dentistId),
         date: values.date,
-        cC: (values.cC === 'Other' ? values.ccOther : values.cC) || null,
-        oE: (values.oE === 'Other' ? values.oeOther : values.oE) || null, rE: values.rE || null,
+        cC: (values.cC === CLINICAL_OTHER_VALUE ? values.ccOther : values.cC) || null,
+        oE: (values.oE === CLINICAL_OTHER_VALUE ? values.oeOther : values.oE) || null, rE: values.rE || null,
         diagnosis: values.diagnosis || null, treatment: values.treatment || null,
         advice: values.advice || null, followUp: values.followUp || null,
-        items: values.items.filter((i) => i.medicineName.trim()),
+        medicineInstruction: values.medicineInstruction.trim() || null,
+        items: medicineDraftsToInput(values.items),
         saveAsTemplate: values.saveAsTemplate || null,
       });
       toast.success('Prescription created', rx.number);
@@ -1383,38 +1433,47 @@ export function RxFormModal(props: { patientId: number; visitId?: number | null;
       }
     >
       {!patientId && (
-        <div className="field mb-4">
-          <label>Patient <span className="req">*</span></label>
-          <Input
-            value={chosenPatient ? `${chosenPatient.name} · ${chosenPatient.code}` : patientQuery}
-            onChange={(v) => { setChosenPatient(null); setPatientQuery(v); }}
-            placeholder="Search patient by name, phone or ID…"
-            autoFocus
-          />
-          {!chosenPatient && patientMatches.length > 0 && (
-            <div className="list" style={{ border: '1px solid var(--line)', borderRadius: 6, marginTop: 6, maxHeight: 150, overflowY: 'auto' }}>
-              {patientMatches.map((m) => (
-                <div key={m.id} className="list-row clickable" style={{ padding: '8px 10px' }}
-                  onClick={() => { setChosenPatient(m); setPatientQuery(m.name); }}>
-                  <strong className="flex-1">{m.name}</strong>
-                  <span className="xsmall muted mono">{m.code}</span>
-                </div>
-              ))}
-            </div>
+        <>
+        <Field
+          label="Patient"
+          required
+          className="mb-4"
+          hint="Type at least two characters, then pick the matching patient from the list."
+        >
+          {(fieldId) => (
+            <Input
+              id={fieldId}
+              value={chosenPatient ? `${chosenPatient.name} · ${chosenPatient.code}` : patientQuery}
+              onChange={(v) => { setChosenPatient(null); setPatientQuery(v); }}
+              placeholder="Search patient by name, phone or ID…"
+              autoFocus
+            />
           )}
-        </div>
+        </Field>
+            {!chosenPatient && patientMatches.length > 0 && (
+              <div className="list" style={{ border: '1px solid var(--line)', borderRadius: 6, marginTop: 6, maxHeight: 150, overflowY: 'auto' }}>
+                {patientMatches.map((m) => (
+                  <div key={m.id} className="list-row clickable" style={{ padding: '8px 10px' }}
+                    onClick={() => { setChosenPatient(m); setPatientQuery(m.name); }}>
+                    <strong className="flex-1">{m.name}</strong>
+                    <span className="xsmall muted mono">{m.code}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+        </>
       )}
       <ClinicalTemplatePicker kind="prescription" label="Prescription text" getBody={() => ({
-        cC: values.cC === 'Other' ? values.ccOther : values.cC,
-        oE: values.oE === 'Other' ? values.oeOther : values.oE, rE: values.rE,
+        cC: values.cC === CLINICAL_OTHER_VALUE ? values.ccOther : values.cC,
+        oE: values.oE === CLINICAL_OTHER_VALUE ? values.oeOther : values.oE, rE: values.rE,
         diagnosis: values.diagnosis, treatment: values.treatment, advice: values.advice, followUp: values.followUp,
       })} onApply={(body) => {
         if ('items' in body) return;
         setMany({
           rE: body.rE ?? '', diagnosis: body.diagnosis ?? '', treatment: body.treatment ?? '',
           advice: body.advice ?? '', followUp: body.followUp ?? '',
-          cC: body.cC ? 'Other' : '', ccOther: body.cC ?? '',
-          oE: body.oE ? 'Other' : '', oeOther: body.oE ?? '',
+          cC: body.cC ? CLINICAL_OTHER_VALUE : '', ccOther: body.cC ?? '',
+          oE: body.oE ? CLINICAL_OTHER_VALUE : '', oeOther: body.oE ?? '',
         });
       }} />
       <ClinicalTemplatePicker kind="instructions" label="Prescription instructions" getBody={() => ({ advice: values.advice })}
@@ -1444,55 +1503,48 @@ export function RxFormModal(props: { patientId: number; visitId?: number | null;
             </div>
           )}
         </Field>
-        <Field label={<>C/C <span className="muted">(chief complaint)</span></>} className="span-2">
+        <Field
+          label={<>C/C — chief complaint</>}
+          className="span-2"
+          hint={chiefComplaintHint}
+        >
           {(id) => (
             <Select
               id={id}
               value={values.cC}
               onChange={(v) => set('cC', v)}
               placeholder="Select chief complaint…"
-              options={[
-                { value: 'Pain On', label: 'Pain On' },
-                { value: 'G. Carries', label: 'G. Carries' },
-                { value: 'Swelling', label: 'Swelling' },
-                { value: 'Gum Bleeding', label: 'Gum Bleeding' },
-                { value: 'Bad Breath', label: 'Bad Breath' },
-                { value: 'Sensitivity', label: 'Sensitivity' },
-                { value: 'Other', label: 'Other' },
-              ]}
+              options={CHIEF_COMPLAINT_OPTIONS.map(({ value, label }) => ({ value, label }))}
             />
           )}
         </Field>
-        {values.cC === 'Other' && (
-          <Field label="C/C — Other" className="span-2">
-            {(id) => <Input id={id} value={values.ccOther} onChange={(v) => set('ccOther', v)} placeholder="Write the chief complaint…" />}
+        {values.cC === CLINICAL_OTHER_VALUE && (
+          <Field
+            label="C/C — write the chief complaint"
+            className="span-2"
+            hint="Free text: this is what prints under the C/C heading."
+          >
+            {(id) => <Input id={id} value={values.ccOther} onChange={(v) => set('ccOther', v)} placeholder="e.g. Pain in the upper left back tooth" />}
           </Field>
         )}
-        <Field label={<>O/E <span className="muted">(on examination)</span></>} className="span-2">
+        <Field label={<>O/E — on examination</>} className="span-2" hint={examinationHint}>
           {(id) => (
             <Select
               id={id}
               value={values.oE}
               onChange={(v) => set('oE', v)}
               placeholder="Select examination finding…"
-              options={[
-                { value: 'Carries/G.Carries', label: 'Carries/G.Carries' },
-                { value: 'BDR/BDC', label: 'BDR/BDC' },
-                { value: 'Gingivitis', label: 'Gingivitis' },
-                { value: 'Parodental Pocket', label: 'Parodental Pocket' },
-                { value: 'Perio Dontitis', label: 'Perio Dontitis' },
-                { value: 'Plupitis', label: 'Plupitis' },
-                { value: 'Impected Teeth', label: 'Impected Teeth' },
-                { value: 'Dry Socket', label: 'Dry Socket' },
-                { value: 'Attrition/Errosion', label: 'Attrition/Errosion' },
-                { value: 'Other', label: 'Other' },
-              ]}
+              options={EXAMINATION_OPTIONS.map(({ value, label }) => ({ value, label }))}
             />
           )}
         </Field>
-        {values.oE === 'Other' && (
-          <Field label="O/E — Other" className="span-2">
-            {(id) => <Input id={id} value={values.oeOther} onChange={(v) => set('oeOther', v)} placeholder="Write the examination finding…" />}
+        {values.oE === CLINICAL_OTHER_VALUE && (
+          <Field
+            label="O/E — write the examination finding"
+            className="span-2"
+            hint="Free text: this is what prints under the O/E heading."
+          >
+            {(id) => <Input id={id} value={values.oeOther} onChange={(v) => set('oeOther', v)} placeholder="e.g. Deep caries 36, tender on percussion" />}
           </Field>
         )}
         <Field label={<>R/E <span className="muted">(radiographic examination)</span></>} className="span-2">
@@ -1513,51 +1565,41 @@ export function RxFormModal(props: { patientId: number; visitId?: number | null;
       </div>
 
       <div className="form-section mt-4">
-        <div className="row between">
-          <h4>Medicines</h4>
-          <Button size="sm" variant="secondary" onClick={() => set('items', [...values.items, { medicineName: '', strength: '', dosage: '', frequency: '', duration: '', generic: '', form: '', qty: '', instruction: '' }])}>+ Add medicine</Button>
-        </div>
-        {errors.items && <div className="error" role="alert">{errors.items}</div>}
-        {values.items.map((it, i) => (
-          <div className="rx-item" key={i}>
-            <div className="row between mb-4">
-              <strong className="small">#{i + 1}</strong>
-              {values.items.length > 1 && (
-                <Button size="sm" variant="ghost" onClick={() => set('items', values.items.filter((_, j) => j !== i))}>Remove</Button>
-              )}
-            </div>
-            <div className="rx-grid">
-              <Field label="Medicine name *">
-                {(id) => <Input id={id} value={it.medicineName} onChange={(v) => setItem(i, { medicineName: v })} placeholder="e.g. Amoxicillin" invalid={!it.medicineName && !!errors.items} />}
-              </Field>
-              <Field label="Generic">
-                {(id) => <Input id={id} value={it.generic} onChange={(v) => setItem(i, { generic: v })} />}
-              </Field>
-              <Field label="Strength">
-                {(id) => <Input id={id} value={it.strength} onChange={(v) => setItem(i, { strength: v })} placeholder="500mg" />}
-              </Field>
-              <Field label="Dosage">
-                {(id) => <Input id={id} value={it.dosage} onChange={(v) => setItem(i, { dosage: v })} placeholder="1 tab" />}
-              </Field>
-              <Field label="Frequency">
-                {(id) => <Input id={id} value={it.frequency} onChange={(v) => setItem(i, { frequency: v })} placeholder="3× daily" />}
-              </Field>
-              <Field label="Duration">
-                {(id) => <Input id={id} value={it.duration} onChange={(v) => setItem(i, { duration: v })} placeholder="5 days" />}
-              </Field>
-              <Field label="Quantity">
-                {(id) => <Input id={id} value={it.qty} onChange={(v) => setItem(i, { qty: v })} />}
-              </Field>
-              <Field label="Instruction">
-                {(id) => <Input id={id} value={it.instruction} onChange={(v) => setItem(i, { instruction: v })} placeholder="after meals" />}
-              </Field>
-            </div>
-          </div>
-        ))}
-        <Field label="Save as template (optional name)" className="mt-4">
+        <MedicineRowsEditor
+          rows={values.items}
+          onChange={(next) => set('items', next)}
+          listError={errors.items ?? null}
+          markMissingNames={missingMedicineNames}
+          max={60}
+        />
+        <div className="divider" />
+        <MedicineInstructionField
+          value={values.medicineInstruction}
+          onChange={(v) => set('medicineInstruction', v)}
+          structuredCount={instructionRowCount}
+          error={errors.medicineInstruction ?? null}
+        />
+        <Field
+          label="Save the medicine rows as a template"
+          className="mt-4"
+          hint="Optional. Reuses an existing template name or creates a new one for the next patient on the same medicines."
+        >
           {(id) => <Input id={id} value={values.saveAsTemplate} onChange={(v) => set('saveAsTemplate', v)} placeholder="e.g. Standard post-extraction" />}
         </Field>
       </div>
+
+      {pendingTemplate && <ConfirmDialog
+        title="Replace the medicines in this draft?"
+        body={<>
+          Applying <strong>{pendingTemplate.name}</strong> replaces the {instructionRowCount} medicine
+          row(s) already entered in this prescription. Rows are only replaced after you confirm, and nothing
+          has been saved yet.
+        </>}
+        confirmLabel="Replace medicines"
+        danger
+        onCancel={() => setPendingTemplate(null)}
+        onConfirm={() => { const action = pendingTemplate.action; setPendingTemplate(null); action(); }}
+      />}
 
       {deleteTemplate && <ConfirmDialog
         title="Delete medicine template?"
@@ -1680,26 +1722,35 @@ export function InvoiceFormModal(props: { patientId: number; visitId?: number | 
       }
     >
       {!props.patientId && (
-        <div className="field mb-4">
-          <label>Patient <span className="req">*</span></label>
-          <Input
-            value={chosenPatient ? `${chosenPatient.name} · ${chosenPatient.code}` : patientQuery}
-            onChange={(v) => { setChosenPatient(null); setPatientQuery(v); }}
-            placeholder="Search patient by name, phone or ID…"
-            autoFocus
-          />
-          {!chosenPatient && patientMatches.length > 0 && (
-            <div className="list" style={{ border: '1px solid var(--line)', borderRadius: 6, marginTop: 6, maxHeight: 150, overflowY: 'auto' }}>
-              {patientMatches.map((m) => (
-                <div key={m.id} className="list-row clickable" style={{ padding: '8px 10px' }}
-                  onClick={() => { setChosenPatient(m); setPatientQuery(m.name); }}>
-                  <strong className="flex-1">{m.name}</strong>
-                  <span className="xsmall muted mono">{m.code}</span>
-                </div>
-              ))}
-            </div>
+        <>
+        <Field
+          label="Patient"
+          required
+          className="mb-4"
+          hint="Type at least two characters, then pick the matching patient from the list."
+        >
+          {(fieldId) => (
+            <Input
+              id={fieldId}
+              value={chosenPatient ? `${chosenPatient.name} · ${chosenPatient.code}` : patientQuery}
+              onChange={(v) => { setChosenPatient(null); setPatientQuery(v); }}
+              placeholder="Search patient by name, phone or ID…"
+              autoFocus
+            />
           )}
-        </div>
+        </Field>
+            {!chosenPatient && patientMatches.length > 0 && (
+              <div className="list" style={{ border: '1px solid var(--line)', borderRadius: 6, marginTop: 6, maxHeight: 150, overflowY: 'auto' }}>
+                {patientMatches.map((m) => (
+                  <div key={m.id} className="list-row clickable" style={{ padding: '8px 10px' }}
+                    onClick={() => { setChosenPatient(m); setPatientQuery(m.name); }}>
+                    <strong className="flex-1">{m.name}</strong>
+                    <span className="xsmall muted mono">{m.code}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+        </>
       )}
       <div className="form-grid">
         <Field label="Invoice date" required>
@@ -1746,24 +1797,30 @@ export function InvoiceFormModal(props: { patientId: number; visitId?: number | 
         </div>
         {values.items.map((line, i) => (
           <div className="invoice-line" key={i}>
-            <Field label="Description">
-              {(id) => <Input id={id} value={line.description} onChange={(v) => setItem(i, { description: v })} placeholder="Treatment or item" />}
+            <Field
+              label="Treatment / service"
+              className="invoice-line-field-wide"
+              hint="What was done — printed on the invoice exactly as typed."
+            >
+              {(id) => <Input id={id} value={line.description} onChange={(v) => setItem(i, { description: v })} placeholder="e.g. Root canal treatment (36)" />}
             </Field>
-            <Field label="Qty">
+            <Field label="Quantity" hint="How many units were charged.">
               {(id) => <Input id={id} type="number" min={1} value={String(line.qty)} onChange={(v) => setItem(i, { qty: Math.max(1, Number(v) || 1) })} />}
             </Field>
-            <Field label="Unit price (৳)">
+            <Field label="Unit price (৳)" hint="Price of one unit, before any discount.">
               {(id) => <Input id={id} type="number" min={0} step="0.01" value={String(line.unitPricePaisa / 100)} onChange={(v) => setItem(i, { unitPricePaisa: Math.round((Number(v) || 0) * 100) })} />}
             </Field>
-            <Field label="Total">
-              {() => <div className="input" style={{ display: 'flex', alignItems: 'center', minHeight: 34 }} aria-readonly="true"><Money paisa={line.qty * line.unitPricePaisa} /></div>}
+            <Field label="Line total (৳)" hint="Quantity × unit price. Calculated, not editable.">
+              {() => <div className="input" style={{ display: 'flex', alignItems: 'center', minHeight: 36 }} aria-readonly="true" role="status"><Money paisa={line.qty * line.unitPricePaisa} /></div>}
             </Field>
             <Button variant="ghost" size="sm" onClick={() => set('items', values.items.filter((_, j) => j !== i))} title="Remove line">✕</Button>
           </div>
         ))}
-        <div className="row between mt-4">
-          <span className="small muted">Subtotal <Money paisa={subtotal} /> · Discount <Money paisa={values.discountPaisa} /></span>
-          <strong>Payable: <Money paisa={total} /></strong>
+        <div className="row between mt-4 wrap gap-2">
+          <span className="small muted">
+            Subtotal (all lines) <Money paisa={subtotal} /> · Invoice discount <Money paisa={values.discountPaisa} />
+          </span>
+          <strong>Total payable: <Money paisa={total} /></strong>
         </div>
       </div>
     </Modal>

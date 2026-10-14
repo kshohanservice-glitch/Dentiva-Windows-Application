@@ -1,8 +1,13 @@
 import { useEffect, useMemo, useState } from 'react';
 import { api, useAsync } from '../api';
 import { useApp } from '../state/app-context';
-import { Badge, Button, Card, Tabs, useToast } from '../components/primitives';
+import { Badge, Button, Card, ConfirmDialog, Tabs, useToast } from '../components/primitives';
 import { Field, Input, Select, Textarea } from '../components/forms';
+import {
+  MedicineInstructionField, MedicineRowsEditor,
+  medicineDraftsFromTemplate, medicineDraftsToInput, type MedicineDraft,
+} from '../components/medicine-entry';
+import { ClinicalTemplatePicker } from '../components/ClinicalTemplatePicker';
 import { Money } from '../components/money';
 import { DocumentPreview } from '../documents/document-preview';
 import { quickDocumentNode, quickDocumentTitle } from '../documents/quick-document-view';
@@ -12,6 +17,9 @@ import {
   type QuickDocumentInput, type QuickDocumentKind,
 } from '../../shared/quick-documents';
 import { formatBdt, parseBdtToPaisa, todayISO } from '../../shared/currency';
+import {
+  CHIEF_COMPLAINT_OPTIONS, CLINICAL_OTHER_VALUE, EXAMINATION_OPTIONS, MEDICINE_INSTRUCTION_MAX,
+} from '../../shared/clinical';
 import type { DentistDTO, TreatmentDTO } from '../../shared/types';
 
 /**
@@ -77,10 +85,13 @@ export function QuickDocumentsPage() {
             reference, date: form.date, customer,
             dentistId: form.dentistId ? Number(form.dentistId) : null,
             dentistName: form.dentistName || dentistName(form.dentistId),
-            cC: form.cC || null, oE: form.oE || null, rE: form.rE || null,
+            cC: (form.cC === CLINICAL_OTHER_VALUE ? form.cCOther : form.cC) || null,
+            oE: (form.oE === CLINICAL_OTHER_VALUE ? form.oEOther : form.oE) || null,
+            rE: form.rE || null,
             diagnosis: form.diagnosis || null, treatment: form.treatment || null,
             advice: form.advice || null, followUp: form.followUp || null,
-            items: form.medicines.filter((m: any) => m.medicineName.trim()).map((m: any) => ({
+            medicineInstruction: form.medicineInstruction?.trim() || null,
+            items: medicineDraftsToInput(form.medicines as MedicineDraft[]).map((m) => ({
               medicineName: m.medicineName, generic: m.generic || null, strength: m.strength || null,
               form: m.form || null, dosage: m.dosage || null, frequency: m.frequency || null,
               duration: m.duration || null, qty: m.qty || null, instruction: m.instruction || null,
@@ -258,7 +269,17 @@ export function QuickDocumentsPage() {
 
         <Card title="Preview" actions={<span className="xsmall muted">Exactly what will print</span>}>
           {validated.input
-            ? <DocumentPreview key={previewKey} zoom={0.6}>{quickDocumentNode(validated.input, previewCtx)}</DocumentPreview>
+            ? (
+              <DocumentPreview
+                key={previewKey}
+                zoom={0.6}
+                watermark={settings?.watermark}
+                logoDataUrl={settings?.clinic?.logoDataUrl ?? null}
+                documentKind={`quick-${kind}`}
+              >
+                {quickDocumentNode(validated.input, previewCtx)}
+              </DocumentPreview>
+            )
             : (
               <div className="empty-state">
                 <p className="small muted" style={{ margin: 0 }}>{validated.errors[0] ?? 'Complete the document to see the preview.'}</p>
@@ -278,43 +299,162 @@ export function QuickDocumentsPage() {
 /* --------------------------------------------------------------- sections */
 
 function PrescriptionFields({ form, set }: { form: any; set: (p: string[], v: unknown) => void }) {
-  const rows: any[] = form.medicines;
-  const setRow = (index: number, patch: Record<string, unknown>) => {
-    const next = rows.map((r, i) => (i === index ? { ...r, ...patch } : r));
-    set(['medicines'], next);
+  const toast = useToast();
+  const rows: MedicineDraft[] = form.medicines;
+  const { data: medicineTemplates } = useAsync(() => api['prescriptions/templates'](), []);
+  const [pendingMedicineSet, setPendingMedicineSet] = useState<{ name: string; rows: MedicineDraft[] } | null>(null);
+
+  /** Fills the rows below from a saved medicine template, after confirmation. */
+  const applyMedicineSet = (templateId: string) => {
+    const tpl = (medicineTemplates ?? []).find((t) => String(t.id) === templateId);
+    if (!tpl) return;
+    const next = medicineDraftsFromTemplate(tpl.items);
+    if (next.length === 0) {
+      toast.warning('Template is empty', `${tpl.name} contains no medicines.`);
+      return;
+    }
+    const replace = () => {
+      set(['medicines'], next.map((row) => ({ ...row })));
+      toast.success('Medicine template applied', `${tpl.name} · ${next.length} medicine${next.length === 1 ? '' : 's'}`);
+    };
+    if (medicineDraftsToInput(rows).length === 0) replace();
+    else setPendingMedicineSet({ name: tpl.name, rows: next });
   };
+
+  const chiefComplaintHint = CHIEF_COMPLAINT_OPTIONS.find((o) => o.value === form.cC)?.hint
+    ?? 'Pick a common complaint, or choose “Other” and type it.';
+  const examinationHint = EXAMINATION_OPTIONS.find((o) => o.value === form.oE)?.hint
+    ?? 'Pick a common finding, or choose “Other” and type it.';
+  const instructionRowCount = medicineDraftsToInput(rows).length;
+
   return (
     <>
       <div className="form-grid mt-4">
-        <Field label="C/C (chief complaint)">{(id) => <Input id={id} value={form.cC} onChange={(v) => set(['cC'], v)} />}</Field>
-        <Field label="O/E (examination)">{(id) => <Input id={id} value={form.oE} onChange={(v) => set(['oE'], v)} />}</Field>
-        <Field label="R/E (investigation)">{(id) => <Input id={id} value={form.rE} onChange={(v) => set(['rE'], v)} />}</Field>
-        <Field label="Diagnosis">{(id) => <Input id={id} value={form.diagnosis} onChange={(v) => set(['diagnosis'], v)} />}</Field>
-        <Field label="Treatment / procedure">{(id) => <Input id={id} value={form.treatment} onChange={(v) => set(['treatment'], v)} />}</Field>
-        <Field label="Follow-up date">{(id) => <Input id={id} type="date" value={form.followUp} onChange={(v) => set(['followUp'], v)} />}</Field>
-        <Field label="Advice" className="span-2">{(id) => <Textarea id={id} rows={2} value={form.advice} onChange={(v) => set(['advice'], v)} />}</Field>
+        <Field label="C/C — chief complaint" className="span-2" hint={chiefComplaintHint}>
+          {(id) => (
+            <Select
+              id={id}
+              value={form.cC}
+              onChange={(v) => set(['cC'], v)}
+              placeholder="Select chief complaint…"
+              options={CHIEF_COMPLAINT_OPTIONS.map(({ value, label }) => ({ value, label }))}
+            />
+          )}
+        </Field>
+        {form.cC === CLINICAL_OTHER_VALUE && (
+          <Field label="C/C — write the chief complaint" className="span-2" hint="Free text: this is what prints under the C/C heading.">
+            {(id) => <Input id={id} value={form.cCOther} onChange={(v) => set(['cCOther'], v)} placeholder="e.g. Pain in the upper left back tooth" />}
+          </Field>
+        )}
+        <Field label="O/E — on examination" className="span-2" hint={examinationHint}>
+          {(id) => (
+            <Select
+              id={id}
+              value={form.oE}
+              onChange={(v) => set(['oE'], v)}
+              placeholder="Select examination finding…"
+              options={EXAMINATION_OPTIONS.map(({ value, label }) => ({ value, label }))}
+            />
+          )}
+        </Field>
+        {form.oE === CLINICAL_OTHER_VALUE && (
+          <Field label="O/E — write the examination finding" className="span-2" hint="Free text: this is what prints under the O/E heading.">
+            {(id) => <Input id={id} value={form.oEOther} onChange={(v) => set(['oEOther'], v)} placeholder="e.g. Deep caries 36, tender on percussion" />}
+          </Field>
+        )}
+        <Field label="R/E — radiographic examination" className="span-2" hint="X-ray and investigation findings (free text).">
+          {(id) => <Textarea id={id} rows={2} value={form.rE} onChange={(v) => set(['rE'], v)} placeholder="e.g. IOPA 36 — radiolucency approaching the pulp" />}
+        </Field>
+        <Field label="Diagnosis">{(id) => <Input id={id} value={form.diagnosis} onChange={(v) => set(['diagnosis'], v)} placeholder="e.g. Irreversible pulpitis 36" />}</Field>
+        <Field label="Treatment / procedure">{(id) => <Input id={id} value={form.treatment} onChange={(v) => set(['treatment'], v)} placeholder="e.g. Access opening" />}</Field>
+        <Field label="Follow-up date" hint="Printed on the prescription. It does not create an appointment.">
+          {(id) => <Input id={id} type="date" value={form.followUp} onChange={(v) => set(['followUp'], v)} />}
+        </Field>
+        <Field label="Advice" className="span-2" hint="What the patient should do at home. Printed under the Advice heading.">
+          {(id) => <Textarea id={id} rows={2} value={form.advice} onChange={(v) => set(['advice'], v)} />}
+        </Field>
       </div>
-      <div className="row space-between mt-4">
-        <strong className="small">Medicines</strong>
-        <Button size="sm" variant="secondary" onClick={() => set(['medicines'], [...rows, emptyMedicine()])}>+ Add medicine</Button>
+
+      <ClinicalTemplatePicker
+        kind="prescription"
+        label="Prescription text"
+        readOnly
+        getBody={() => ({
+          cC: form.cC === CLINICAL_OTHER_VALUE ? form.cCOther : form.cC,
+          oE: form.oE === CLINICAL_OTHER_VALUE ? form.oEOther : form.oE,
+          rE: form.rE, diagnosis: form.diagnosis, treatment: form.treatment,
+          advice: form.advice, followUp: form.followUp,
+        })}
+        onApply={(body) => {
+          if ('items' in body) return;
+          set(['cC'], body.cC ? CLINICAL_OTHER_VALUE : '');
+          set(['cCOther'], body.cC ?? '');
+          set(['oE'], body.oE ? CLINICAL_OTHER_VALUE : '');
+          set(['oEOther'], body.oE ?? '');
+          set(['rE'], body.rE ?? '');
+          set(['diagnosis'], body.diagnosis ?? '');
+          set(['treatment'], body.treatment ?? '');
+          set(['advice'], body.advice ?? '');
+          set(['followUp'], body.followUp ?? '');
+        }}
+      />
+      <ClinicalTemplatePicker
+        kind="instructions"
+        label="Prescription instructions"
+        readOnly
+        getBody={() => ({ advice: form.advice })}
+        onApply={(body) => { if (!('items' in body)) set(['advice'], body.advice ?? ''); }}
+      />
+
+      <div className="form-section mt-4">
+        <MedicineRowsEditor
+          rows={rows}
+          onChange={(next) => set(['medicines'], next)}
+          max={60}
+          before={(
+            <Field
+              label="Apply a saved medicine template"
+              className="mt-4"
+              hint="Fills the rows below with medicines saved earlier. Existing rows are replaced only after you confirm."
+            >
+              {(id) => (
+                <Select
+                  id={id}
+                  value=""
+                  onChange={applyMedicineSet}
+                  placeholder={(medicineTemplates ?? []).length > 0 ? 'Choose a saved medicine template…' : 'No saved medicine templates yet'}
+                  options={(medicineTemplates ?? []).map((t) => ({ value: String(t.id), label: t.name }))}
+                />
+              )}
+            </Field>
+          )}
+        />
+        <div className="divider" />
+        <MedicineInstructionField
+          value={form.medicineInstruction}
+          onChange={(v) => set(['medicineInstruction'], v)}
+          structuredCount={instructionRowCount}
+          error={form.medicineInstruction.length > MEDICINE_INSTRUCTION_MAX
+            ? `The medicine instruction must be ${MEDICINE_INSTRUCTION_MAX} characters or fewer.`
+            : null}
+        />
       </div>
-      <div className="col gap-2 mt-2">
-        {rows.map((row, i) => (
-          <div className="line-editor" key={i}>
-            <Input value={row.medicineName} onChange={(v) => setRow(i, { medicineName: v })} placeholder="Medicine name" />
-            <Input value={row.strength} onChange={(v) => setRow(i, { strength: v })} placeholder="500mg" />
-            <Input value={row.dosage} onChange={(v) => setRow(i, { dosage: v })} placeholder="1 capsule" />
-            <Input value={row.frequency} onChange={(v) => setRow(i, { frequency: v })} placeholder="3× daily" />
-            <Input value={row.duration} onChange={(v) => setRow(i, { duration: v })} placeholder="5 days" />
-            <Input value={row.qty} onChange={(v) => setRow(i, { qty: v })} placeholder="Qty" />
-            <Input value={row.generic} onChange={(v) => setRow(i, { generic: v })} placeholder="Generic (optional)" />
-            <Input value={row.form} onChange={(v) => setRow(i, { form: v })} placeholder="Form e.g. Capsule" />
-            <Input value={row.instruction} onChange={(v) => setRow(i, { instruction: v })} placeholder="Instruction e.g. after meals" />
-            <Button size="sm" variant="ghost" title="Remove" onClick={() => set(['medicines'], rows.filter((_, x) => x !== i))}>✕</Button>
-          </div>
-        ))}
-        {rows.length === 0 && <p className="xsmall muted" style={{ margin: 0 }}>Add at least one medicine — a prescription cannot be printed empty.</p>}
-      </div>
+
+      {pendingMedicineSet && (
+        <ConfirmDialog
+          title="Replace the medicines in this form?"
+          body={<>Applying <strong>{pendingMedicineSet.name}</strong> replaces the {instructionRowCount} medicine row(s) already entered here.</>}
+          confirmLabel="Replace medicines"
+          danger
+          onCancel={() => setPendingMedicineSet(null)}
+          onConfirm={() => {
+            const next = pendingMedicineSet.rows;
+            setPendingMedicineSet(null);
+            set(['medicines'], next.map((row) => ({ ...row })));
+            toast.success('Medicine template applied');
+          }}
+        />
+      )}
     </>
   );
 }
@@ -328,11 +468,12 @@ function InvoiceFields({ form, set, treatments }: { form: any; set: (p: string[]
   const received = parseBdtToPaisa(form.amountReceived) ?? 0;
   return (
     <>
-      <div className="row space-between mt-4">
+      <div className="row space-between wrap gap-2 mt-4">
         <strong className="small">Lines</strong>
         <div className="row gap-2">
           <Select
             value="" placeholder="+ Add from treatments"
+            ariaLabel="Add a line from the saved treatment list"
             onChange={(v) => {
               const t = treatments.find((x) => String(x.id) === v);
               if (t) set(['lines'], [...rows, { description: t.name, qty: 1, unitPrice: String(t.defaultPricePaisa / 100), discount: '', treatmentId: t.id }]);
@@ -342,24 +483,40 @@ function InvoiceFields({ form, set, treatments }: { form: any; set: (p: string[]
           <Button size="sm" variant="secondary" onClick={() => set(['lines'], [...rows, emptyLine()])}>+ Add line</Button>
         </div>
       </div>
-      <div className="col gap-2 mt-2">
+      <div className="mt-2">
         {rows.map((row, i) => (
-          <div className="line-editor" key={i}>
-            <Input value={row.description} onChange={(v) => setRow(i, { description: v })} placeholder="Description" />
-            <Input type="number" min={1} value={String(row.qty)} onChange={(v) => setRow(i, { qty: v })} placeholder="Qty" />
-            <Input type="number" min={0} step="0.01" value={String(row.unitPrice)} onChange={(v) => setRow(i, { unitPrice: v })} placeholder="Unit price" />
-            <Input type="number" min={0} step="0.01" value={String(row.discount)} onChange={(v) => setRow(i, { discount: v })} placeholder="Line discount" />
-            <span className="num small muted" style={{ minWidth: 96, textAlign: 'right' }}>
-              <Money paisa={(Number(row.qty) || 0) * (parseBdtToPaisa(row.unitPrice) ?? 0) - (parseBdtToPaisa(row.discount) ?? 0)} />
-            </span>
-            <Button size="sm" variant="ghost" title="Remove" onClick={() => set(['lines'], rows.filter((_, x) => x !== i))}>✕</Button>
+          <div className="invoice-line invoice-line-discount" key={i}>
+            <Field label="Treatment / service" hint="What is being charged.">
+              {(id) => <Input id={id} value={row.description} onChange={(v) => setRow(i, { description: v })} placeholder="e.g. Scaling (full mouth)" />}
+            </Field>
+            <Field label="Quantity" hint="Units charged.">
+              {(id) => <Input id={id} type="number" min={1} value={String(row.qty)} onChange={(v) => setRow(i, { qty: v })} />}
+            </Field>
+            <Field label="Unit price (৳)" hint="Price of one unit.">
+              {(id) => <Input id={id} type="number" min={0} step="0.01" value={String(row.unitPrice)} onChange={(v) => setRow(i, { unitPrice: v })} placeholder="0.00" />}
+            </Field>
+            <Field label="Line discount (৳)" hint="Optional reduction on this line.">
+              {(id) => <Input id={id} type="number" min={0} step="0.01" value={String(row.discount)} onChange={(v) => setRow(i, { discount: v })} placeholder="0.00" />}
+            </Field>
+            <Field label="Line total (৳)" hint="Calculated.">
+              {() => (
+                <div className="input" role="status" aria-readonly="true" style={{ display: 'flex', alignItems: 'center', minHeight: 36 }}>
+                  <Money paisa={(Number(row.qty) || 0) * (parseBdtToPaisa(row.unitPrice) ?? 0) - (parseBdtToPaisa(row.discount) ?? 0)} />
+                </div>
+              )}
+            </Field>
+            <Button size="sm" variant="ghost" aria-label={`Remove line ${i + 1}`} title={`Remove line ${i + 1}`} onClick={() => set(['lines'], rows.filter((_, x) => x !== i))}>Remove</Button>
           </div>
         ))}
-        {rows.length === 0 && <p className="xsmall muted" style={{ margin: 0 }}>Add at least one line.</p>}
+        {rows.length === 0 && <p className="xsmall muted" style={{ margin: 0 }}>Add at least one line — an invoice cannot be printed empty.</p>}
       </div>
       <div className="form-grid mt-4">
-        <Field label="Invoice discount">{(id) => <Input id={id} type="number" min={0} step="0.01" value={String(form.invoiceDiscount)} onChange={(v) => set(['invoiceDiscount'], v)} />}</Field>
-        <Field label="Amount received now">{(id) => <Input id={id} type="number" min={0} step="0.01" value={String(form.amountReceived)} onChange={(v) => set(['amountReceived'], v)} />}</Field>
+        <Field label="Invoice discount (৳)" hint="Whole-invoice reduction, applied after line discounts.">
+          {(id) => <Input id={id} type="number" min={0} step="0.01" value={String(form.invoiceDiscount)} onChange={(v) => set(['invoiceDiscount'], v)} />}
+        </Field>
+        <Field label="Amount received now (৳)" hint="Money handed over at the counter. Leave empty when nothing was paid.">
+          {(id) => <Input id={id} type="number" min={0} step="0.01" value={String(form.amountReceived)} onChange={(v) => set(['amountReceived'], v)} />}
+        </Field>
         <Field label="Payment method" hint="Shown on the invoice when an amount is received">
           {(id) => (
             <Select id={id} value={form.method || 'Cash'} onChange={(v) => set(['method'], v)}
@@ -368,11 +525,11 @@ function InvoiceFields({ form, set, treatments }: { form: any; set: (p: string[]
         </Field>
         <Field label="Note (printed on the invoice)">{(id) => <Input id={id} value={form.note} onChange={(v) => set(['note'], v)} />}</Field>
       </div>
-      <div className="row gap-4 mt-2 small">
-        <span>Subtotal <strong className="num"><Money paisa={subtotal} /></strong></span>
-        <span>Discount <strong className="num"><Money paisa={invoiceDiscount} /></strong></span>
-        <span>Total <strong className="num"><Money paisa={total} /></strong></span>
-        <span>Due <strong className="num"><Money paisa={Math.max(0, total - received)} /></strong></span>
+      <div className="row gap-4 mt-2 small wrap">
+        <span>Subtotal (before invoice discount) <strong className="num"><Money paisa={subtotal} /></strong></span>
+        <span>Invoice discount <strong className="num"><Money paisa={invoiceDiscount} /></strong></span>
+        <span>Total payable <strong className="num"><Money paisa={total} /></strong></span>
+        <span>Still due after the amount received <strong className="num"><Money paisa={Math.max(0, total - received)} /></strong></span>
       </div>
     </>
   );
@@ -413,6 +570,7 @@ function VisitFields({ form, set, treatments }: { form: any; set: (p: string[], 
         <strong className="small">Procedures</strong>
         <div className="row gap-2">
           <Select value="" placeholder="+ Add from treatments"
+            ariaLabel="Add a procedure from the saved treatment list"
             onChange={(v) => {
               const t = treatments.find((x) => String(x.id) === v);
               if (t) set(['procedures'], [...rows, { toothNumber: '', treatmentName: t.name, qty: 1, unitPrice: String(t.defaultPricePaisa / 100) }]);
@@ -421,14 +579,22 @@ function VisitFields({ form, set, treatments }: { form: any; set: (p: string[], 
           <Button size="sm" variant="secondary" onClick={() => set(['procedures'], [...rows, { toothNumber: '', treatmentName: '', qty: 1, unitPrice: '' }])}>+ Add procedure</Button>
         </div>
       </div>
-      <div className="col gap-2 mt-2">
+      <div className="mt-2">
         {rows.map((row, i) => (
-          <div className="line-editor" key={i}>
-            <Input value={row.toothNumber} onChange={(v) => setRow(i, { toothNumber: v })} placeholder="Tooth" />
-            <Input value={row.treatmentName} onChange={(v) => setRow(i, { treatmentName: v })} placeholder="Procedure" />
-            <Input type="number" min={1} value={String(row.qty)} onChange={(v) => setRow(i, { qty: v })} placeholder="Qty" />
-            <Input type="number" min={0} step="0.01" value={String(row.unitPrice)} onChange={(v) => setRow(i, { unitPrice: v })} placeholder="Unit price" />
-            <Button size="sm" variant="ghost" title="Remove" onClick={() => set(['procedures'], rows.filter((_, x) => x !== i))}>✕</Button>
+          <div className="invoice-line row-editor-procedure" key={i}>
+            <Field label="Tooth" hint="FDI number, e.g. 36.">
+              {(id) => <Input id={id} value={row.toothNumber} onChange={(v) => setRow(i, { toothNumber: v })} placeholder="36" />}
+            </Field>
+            <Field label="Procedure" hint="What was done.">
+              {(id) => <Input id={id} value={row.treatmentName} onChange={(v) => setRow(i, { treatmentName: v })} placeholder="e.g. Composite filling" />}
+            </Field>
+            <Field label="Quantity" hint="Units performed.">
+              {(id) => <Input id={id} type="number" min={1} value={String(row.qty)} onChange={(v) => setRow(i, { qty: v })} />}
+            </Field>
+            <Field label="Unit price (৳)" hint="Price of one unit.">
+              {(id) => <Input id={id} type="number" min={0} step="0.01" value={String(row.unitPrice)} onChange={(v) => setRow(i, { unitPrice: v })} placeholder="0.00" />}
+            </Field>
+            <Button size="sm" variant="ghost" aria-label={`Remove procedure ${i + 1}`} title={`Remove procedure ${i + 1}`} onClick={() => set(['procedures'], rows.filter((_, x) => x !== i))}>Remove</Button>
           </div>
         ))}
         {rows.length === 0 && <p className="xsmall muted" style={{ margin: 0 }}>Procedures are optional.</p>}
@@ -461,7 +627,8 @@ function emptyForm(kind: QuickDocumentKind): any {
     dentistName: '',
     customer: { name: '', phone: '', ageYears: '', gender: '' },
     // prescription
-    cC: '', oE: '', rE: '', diagnosis: '', treatment: '', advice: '', followUp: '',
+    cC: '', cCOther: '', oE: '', oEOther: '', rE: '', diagnosis: '', treatment: '', advice: '', followUp: '',
+    medicineInstruction: '',
     medicines: [emptyMedicine()],
     // invoice
     lines: [emptyLine()],
@@ -481,9 +648,9 @@ function emptyForm(kind: QuickDocumentKind): any {
   };
 }
 
-function emptyMedicine(): any {
+function emptyMedicine(): MedicineDraft {
   return {
-    medicineName: '', generic: '', strength: '', form: '', dosage: '', frequency: '',
+    medicineName: '', form: '', strength: '', generic: '', dosage: '', frequency: '',
     duration: '', qty: '', instruction: '',
   };
 }

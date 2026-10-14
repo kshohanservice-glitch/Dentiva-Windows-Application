@@ -264,6 +264,8 @@ export interface PrescriptionCreatePayload {
   patientId: number; visitId?: number | null; dentistId: number; date?: string;
   cC?: string | null; oE?: string | null; rE?: string | null;
   diagnosis?: string | null; treatment?: string | null; advice?: string | null; followUp?: string | null;
+  /** Optional single-line medicine instruction, printed on its own line. */
+  medicineInstruction?: string | null;
   items: Partial<PatientItemPayload>[];
   saveAsTemplate?: string | null;
 }

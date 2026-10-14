@@ -67,11 +67,12 @@ export function AuditPage() {
         }
       >
         <div style={{ minWidth: 240, flex: '1 1 240px' }}>
-          <Input value={query} onChange={(v) => { setQuery(v); setPage(1); }} placeholder="Search summary, entity, user…" />
+          <Input value={query} onChange={(v) => { setQuery(v); setPage(1); }} placeholder="Search summary, entity, user…" ariaLabel="Search audit log" />
         </div>
         <Select
           value={action}
           onChange={(v) => { setAction(v); setPage(1); }}
+          ariaLabel="Filter by action"
           placeholder="All actions"
           options={[
             { value: 'patient.', label: 'Patient actions' },

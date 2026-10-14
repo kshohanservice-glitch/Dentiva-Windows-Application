@@ -8,6 +8,20 @@ import { ClinicLogo } from '../components/clinic-brand';
 import { MessageTemplatesPanel } from '../components/message-templates';
 import { CustomizeDocumentsPanel } from '../components/customize-documents';
 import type { DocumentStyleMap } from '../../shared/document-styles';
+import { WATERMARK_DEFAULT } from '../../shared/watermark';
+import type { PrescriptionLabels } from '../../shared/clinical';
+
+/** Operator-facing names for the printed prescription field labels. */
+const PRESCRIPTION_LABEL_FIELDS: { key: keyof PrescriptionLabels; label: string; hint: string }[] = [
+  { key: 'cc', label: 'Chief complaint (C/C)', hint: 'Printed label for the presenting complaint.' },
+  { key: 'oe', label: 'On examination (O/E)', hint: 'Printed label for the examination findings.' },
+  { key: 're', label: 'Radiographic examination (R/E)', hint: 'Printed label for X-ray / investigation notes.' },
+  { key: 'diagnosis', label: 'Diagnosis', hint: 'Printed label for the diagnosis.' },
+  { key: 'treatment', label: 'Treatment', hint: 'Printed label for the treatment given.' },
+  { key: 'advice', label: 'Advice', hint: 'Printed label for the advice section.' },
+  { key: 'followUp', label: 'Follow-up', hint: 'Printed label for the follow-up date.' },
+  { key: 'medicineInstruction', label: 'Medicine instruction', hint: 'Printed label for the optional single-line medicine instruction.' },
+];
 
 type SetTab = 'clinic' | 'security' | 'appearance' | 'notifications' | 'billing' | 'prescription' | 'templates'
   | 'print' | 'documents' | 'data' | 'shortcuts';
@@ -251,9 +265,15 @@ export function SettingsPage() {
             <div className="divider" />
             <h4 className="small">Form labels</h4>
             <div className="form-grid mt-2">
-              {(Object.keys(form.prescription.labels) as string[]).map((k) => (
-                <Field key={k} label={k.toUpperCase()}>
-                  {(id) => <Input id={id} value={form.prescription.labels[k]} onChange={(v) => set(['prescription', 'labels', k], v)} />}
+              {PRESCRIPTION_LABEL_FIELDS.map(({ key, label, hint }) => (
+                <Field key={key} label={label} hint={hint}>
+                  {(id) => (
+                    <Input
+                      id={id}
+                      value={form.prescription.labels[key] ?? ''}
+                      onChange={(v) => set(['prescription', 'labels', key], v)}
+                    />
+                  )}
                 </Field>
               ))}
             </div>
@@ -268,6 +288,8 @@ export function SettingsPage() {
           <CustomizeDocumentsPanel
             value={(form.documentStyles ?? {}) as DocumentStyleMap}
             onChange={(next) => set(['documentStyles'], next)}
+            watermark={form.watermark ?? WATERMARK_DEFAULT}
+            onWatermarkChange={(next) => set(['watermark'], next)}
             clinic={form.clinic}
             settings={form}
           />

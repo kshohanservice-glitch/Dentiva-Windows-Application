@@ -5,6 +5,7 @@ import { audit, requirePermission, tx } from '../core/context';
 import { nextPrescriptionNumber } from '../core/sequences';
 import { optString, pageParams, reqDate, reqInt, reqString, oneOf } from '../core/validate';
 import { nowISO, todayISO } from '../../shared/currency';
+import { MEDICINE_INSTRUCTION_MAX } from '../../shared/clinical';
 
 interface ItemRow {
   id?: number; seq: number; medicine_name: string; generic: string | null; form: string | null;
@@ -18,7 +19,8 @@ interface RxRow {
   id: number; number: string; patient_id: number; patient_name: string; patient_code: string;
   visit_id: number | null; dentist_id: number; dentist_name: string; date: string;
   c_c: string | null; o_e: string | null; r_e: string | null; diagnosis: string | null;
-  treatment: string | null; advice: string | null; follow_up: string | null; created_at: string;
+  treatment: string | null; advice: string | null; follow_up: string | null;
+  medicine_instruction: string | null; created_at: string;
 }
 
 function toItemDTO(r: ItemRow): PrescriptionItemDTO {
@@ -46,7 +48,8 @@ function hydrate(ctx: Ctx, row: RxRow): PrescriptionDTO {
     patientCode: row.patient_code, visitId: row.visit_id, dentistId: row.dentist_id,
     dentistName: row.dentist_name, date: row.date, cC: row.c_c, oE: row.o_e, rE: row.r_e,
     diagnosis: row.diagnosis, treatment: row.treatment, advice: row.advice,
-    followUp: row.follow_up, items: items.map(toItemDTO), createdAt: row.created_at,
+    followUp: row.follow_up, medicineInstruction: row.medicine_instruction,
+    items: items.map(toItemDTO), createdAt: row.created_at,
   };
 }
 
@@ -97,6 +100,8 @@ export interface PrescriptionInput {
   patientId: number; visitId?: number | null; dentistId: number; date?: string;
   cC?: string | null; oE?: string | null; rE?: string | null;
   diagnosis?: string | null; treatment?: string | null; advice?: string | null; followUp?: string | null;
+  /** Optional single-line medicine instruction (see `shared/clinical.ts`). */
+  medicineInstruction?: string | null;
   items: Partial<PrescriptionItemDTO>[];
   saveAsTemplate?: string | null;
 }
@@ -137,8 +142,8 @@ export function createPrescription(ctx: Ctx, raw: unknown): PrescriptionDTO {
     const info = ctx.db
       .prepare(
         `INSERT INTO prescriptions (number, patient_id, visit_id, dentist_id, date, c_c, o_e, r_e,
-           diagnosis, treatment, advice, follow_up, created_by, created_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+           diagnosis, treatment, advice, follow_up, medicine_instruction, created_by, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       )
       .run(
         number, patientId, input.visitId ?? null, dentistId, date,
@@ -149,6 +154,7 @@ export function createPrescription(ctx: Ctx, raw: unknown): PrescriptionDTO {
         optString(input.treatment, 'Treatment', { max: 20000 }),
         optString(input.advice, 'Advice', { max: 20000 }),
         optString(input.followUp, 'Follow-up', { max: 200 }),
+        optString(input.medicineInstruction, 'Medicine instruction', { max: MEDICINE_INSTRUCTION_MAX }),
         ctx.session.userId, nowISO(),
       );
     const rxId = Number(info.lastInsertRowid);

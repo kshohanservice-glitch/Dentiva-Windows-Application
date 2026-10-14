@@ -6,7 +6,7 @@ import { useApp } from '../state/app-context';
 import { ClinicLogo, ClinicName } from './clinic-brand';
 import { PRODUCT_NAME } from '../../shared/branding';
 import { Badge, Button, ErrorState, IconButton, Kbd, Spinner, useToast } from './primitives';
-import { Input } from './forms';
+import { Field, Input } from './forms';
 import { SearchHitRow } from '../components/search-hit-row';
 import type { NotificationDTO, SearchHit } from '../../shared/types';
 import { formatDate } from '../format';
@@ -298,7 +298,21 @@ export function LockOverlay() {
           </p>
         </div>
         <div className="col" style={{ width: '100%' }}>
-          <Input value={password} onChange={setPassword} type="password" placeholder="Password" autoFocus autoComplete="current-password" />
+          {/* A visible label, not a placeholder: the lock screen is the one form
+              every member of staff has to complete. */}
+          <Field label="Password" required>
+            {(id) => (
+              <Input
+                id={id}
+                value={password}
+                onChange={setPassword}
+                type="password"
+                placeholder="Your login password"
+                autoFocus
+                autoComplete="current-password"
+              />
+            )}
+          </Field>
           {error && <div className="auth-error" role="alert">{error}</div>}
           <Button type="submit" variant="primary" block loading={pending} onClick={() => void submit()}>Unlock</Button>
         </div>

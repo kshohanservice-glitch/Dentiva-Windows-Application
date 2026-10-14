@@ -480,11 +480,14 @@ export function AppointmentsPage() {
             value={searchInput}
             onChange={(e) => setSearchInput(e.target.value)}
           />
-          <Select value={dentistId} onChange={setDentistId} placeholder="All dentists"
+          <Select value={dentistId} onChange={setDentistId} ariaLabel="Filter by dentist"
+          placeholder="All dentists"
             options={(dentists ?? []).map((d) => ({ value: String(d.id), label: d.name }))} />
-          <Select value={reasonFilter} onChange={setReasonFilter} placeholder="Any reason"
+          <Select value={reasonFilter} onChange={setReasonFilter} ariaLabel="Filter by reason"
+          placeholder="Any reason"
             options={REASONS.map((r) => ({ value: r, label: r }))} />
-          <Select value={statusFilter} onChange={setStatusFilter} placeholder="Open & upcoming"
+          <Select value={statusFilter} onChange={setStatusFilter} ariaLabel="Filter by status"
+          placeholder="Open & upcoming"
             options={[
               { value: 'scheduled', label: 'Scheduled' }, { value: 'confirmed', label: 'Confirmed' },
               { value: 'completed', label: 'Completed' }, { value: 'cancelled', label: 'Cancelled' },

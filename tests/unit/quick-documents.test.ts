@@ -15,6 +15,7 @@ import {
   validateQuickDocumentInput,
 } from '../../src/shared/quick-documents';
 import { ALL_PERMISSIONS } from '../../src/shared/permissions';
+import { MEDICINE_INSTRUCTION_MAX } from '../../src/shared/clinical';
 
 const repoRoot = path.resolve(__dirname, '..', '..');
 const read = (rel: string): string => fs.readFileSync(path.join(repoRoot, rel), 'utf8');
@@ -87,6 +88,39 @@ describe('validateQuickDocumentInput', () => {
     expect(result.input!.payload.customer.name).toBe('Walk-in Customer');
     expect((result.input!.payload as any).advice).toBe('Soft diet');
     expect((result.input!.payload as any).items).toHaveLength(2);
+  });
+
+  it('carries the optional single-line medicine instruction with the same bound as stored prescriptions', () => {
+    const line = 'Tab.Napa - 100MG - 1+0+1 - 7 days - after meals';
+    const withLine = validateQuickDocumentInput({
+      kind: 'prescription',
+      payload: {
+        reference: 'QP-1', date: '2026-10-14', customer, dentistName: 'Dr X',
+        medicineInstruction: `  ${line}  `,
+        items: [{ medicineName: 'Amoxicillin' }],
+      },
+    });
+    expect(withLine.errors).toEqual([]);
+    expect((withLine.input!.payload as any).medicineInstruction).toBe(line);
+
+    // Omitted entirely (every walk-in prescription written before v4.1.3).
+    const omitted = validateQuickDocumentInput({
+      kind: 'prescription',
+      payload: { reference: 'QP-1', date: '2026-10-14', customer, dentistName: 'Dr X', items: [{ medicineName: 'A' }] },
+    });
+    expect((omitted.input!.payload as any).medicineInstruction).toBeNull();
+
+    // Over-long instructions are rejected, not silently truncated.
+    const oversized = validateQuickDocumentInput({
+      kind: 'prescription',
+      payload: {
+        reference: 'QP-1', date: '2026-10-14', customer, dentistName: 'Dr X',
+        medicineInstruction: 'x'.repeat(MEDICINE_INSTRUCTION_MAX + 1),
+        items: [{ medicineName: 'A' }],
+      },
+    });
+    expect(oversized.input).toBeNull();
+    expect(oversized.errors.some((e) => e.includes(`Medicine instruction must be ${MEDICINE_INSTRUCTION_MAX} characters or fewer.`))).toBe(true);
   });
 
   it('requires at least one medicine or invoice line', () => {

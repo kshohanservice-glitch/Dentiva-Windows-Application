@@ -5,6 +5,7 @@ import { migration003 } from './003_retire_queue';
 import { migration004 } from './004_appointment_lifecycle';
 import { migration005 } from './005_clinical_templates';
 import { migration006 } from './006_whatsapp';
+import { migration007 } from './007_medicine_instruction';
 
 export interface Migration {
   version: number;
@@ -45,5 +46,10 @@ export const MIGRATIONS: Migration[] = [
     version: migration006.version,
     name: migration006.name,
     up: migration006.up,
+  },
+  {
+    version: migration007.version,
+    name: migration007.name,
+    up: migration007.up,
   },
 ];

@@ -22,6 +22,12 @@ export function Field(props: {
 
 export const Input = React.forwardRef<HTMLInputElement, {
   value: string; onChange: (v: string) => void; type?: string; placeholder?: string;
+  /**
+   * Accessible name for a control that carries no visible label (a filter in a
+   * toolbar, a search box). Controls on data-entry forms use a visible `Field`
+   * label instead — a placeholder is never a label.
+   */
+  ariaLabel?: string;
   invalid?: boolean; disabled?: boolean; autoFocus?: boolean; id?: string; name?: string;
   min?: string | number; max?: string | number; step?: string | number; autoComplete?: string;
   onKeyDown?: (e: React.KeyboardEvent) => void;
@@ -33,6 +39,7 @@ export const Input = React.forwardRef<HTMLInputElement, {
       ref={ref}
       id={props.id}
       name={props.name}
+      aria-label={props.ariaLabel}
       className={`input ${props.invalid ? 'invalid' : ''}`}
       type={props.type ?? 'text'}
       lang={props.type === 'date' || props.type === 'datetime-local' ? 'en-GB' : undefined}
@@ -58,10 +65,13 @@ export function Select(props: {
   value: string; onChange: (v: string) => void;
   options: { value: string; label: string; disabled?: boolean }[];
   invalid?: boolean; disabled?: boolean; id?: string; placeholder?: string;
+  /** Accessible name for a filter dropdown that has no visible label. */
+  ariaLabel?: string;
 }) {
   return (
     <select
       id={props.id}
+      aria-label={props.ariaLabel}
       className={`select ${props.invalid ? 'invalid' : ''}`}
       value={props.value}
       disabled={props.disabled}
@@ -78,10 +88,13 @@ export function Select(props: {
 export function Textarea(props: {
   value: string; onChange: (v: string) => void; rows?: number; placeholder?: string;
   invalid?: boolean; disabled?: boolean; id?: string; monospace?: boolean; maxLength?: number;
+  /** Accessible name for a control without a visible label. */
+  ariaLabel?: string;
 }) {
   return (
     <textarea
       id={props.id}
+      aria-label={props.ariaLabel}
       className={`textarea ${props.invalid ? 'invalid' : ''}`}
       rows={props.rows ?? 3}
       placeholder={props.placeholder}

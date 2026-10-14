@@ -109,7 +109,7 @@ export function PrescriptionsPage() {
       <div className="mt-4">
         <TableToolbar>
           <div style={{ minWidth: 260, flex: '1 1 260px' }}>
-            <Input value={query} onChange={setQuery} placeholder="Search patient, Rx number or medicine…" />
+            <Input value={query} onChange={setQuery} placeholder="Search patient, Rx number or medicine…" ariaLabel="Search prescriptions" />
           </div>
         </TableToolbar>
 

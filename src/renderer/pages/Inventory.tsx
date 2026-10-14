@@ -370,7 +370,7 @@ export function InventoryPage() {
               }
             >
               <div style={{ minWidth: 260, flex: '1 1 260px' }}>
-                <Input value={query} onChange={setQuery} placeholder="Search items…" />
+                <Input value={query} onChange={setQuery} placeholder="Search items…" ariaLabel="Search inventory items" />
               </div>
             </TableToolbar>
             <Card pad={false}>

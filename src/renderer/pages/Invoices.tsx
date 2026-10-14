@@ -422,11 +422,12 @@ export function InvoicesPage() {
 
       <TableToolbar>
         <div style={{ minWidth: 240, flex: '1 1 240px' }}>
-          <Input value={query} onChange={setQuery} placeholder="Search invoice number or patient…" />
+          <Input value={query} onChange={setQuery} placeholder="Search invoice number or patient…" ariaLabel="Search invoices" />
         </div>
         <Select
           value={range}
           onChange={(v) => { setRange(v); setPage(1); }}
+          ariaLabel="Filter by date range"
           options={[
             { value: 'all', label: 'All time' }, { value: 'today', label: 'Today' },
             { value: '7', label: 'Last 7 days' }, { value: '30', label: 'Last 30 days' }, { value: '365', label: 'Last year' },
@@ -435,6 +436,7 @@ export function InvoicesPage() {
         <Select
           value={status}
           onChange={(v) => { setStatus(v); setPage(1); }}
+          ariaLabel="Filter by payment status"
           placeholder="Any status"
           options={[
             { value: 'unpaid', label: 'Unpaid' }, { value: 'partial', label: 'Partial' },
@@ -536,6 +538,7 @@ export function PaymentsPage() {
         <Select
           value={range}
           onChange={(v) => { setRange(v); setPage(1); }}
+          ariaLabel="Filter by date range"
           options={[
             { value: 'all', label: 'All time' }, { value: 'today', label: 'Today' },
             { value: '7', label: 'Last 7 days' }, { value: '30', label: 'Last 30 days' },
@@ -544,6 +547,7 @@ export function PaymentsPage() {
         <Select
           value={method}
           onChange={(v) => { setMethod(v); setPage(1); }}
+          ariaLabel="Filter by payment method"
           placeholder="Any method"
           options={['cash', 'bkash', 'nagad', 'rocket', 'upay', 'card', 'bank', 'other'].map((m) => ({ value: m, label: m.toUpperCase() }))}
         />

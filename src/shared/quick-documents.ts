@@ -16,6 +16,7 @@
  *   - there is no WhatsApp surface anywhere in this model.
  */
 import type { PermissionKey } from './permissions';
+import { MEDICINE_INSTRUCTION_MAX } from './clinical';
 
 export type QuickDocumentKind = 'prescription' | 'invoice' | 'receipt' | 'visit-summary' | 'appointment-card';
 
@@ -138,6 +139,8 @@ export interface QuickPrescriptionPayload {
   treatment: string | null;
   advice: string | null;
   followUp: string | null;
+  /** Optional single-line medicine instruction — see `shared/clinical.ts`. */
+  medicineInstruction: string | null;
   items: QuickMedicineItem[];
 }
 
@@ -402,6 +405,7 @@ export function validateQuickDocumentInput(raw: unknown): QuickValidationResult 
         treatment: str(payload.treatment, LIMITS.short, 'Treatment', errors),
         advice: str(payload.advice, LIMITS.text, 'Advice', errors),
         followUp: isoDate(payload.followUp, 'Follow-up date', errors, false),
+        medicineInstruction: str(payload.medicineInstruction, MEDICINE_INSTRUCTION_MAX, 'Medicine instruction', errors),
         items: medicineItems(payload.items, errors),
       } satisfies QuickPrescriptionPayload;
       break;

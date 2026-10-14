@@ -1249,8 +1249,23 @@ tr.row-muted td { opacity: 0.55; }
 .report-total { display: flex; justify-content: space-between; padding: 6px 0; border-top: 2px solid var(--line-strong); }
 
 /* Invoice builder */
-.invoice-line { display: grid; grid-template-columns: 1fr 70px 110px 90px 40px; gap: var(--sp-2); align-items: end; }
-.invoice-line .field label { display: none; }
+/* Invoice line editor. Labels stay visible in every row: a placeholder
+   disappears as soon as the operator types, which is what made "Qty" and
+   "Unit price" ambiguous. The first column is wide enough for a treatment
+   name; the trailing column holds the remove button. */
+.invoice-line { display: grid; grid-template-columns: minmax(0, 1fr) 110px 150px 130px 40px; gap: var(--sp-3); align-items: start; }
+.invoice-line + .invoice-line { margin-top: var(--sp-3); }
+/* Walk-in invoice line: five fields (treatment, quantity, unit price, line
+   discount, calculated line total) and the remove button. */
+.invoice-line-discount { grid-template-columns: minmax(0, 1fr) 84px 124px 124px 124px auto; }
+/* Walk-in procedure row: tooth, procedure, quantity, unit price, remove. */
+.row-editor-procedure { grid-template-columns: 84px minmax(0, 1fr) 84px 124px auto; }
+@media (max-width: 900px) {
+  .invoice-line, .invoice-line-discount, .row-editor-procedure { grid-template-columns: minmax(0, 1fr) 1fr; }
+  .invoice-line .invoice-line-field-wide { grid-column: span 2; }
+  .invoice-line-discount > .field:first-child,
+  .row-editor-procedure > .field:nth-child(2) { grid-column: span 2; }
+}
 .preset-chips { display: flex; flex-wrap: wrap; gap: 6px; }
 .preset-chip {
   font-size: var(--fs-xs); border: 1px solid var(--line); background: var(--surface-2);
@@ -1258,10 +1273,19 @@ tr.row-muted td { opacity: 0.55; }
 }
 .preset-chip:hover { border-color: var(--brand-600); color: var(--brand-700); }
 
-/* Rx builder */
-.rx-item { border: 1px solid var(--line); border-radius: var(--r-md); padding: var(--sp-3); background: var(--surface-1); }
-.rx-item + .rx-item { margin-top: var(--sp-2); }
-.rx-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: var(--sp-2); }
+/* Rx builder — shared by Main Prescription and Walk-in Prescription rows. */
+.rx-item { border: 1px solid var(--line); border-radius: var(--r-md); padding: var(--sp-4); background: var(--surface-2); }
+.rx-item + .rx-item { margin-top: var(--sp-3); }
+.rx-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: var(--sp-3); }
+.rx-grid .span-2 { grid-column: span 2; }
+@media (max-width: 760px) {
+  .rx-grid .span-2 { grid-column: span 1; }
+}
+
+.medicine-editor { display: flex; flex-direction: column; }
+.medicine-editor-head { align-items: flex-start; }
+.medicine-instruction { margin-top: var(--sp-4); }
+.medicine-instruction .callout { margin-top: var(--sp-2); }
 
 /* Status pills in lists */
 .status-pill { font-size: 11px; font-weight: 750; text-transform: capitalize; }

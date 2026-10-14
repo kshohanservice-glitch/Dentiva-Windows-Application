@@ -13,6 +13,8 @@ import {
 } from '../documents/print-documents';
 import { quickDocumentNode, quickDocumentTitle } from '../documents/quick-document-view';
 import { DocumentStyleSheet } from '../documents/document-style-sheet';
+import { WatermarkLayer } from '../documents/watermark-layer';
+import { WATERMARK_DEFAULT, normalizeWatermarkSettings, type WatermarkSettings } from '../../shared/watermark';
 import type { QuickDocumentInput, QuickDocumentKind } from '../../shared/quick-documents';
 
 const DEFAULT_PRINT_PROFILES: PrintProfile[] = [
@@ -59,6 +61,11 @@ export function PrintPage() {
   // Stored document customizations (Settings → Customize Documents). Empty for
   // an untouched installation, in which case no stylesheet is emitted at all.
   const [docStyles, setDocStyles] = useState<DocumentStyleMap>({});
+  // Clinic-logo watermark. Starts disabled and is replaced by the stored
+  // setting as soon as it is loaded, so a slow or failed settings read can only
+  // ever produce a *plainer* document — never a broken one.
+  const [watermark, setWatermark] = useState<WatermarkSettings>(WATERMARK_DEFAULT);
+  const [logoDataUrl, setLogoDataUrl] = useState<string | null>(null);
   const toast = useToast();
   const { locked, user } = useApp();
   const canOutput = !loading && !error && !locked && !!user;
@@ -97,6 +104,10 @@ export function PrintPage() {
         });
       }
       setDocStyles(normalizeDocumentStyles((s as { documentStyles?: unknown }).documentStyles));
+      if (!cancelled) {
+        setWatermark(normalizeWatermarkSettings((s as { watermark?: unknown }).watermark));
+        setLogoDataUrl(((s as { clinic?: { logoDataUrl?: string | null } }).clinic?.logoDataUrl) ?? null);
+      }
       return s;
     };
     const clinicOf = async (): Promise<any> => (await settingsOf()).clinic;
@@ -334,6 +345,16 @@ export function PrintPage() {
         {(locked || !user) && !loading && <div className="card card-pad">Unlock the app to view or print this document.</div>}
         {!loading && error == null && !locked && !!user && (
           <div className="print-doc" style={docStyle}>
+            {/* Page-level clinic-logo watermark: centred on the real page
+                geometry and painted under the document content. Renders
+                nothing unless the clinic enabled it and a logo exists. */}
+            <WatermarkLayer
+              settings={watermark}
+              logoDataUrl={logoDataUrl}
+              pageWidthMm={pageW}
+              pageHeightMm={pageH}
+              documentKind={state?.kind ?? kind}
+            />
             {state?.doc}
           </div>
         )}

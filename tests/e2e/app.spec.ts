@@ -151,7 +151,7 @@ test('creates an invoice and receives full payment', async () => {
   await modal.locator('.list-row', { hasText: 'E2E Test Patient' }).first().click();
 
   // The form starts with one empty line.
-  await modal.getByPlaceholder('Treatment or item').fill('Scaling and polishing');
+  await modal.getByLabel('Treatment / service').first().fill('Scaling and polishing');
   await modal.getByLabel('Unit price (৳)').fill('500');
   await modal.getByRole('button', { name: 'Create invoice' }).click();
 
@@ -219,17 +219,17 @@ test('clinician templates fill visit and invoice drafts without creating records
   await page.getByRole('link', { name: 'Invoice', exact: true }).click();
   await page.getByRole('button', { name: 'New invoice' }).first().click();
   const invoice = page.locator('.modal[role="dialog"]', { hasText: 'Create invoice' });
-  await invoice.getByPlaceholder('Treatment or item').fill('Template consultation');
+  await invoice.getByLabel('Treatment / service').first().fill('Template consultation');
   await invoice.getByLabel('Unit price (৳)').fill('125');
   const items = invoice.locator('.form-section', { hasText: 'Invoice item templates' });
   await items.getByPlaceholder('New template name').fill('E2E invoice items');
   await items.getByRole('button', { name: 'Save current draft' }).click();
   await expect(items.getByRole('option', { name: 'E2E invoice items' })).toBeAttached();
-  await invoice.getByPlaceholder('Treatment or item').fill('');
+  await invoice.getByLabel('Treatment / service').first().fill('');
   await items.getByLabel('Invoice item templates').selectOption({ label: 'E2E invoice items' });
   await items.getByRole('button', { name: 'Apply to draft' }).click();
   await page.getByRole('button', { name: 'Replace draft fields' }).click();
-  await expect(invoice.getByPlaceholder('Treatment or item')).toHaveValue('Template consultation');
+  await expect(invoice.getByLabel('Treatment / service').first()).toHaveValue('Template consultation');
   await invoice.getByRole('button', { name: 'Cancel' }).click();
   await page.getByRole('button', { name: 'Discard changes' }).click();
 });
@@ -418,14 +418,23 @@ test('walk-in / quick documents print a real document without registering a pati
   // Prescription is the default document type for this workflow.
   await page.getByLabel('Customer name').fill('E2E Walk-in Customer');
   await page.getByLabel('Dentist name (typed)').fill('Dr. E2E Dentist');
-  await page.locator('.line-editor input').first().fill('Amoxicillin');
-  await page.locator('.line-editor input').nth(1).fill('500mg');
+  // Walk-in medicine rows are labelled exactly like the stored prescription form
+  // (v4.1.3 removed the unlabelled 116 px placeholder grid).
+  await page.getByLabel('Medicine name').first().fill('Amoxicillin');
+  await page.getByLabel('Strength').first().fill('500mg');
+  // …and the optional single-line instruction is labelled too.
+  const walkInInstruction = 'Tab.Napa - 100MG - 1+0+1 - 7 days - after meals';
+  await page.getByLabel('Medicine instruction (optional)').fill(walkInInstruction);
+  // The structured rows and the free-text line are both present, so the form must
+  // say that both will print instead of silently dropping one of them.
+  await expect(page.locator('.medicine-instruction [role="status"]')).toContainText('Both forms of entry are filled');
 
   // The preview is the real document renderer, so it must show the same content
   // the print window will show.
   const preview = page.locator('.doc-preview-frame .print-doc');
   await expect(preview.locator('.prescription-medication')).toContainText('Amoxicillin');
   await expect(preview).toContainText('E2E Walk-in Customer');
+  await expect(preview.locator('.prescription-medicine-instruction')).toContainText(walkInInstruction);
 
   const [printWin] = await Promise.all([
     app.waitForEvent('window', { timeout: 60_000 }),
@@ -435,6 +444,9 @@ test('walk-in / quick documents print a real document without registering a pati
   expect(printWin.url()).toContain('#print/quick/');
   await expect(printWin.locator('.print-doc')).toContainText('Amoxicillin', { timeout: 60_000 });
   await expect(printWin.locator('.print-doc .prescription-patient-strip')).toContainText('E2E Walk-in Customer');
+  // The optional single-line instruction reaches the printed page exactly once.
+  await expect(printWin.locator('.print-doc .prescription-medicine-instruction')).toContainText(walkInInstruction);
+  await expect(printWin.locator('.print-doc .prescription-medicine-instruction [data-doc-el="prescription.body.medicineInstructionValue"]')).toHaveCount(1);
   // The walk-in path prints the same template as a stored prescription.
   await expect(printWin.locator('.print-doc .prescription-header')).toBeVisible();
   await Promise.all([
