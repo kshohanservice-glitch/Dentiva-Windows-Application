@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useId, useMemo, useState } from 'react';
 import {
   DOCUMENT_SECTIONS, DOCUMENT_SECTION_LABELS, DOCUMENT_TYPE_DEFS, documentTypeDef,
   countDocumentOverrides, propDef, resetAllDocuments, resetDocument, resetElement, resetSection,
@@ -200,6 +200,9 @@ function StyleControl(props: {
   onClear: () => void;
 }): React.ReactElement {
   const def = propDef(props.propKey);
+  // The label and its control are always associated, so the panel is navigable
+  // by keyboard and screen reader like the rest of the application.
+  const fieldId = useId();
   const set = props.value !== undefined && props.value !== null;
   const label = (
     <span className="row gap-2" style={{ alignItems: 'center' }}>
@@ -224,8 +227,9 @@ function StyleControl(props: {
   if (def.control === 'select') {
     return (
       <div className="field style-control">
-        <label>{label}</label>
+        <label htmlFor={fieldId}>{label}</label>
         <Select
+          id={fieldId}
           value={typeof props.value === 'string' ? props.value : ''}
           onChange={(v) => (v ? props.onSet(v) : props.onClear())}
           placeholder="Original"
@@ -238,14 +242,14 @@ function StyleControl(props: {
   if (def.control === 'color') {
     return (
       <div className="field style-control">
-        <label>{label}</label>
+        <label htmlFor={fieldId}>{label}</label>
         <div className="row gap-2">
           <input
+            id={fieldId}
             type="color"
             className="input style-color"
             value={typeof props.value === 'string' ? props.value : '#000000'}
             onChange={(e) => props.onSet(e.target.value)}
-            aria-label={`${def.label} colour`}
           />
           <code className="xsmall muted">{set ? String(props.value) : 'original'}</code>
         </div>
@@ -255,8 +259,9 @@ function StyleControl(props: {
 
   return (
     <div className="field style-control">
-      <label>{label}</label>
+      <label htmlFor={fieldId}>{label}</label>
       <StyleNumberInput
+        id={fieldId}
         value={typeof props.value === 'number' ? props.value : null}
         min={def.min ?? 0}
         max={def.max ?? 100}
@@ -270,6 +275,7 @@ function StyleControl(props: {
 
 /** Number input that commits on blur/Enter and clamps to the documented range. */
 function StyleNumberInput(props: {
+  id?: string;
   value: number | null;
   min: number; max: number; step: number;
   onCommit: (value: number) => void;
@@ -290,6 +296,7 @@ function StyleNumberInput(props: {
   return (
     <div className="row gap-2" style={{ alignItems: 'center' }}>
       <input
+        id={props.id}
         className="input"
         style={{ width: 104 }}
         inputMode="decimal"
@@ -298,7 +305,6 @@ function StyleNumberInput(props: {
         onChange={(e) => setText(e.target.value)}
         onBlur={commit}
         onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); commit(); } }}
-        aria-label="Value"
       />
       <span className="xsmall muted">{props.min}–{props.max}</span>
     </div>

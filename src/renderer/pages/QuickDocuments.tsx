@@ -213,21 +213,21 @@ export function QuickDocumentsPage() {
         <Card title={def.label} actions={<Badge tone="neutral">{def.referencePrefix}-…</Badge>}>
           <p className="xsmall muted" style={{ marginTop: 0 }}>{def.limitation}</p>
           <div className="form-grid">
-            <Field label="Customer name" required>{() => <Input value={form.customer.name} onChange={(v) => set(['customer', 'name'], v)} placeholder="Walk-in customer" autoFocus />}</Field>
-            <Field label="Phone">{() => <Input value={form.customer.phone} onChange={(v) => set(['customer', 'phone'], v)} placeholder="01XXXXXXXXX" inputMode="tel" />}</Field>
-            <Field label="Age (years)">{() => <Input type="number" min={0} max={130} value={String(form.customer.ageYears ?? '')} onChange={(v) => set(['customer', 'ageYears'], v)} />}</Field>
+            <Field label="Customer name" required>{(id) => <Input id={id} value={form.customer.name} onChange={(v) => set(['customer', 'name'], v)} placeholder="Walk-in customer" autoFocus />}</Field>
+            <Field label="Phone">{(id) => <Input id={id} value={form.customer.phone} onChange={(v) => set(['customer', 'phone'], v)} placeholder="01XXXXXXXXX" inputMode="tel" />}</Field>
+            <Field label="Age (years)">{(id) => <Input id={id} type="number" min={0} max={130} value={String(form.customer.ageYears ?? '')} onChange={(v) => set(['customer', 'ageYears'], v)} />}</Field>
             <Field label="Gender">
-              {() => (
-                <Select value={form.customer.gender ?? ''} onChange={(v) => set(['customer', 'gender'], v)} placeholder="Not specified"
+              {(id) => (
+                <Select id={id} value={form.customer.gender ?? ''} onChange={(v) => set(['customer', 'gender'], v)} placeholder="Not specified"
                   options={[{ value: 'Male', label: 'Male' }, { value: 'Female', label: 'Female' }, { value: 'Other', label: 'Other' }]} />
               )}
             </Field>
-            <Field label="Date" required>{() => <Input type="date" value={form.date} onChange={(v) => set(['date'], v)} />}</Field>
+            <Field label="Date" required>{(id) => <Input id={id} type="date" value={form.date} onChange={(v) => set(['date'], v)} />}</Field>
             {kind !== 'receipt' && (
               <>
                 <Field label="Dentist" hint="Chosen from the clinic's dentist list — prints with credentials">
-                  {() => (
-                    <Select value={String(form.dentistId ?? '')} onChange={(v) => set(['dentistId'], v)} placeholder="Not selected"
+                  {(id) => (
+                    <Select id={id} value={String(form.dentistId ?? '')} onChange={(v) => set(['dentistId'], v)} placeholder="Not selected"
                       options={(dentists.data ?? []).map((d) => ({ value: String(d.id), label: d.name }))} />
                   )}
                 </Field>
@@ -236,7 +236,7 @@ export function QuickDocumentsPage() {
                   required={kind === 'prescription' && !form.dentistId}
                   hint="Used when the dentist is not in the list; a prescription must name the dentist."
                 >
-                  {() => <Input value={form.dentistName} onChange={(v) => set(['dentistName'], v)} disabled={!!form.dentistId} />}
+                  {(id) => <Input id={id} value={form.dentistName} onChange={(v) => set(['dentistName'], v)} disabled={!!form.dentistId} />}
                 </Field>
               </>
             )}
@@ -286,13 +286,13 @@ function PrescriptionFields({ form, set }: { form: any; set: (p: string[], v: un
   return (
     <>
       <div className="form-grid mt-4">
-        <Field label="C/C (chief complaint)">{() => <Input value={form.cC} onChange={(v) => set(['cC'], v)} />}</Field>
-        <Field label="O/E (examination)">{() => <Input value={form.oE} onChange={(v) => set(['oE'], v)} />}</Field>
-        <Field label="R/E (investigation)">{() => <Input value={form.rE} onChange={(v) => set(['rE'], v)} />}</Field>
-        <Field label="Diagnosis">{() => <Input value={form.diagnosis} onChange={(v) => set(['diagnosis'], v)} />}</Field>
-        <Field label="Treatment / procedure">{() => <Input value={form.treatment} onChange={(v) => set(['treatment'], v)} />}</Field>
-        <Field label="Follow-up date">{() => <Input type="date" value={form.followUp} onChange={(v) => set(['followUp'], v)} />}</Field>
-        <Field label="Advice" className="span-2">{() => <Textarea rows={2} value={form.advice} onChange={(v) => set(['advice'], v)} />}</Field>
+        <Field label="C/C (chief complaint)">{(id) => <Input id={id} value={form.cC} onChange={(v) => set(['cC'], v)} />}</Field>
+        <Field label="O/E (examination)">{(id) => <Input id={id} value={form.oE} onChange={(v) => set(['oE'], v)} />}</Field>
+        <Field label="R/E (investigation)">{(id) => <Input id={id} value={form.rE} onChange={(v) => set(['rE'], v)} />}</Field>
+        <Field label="Diagnosis">{(id) => <Input id={id} value={form.diagnosis} onChange={(v) => set(['diagnosis'], v)} />}</Field>
+        <Field label="Treatment / procedure">{(id) => <Input id={id} value={form.treatment} onChange={(v) => set(['treatment'], v)} />}</Field>
+        <Field label="Follow-up date">{(id) => <Input id={id} type="date" value={form.followUp} onChange={(v) => set(['followUp'], v)} />}</Field>
+        <Field label="Advice" className="span-2">{(id) => <Textarea id={id} rows={2} value={form.advice} onChange={(v) => set(['advice'], v)} />}</Field>
       </div>
       <div className="row space-between mt-4">
         <strong className="small">Medicines</strong>
@@ -358,15 +358,15 @@ function InvoiceFields({ form, set, treatments }: { form: any; set: (p: string[]
         {rows.length === 0 && <p className="xsmall muted" style={{ margin: 0 }}>Add at least one line.</p>}
       </div>
       <div className="form-grid mt-4">
-        <Field label="Invoice discount">{() => <Input type="number" min={0} step="0.01" value={String(form.invoiceDiscount)} onChange={(v) => set(['invoiceDiscount'], v)} />}</Field>
-        <Field label="Amount received now">{() => <Input type="number" min={0} step="0.01" value={String(form.amountReceived)} onChange={(v) => set(['amountReceived'], v)} />}</Field>
+        <Field label="Invoice discount">{(id) => <Input id={id} type="number" min={0} step="0.01" value={String(form.invoiceDiscount)} onChange={(v) => set(['invoiceDiscount'], v)} />}</Field>
+        <Field label="Amount received now">{(id) => <Input id={id} type="number" min={0} step="0.01" value={String(form.amountReceived)} onChange={(v) => set(['amountReceived'], v)} />}</Field>
         <Field label="Payment method" hint="Shown on the invoice when an amount is received">
-          {() => (
-            <Select value={form.method || 'Cash'} onChange={(v) => set(['method'], v)}
+          {(id) => (
+            <Select id={id} value={form.method || 'Cash'} onChange={(v) => set(['method'], v)}
               options={QUICK_PAYMENT_METHODS.map((m) => ({ value: m, label: m }))} />
           )}
         </Field>
-        <Field label="Note (printed on the invoice)">{() => <Input value={form.note} onChange={(v) => set(['note'], v)} />}</Field>
+        <Field label="Note (printed on the invoice)">{(id) => <Input id={id} value={form.note} onChange={(v) => set(['note'], v)} />}</Field>
       </div>
       <div className="row gap-4 mt-2 small">
         <span>Subtotal <strong className="num"><Money paisa={subtotal} /></strong></span>
@@ -382,16 +382,16 @@ function ReceiptFields({ form, set }: { form: any; set: (p: string[], v: unknown
   return (
     <div className="form-grid mt-4">
       <Field label="Amount received" required hint="The amount this receipt acknowledges">
-        {() => <Input type="number" min={0} step="0.01" value={String(form.amount)} onChange={(v) => set(['amount'], v)} />}
+        {(id) => <Input id={id} type="number" min={0} step="0.01" value={String(form.amount)} onChange={(v) => set(['amount'], v)} />}
       </Field>
       <Field label="Method">
-        {() => (
-          <Select value={form.method || 'Cash'} onChange={(v) => set(['method'], v)}
+        {(id) => (
+          <Select id={id} value={form.method || 'Cash'} onChange={(v) => set(['method'], v)}
             options={QUICK_PAYMENT_METHODS.map((m) => ({ value: m, label: m }))} />
         )}
       </Field>
       <Field label="Payment reference" hint="Optional — mobile-wallet or bank reference">
-        {() => <Input value={form.paymentReference} onChange={(v) => set(['paymentReference'], v)} />}
+        {(id) => <Input id={id} value={form.paymentReference} onChange={(v) => set(['paymentReference'], v)} />}
       </Field>
     </div>
   );
@@ -403,11 +403,11 @@ function VisitFields({ form, set, treatments }: { form: any; set: (p: string[], 
   return (
     <>
       <div className="form-grid mt-4">
-        <Field label="Chief complaint">{() => <Input value={form.chiefComplaint} onChange={(v) => set(['chiefComplaint'], v)} />}</Field>
-        <Field label="Diagnosis">{() => <Input value={form.diagnosis} onChange={(v) => set(['diagnosis'], v)} />}</Field>
-        <Field label="Treatment notes" className="span-2">{() => <Textarea rows={3} value={form.treatmentNotes} onChange={(v) => set(['treatmentNotes'], v)} />}</Field>
-        <Field label="Next visit date">{() => <Input type="date" value={form.nextVisitDate} onChange={(v) => set(['nextVisitDate'], v)} />}</Field>
-        <Field label="Next visit purpose">{() => <Input value={form.nextVisitPurpose} onChange={(v) => set(['nextVisitPurpose'], v)} />}</Field>
+        <Field label="Chief complaint">{(id) => <Input id={id} value={form.chiefComplaint} onChange={(v) => set(['chiefComplaint'], v)} />}</Field>
+        <Field label="Diagnosis">{(id) => <Input id={id} value={form.diagnosis} onChange={(v) => set(['diagnosis'], v)} />}</Field>
+        <Field label="Treatment notes" className="span-2">{(id) => <Textarea id={id} rows={3} value={form.treatmentNotes} onChange={(v) => set(['treatmentNotes'], v)} />}</Field>
+        <Field label="Next visit date">{(id) => <Input id={id} type="date" value={form.nextVisitDate} onChange={(v) => set(['nextVisitDate'], v)} />}</Field>
+        <Field label="Next visit purpose">{(id) => <Input id={id} value={form.nextVisitPurpose} onChange={(v) => set(['nextVisitPurpose'], v)} />}</Field>
       </div>
       <div className="row space-between mt-4">
         <strong className="small">Procedures</strong>
@@ -441,9 +441,9 @@ function AppointmentFields({ form, set }: { form: any; set: (p: string[], v: unk
   return (
     <div className="form-grid mt-4">
       <Field label="Time" required hint="24-hour clock">
-        {() => <Input type="time" value={form.time} onChange={(v) => set(['time'], v)} />}
+        {(id) => <Input id={id} type="time" value={form.time} onChange={(v) => set(['time'], v)} />}
       </Field>
-      <Field label="Purpose">{() => <Input value={form.purpose} onChange={(v) => set(['purpose'], v)} placeholder="e.g. Scaling" />}</Field>
+      <Field label="Purpose">{(id) => <Input id={id} value={form.purpose} onChange={(v) => set(['purpose'], v)} placeholder="e.g. Scaling" />}</Field>
     </div>
   );
 }

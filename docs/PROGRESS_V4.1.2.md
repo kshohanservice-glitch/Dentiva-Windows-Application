@@ -65,7 +65,7 @@ which loads data over authenticated IPC and renders into `.print-doc`.
 | Feature A — Customize Documents (settings section, engine, persistence, live preview) | done (implementation) — see §4 |
 | Feature B — Walk-in / Quick Documents (sidebar, forms, print, PDF, no WhatsApp) | done (implementation) — see §5 |
 | Codebase audit + fixes | done — `docs/AUDIT_V4.1.2.md` (7 verified defects fixed, 3 clean areas confirmed) |
-| Tests (unit / integration / layout regression) | done (local) — 42 files / 468 tests passing |
+| Tests (unit / integration / layout regression) | done (local) — 43 files / 472 tests passing |
 | Docs + version bump to 4.1.2 | done — `docs/AUDIT_V4.1.2.md`, `docs/RELEASE_NOTES_4.1.2.md`, PRINTING/ARCHITECTURE updated, `package.json` = 4.1.2 |
 | Final gates + PR + tag `v4.1.2` + released installer | in progress — see §6 |
 
@@ -110,7 +110,8 @@ permissions enforced in the service layer for both create and print.
 | 5 | Feature B model + main service + IPC + page | `tests/unit/quick-documents.test.ts` (17) green |
 | 6 | Shared billing arithmetic | `tests/unit/billing-math.test.ts` (14) green |
 | 7 | Audit + fixes | `docs/AUDIT_V4.1.2.md` |
-| 8 | Full local gates | 42 files / 468 tests, `npm run typecheck`, `npm run lint`, `npm run build`, `npm audit --omit=dev` → all clean |
+| 8 | Full local gates | 43 files / 472 tests, `npm run typecheck`, `npm run lint`, `npm run build`, `npm audit --omit=dev` → all clean |
+| 8a | Windows CI round 1 (run 38539065629) | `verify` **passed** on `windows-latest`; `Electron E2E` **failed** with `locator.fill: Timeout` in the new walk-in test; `package` skipped. Root cause: the new form ignored the `Field` id, leaving every label unassociated (defect AUD-412-08). Fixed for all 30 controls and locked by `tests/unit/document-forms-a11y.test.ts`. |
 | 9 | Version + notes | `package.json` / `package-lock.json` = 4.1.2; `docs/RELEASE_NOTES_4.1.2.md` |
 | 10 | Commit + push + PR | see §7 (updated with the commit SHA) |
 | 11 | Windows CI (verify / E2E / NSIS + installed smoke test) | see §7 |
