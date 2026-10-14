@@ -229,7 +229,7 @@ function PatientFormModal(props: { open: boolean; initial?: (PatientDTO & Partia
               id={id}
               value={values.whatsappSameAsPhone ? (values.phone ?? '') : (values.whatsappNumber ?? '')}
               onChange={(v) => { set('whatsappNumber', v); setWhatsappCheck(null); }}
-              placeholder="+8801XXXXXXXXX"
+              placeholder="+880 1XXX-XXXXXX"
               disabled={!!values.whatsappSameAsPhone}
               invalid={!!errors.whatsappNumber}
             />
