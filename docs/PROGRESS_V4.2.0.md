@@ -57,7 +57,7 @@ until observed from GitHub Actions.
 | User-facing versioned notes | `docs/RELEASE_NOTES_4.2.0.md` added. |
 | Repository audit | `docs/AUDIT_V4.2.0.md` added. |
 | Local checks | Typecheck, lint, build and Vitest passed; see limitations above. |
-| PR and Windows CI | Pending; do not infer success from local checks. |
+| PR and Windows CI | [PR #30](https://github.com/kshohanservice-glitch/Dentiva-Windows-Application/pull/30) is open. First push/PR runs (`38587907386`, `38588037335`) passed the Windows verification job, including `npm ci`, but the Electron E2E job exposed an existing test selector still targeting the old template-name placeholder after the field became explicitly labelled. Updated the E2E selectors to use the accessible **Template name** label; rerun pending. Installer job was correctly skipped because E2E had failed. |
 | Merge to `main` | Pending CI and merge. |
 | Tag `v4.2.0` / GitHub Release | Not created. |
 | Installer asset and SHA-256 | Not produced or verified in this sandbox. |
