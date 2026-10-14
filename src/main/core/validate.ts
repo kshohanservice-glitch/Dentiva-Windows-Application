@@ -1,4 +1,5 @@
 import { validation } from '../errors';
+import { normalizeWhatsAppNumber } from '../../shared/whatsapp';
 
 export function reqString(value: unknown, field: string, opts: { max?: number; min?: number } = {}): string {
   if (typeof value !== 'string' || value.trim() === '') {
@@ -88,6 +89,20 @@ export function normalizePhone(value: string): string | null {
     throw validation('Phone number must be a valid Bangladeshi number (e.g. 01712345678).');
   }
   return normalized;
+}
+
+/**
+ * Optional WhatsApp number, normalized to the digits-only international
+ * form WhatsApp Click to Chat requires. Bangladesh local numbers and valid
+ * international numbers are accepted; the existing clinic `phone` keeps its
+ * Bangladesh-local format and is never rewritten by this validator.
+ */
+export function optWhatsAppNumber(value: unknown, field = 'WhatsApp number'): string | null {
+  if (value === null || value === undefined || value === '') return null;
+  if (typeof value !== 'string') throw validation(`${field} must be text.`);
+  const result = normalizeWhatsAppNumber(value);
+  if (!result.ok) throw validation(result.error);
+  return result.international;
 }
 
 export function optPhone(value: unknown, field: string): string | null {

@@ -11,6 +11,9 @@ import type {
   NotificationDTO, Paged, PatientDetailDTO, PatientDTO, PatientFilters, PaymentDTO,
   PaymentInput, PrescriptionDTO, ReportResult, RoleDTO, SearchHit, SessionUser,
   SettingsDTO, StaffDTO, StockInput, TreatmentDTO, UserDTO, VisitDTO,
+  PatientDocumentDTO, WhatsAppDocumentPrepareResult, WhatsAppDocumentSelection,
+  WhatsAppMessageLogDTO, WhatsAppPrepareInput, WhatsAppPrepareResult,
+  WhatsAppTemplateDTO, WhatsAppTemplateSaveInput,
 } from './types';
 import type { PermissionKey } from './permissions';
 import type { ClinicalTemplate, ClinicalTemplateKind, ClinicalTemplateBody } from './clinical-templates';
@@ -62,6 +65,20 @@ export interface DentivaApi {
   'patients/duplicates'(input: Partial<PatientInputPayload>): Promise<DuplicateCandidate[]>;
   'patients/timeline'(patientId: number): Promise<PatientTimelineEvent[]>;
   'patients/export'(filters: PatientFilters): Promise<{ path: string; count: number } | { cancelled: true }>;
+
+  /* whatsapp (free Click to Chat — prepares links, never sends) */
+  'whatsapp/documents'(patientId: number): Promise<PatientDocumentDTO[]>;
+  'whatsapp/templates/list'(): Promise<WhatsAppTemplateDTO[]>;
+  'whatsapp/templates/save'(input: WhatsAppTemplateSaveInput): Promise<WhatsAppTemplateDTO>;
+  'whatsapp/templates/duplicate'(id: number): Promise<WhatsAppTemplateDTO>;
+  'whatsapp/templates/delete'(id: number): Promise<{ ok: true }>;
+  'whatsapp/templates/set-enabled'(payload: { id: number; enabled: boolean }): Promise<WhatsAppTemplateDTO>;
+  'whatsapp/templates/restore'(id: number): Promise<WhatsAppTemplateDTO>;
+  'whatsapp/prepare'(input: WhatsAppPrepareInput): Promise<WhatsAppPrepareResult>;
+  'whatsapp/prepare-documents'(input: { patientId: number; documents: WhatsAppDocumentSelection[] }): Promise<WhatsAppDocumentPrepareResult>;
+  'whatsapp/open'(url: string): Promise<{ ok: true }>;
+  'whatsapp/history'(patientId: number): Promise<WhatsAppMessageLogDTO[]>;
+  'whatsapp/history/status'(payload: { id: number; status: 'sent' | 'not_sent' | 'unknown' }): Promise<WhatsAppMessageLogDTO>;
 
   /* visits */
   'visits/list'(filter: { patientId?: number; range?: string; page?: number; pageSize?: number }): Promise<Paged<VisitDTO>>;
@@ -218,7 +235,10 @@ export interface DentivaApi {
 export interface PatientInputPayload {
   code?: string | null; name: string; bengaliName?: string | null;
   dob?: string | null; ageYears?: number | null; gender: string; bloodGroup?: string | null;
-  phone?: string | null; phone2?: string | null; emergencyContact?: string | null;
+  phone?: string | null; phone2?: string | null;
+  whatsappNumber?: string | null; whatsappSameAsPhone?: boolean;
+  whatsappConsent?: 'unknown' | 'granted' | 'declined';
+  emergencyContact?: string | null;
   emergencyPhone?: string | null; address?: string | null; city?: string | null;
   chiefComplaint?: string | null; referredBy?: string | null; preferredDentistId?: number | null;
   status?: string; registrationDate?: string | null; tags?: string[];
@@ -446,4 +466,17 @@ export const IPC = {
 
   referralsList: 'referrals/list',
   referralsSave: 'referrals/save',
+
+  whatsappDocuments: 'whatsapp/documents',
+  whatsappTemplatesList: 'whatsapp/templates/list',
+  whatsappTemplatesSave: 'whatsapp/templates/save',
+  whatsappTemplatesDuplicate: 'whatsapp/templates/duplicate',
+  whatsappTemplatesDelete: 'whatsapp/templates/delete',
+  whatsappTemplatesSetEnabled: 'whatsapp/templates/set-enabled',
+  whatsappTemplatesRestore: 'whatsapp/templates/restore',
+  whatsappPrepare: 'whatsapp/prepare',
+  whatsappPrepareDocuments: 'whatsapp/prepare-documents',
+  whatsappOpen: 'whatsapp/open',
+  whatsappHistory: 'whatsapp/history',
+  whatsappHistoryStatus: 'whatsapp/history/status',
 } as const;

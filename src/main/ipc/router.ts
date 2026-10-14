@@ -5,7 +5,7 @@ import type { SessionUser } from '../../shared/types';
 import { AppError, toWireError } from '../errors';
 import { logger } from '../logger';
 import type { Ctx } from '../core/context';
-import { audit } from '../core/context';
+import { audit, requirePermission } from '../core/context';
 import type { SessionManager } from '../core/session';
 import type { ActivationStore } from '../core/activation';
 import { changePassword, completeSetup, needsSetup, type SetupInputInternal } from '../services/auth';
@@ -28,6 +28,7 @@ import * as notificationsSvc from '../services/notifications';
 import * as searchSvc from '../services/search';
 import * as reportsSvc from '../services/reports';
 import * as referralsSvc from '../services/referrals';
+import * as whatsappSvc from '../services/whatsapp';
 import type { BackupService } from '../services/backup';
 import { closePrintWindow, executePrint, listPrinters, openPrintWindow, saveAsPdf } from '../print';
 import { toCsv } from '../../shared/csv';
@@ -416,6 +417,28 @@ export function registerRouter(deps: RouterDeps): void {
   handle(IPC.printClose, { auth: true, fn: () => { closePrintWindow(); return { ok: true }; } });
   handle(IPC.printExecute, { auth: true, fn: async (p) => executePrint(p ?? {}) });
   handle(IPC.printPdf, { auth: true, fn: async (p) => saveAsPdf(p ?? {}) });
+
+  /* ------------------------------ whatsapp -------------------------------- */
+  // Free Click to Chat only: these handlers prepare links/documents and hand
+  // one strictly validated https://wa.me URL to the OS. Nothing sends a
+  // message, attaches a file, or touches an unofficial WhatsApp endpoint.
+  handle(IPC.whatsappDocuments, { auth: true, fn: (p, ctx) => whatsappSvc.listPatientDocuments(ctx!, Number(p)) });
+  handle(IPC.whatsappTemplatesList, { auth: true, fn: (_p, ctx) => whatsappSvc.listWhatsAppTemplates(ctx!) });
+  handle(IPC.whatsappTemplatesSave, { auth: true, fn: (p, ctx) => whatsappSvc.saveWhatsAppTemplate(ctx!, p) });
+  handle(IPC.whatsappTemplatesDuplicate, { auth: true, fn: (p, ctx) => whatsappSvc.duplicateWhatsAppTemplate(ctx!, Number(p)) });
+  handle(IPC.whatsappTemplatesDelete, { auth: true, fn: (p, ctx) => whatsappSvc.deleteWhatsAppTemplate(ctx!, Number(p)) });
+  handle(IPC.whatsappTemplatesSetEnabled, { auth: true, fn: (p, ctx) => whatsappSvc.setWhatsAppTemplateEnabled(ctx!, Number(p?.id), !!p?.enabled) });
+  handle(IPC.whatsappTemplatesRestore, { auth: true, fn: (p, ctx) => whatsappSvc.restoreWhatsAppTemplate(ctx!, Number(p)) });
+  handle(IPC.whatsappPrepare, { auth: true, fn: (p, ctx) => whatsappSvc.prepareWhatsAppMessage(ctx!, p) });
+  handle(IPC.whatsappPrepareDocuments, { auth: true, fn: (p, ctx) => whatsappSvc.prepareWhatsAppDocuments(ctx!, p) });
+  handle(IPC.whatsappOpen, { auth: true, fn: async (p, ctx) => {
+    requirePermission(ctx!, 'patients.view');
+    const url = whatsappSvc.assertSafeWhatsAppOpenUrl(p);
+    await shell.openExternal(url);
+    return { ok: true as const };
+  } });
+  handle(IPC.whatsappHistory, { auth: true, fn: (p, ctx) => whatsappSvc.listWhatsAppHistory(ctx!, Number(p)) });
+  handle(IPC.whatsappHistoryStatus, { auth: true, fn: (p, ctx) => whatsappSvc.recordWhatsAppStatus(ctx!, Number(p?.id), String(p?.status ?? '')) });
 
   /* ------------------------------ referrals -------------------------------- */
   handle(IPC.referralsList, { auth: true, fn: (p, ctx) => referralsSvc.listReferrals(ctx!, Number(p)) });
