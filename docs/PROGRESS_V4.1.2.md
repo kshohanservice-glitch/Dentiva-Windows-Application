@@ -131,5 +131,6 @@ asset identifiers as each step completes:
 | CI run (branch) | [38540067953](https://github.com/kshohanservice-glitch/Dentiva-Windows-Application/actions/runs/38540067953) — verify ✅, Electron E2E ✅, NSIS + installed smoke test ✅ |
 | CI run (PR) | [38540068591](https://github.com/kshohanservice-glitch/Dentiva-Windows-Application/actions/runs/38540068591) — verify ✅, Electron E2E ✅, NSIS + installed smoke test ✅ |
 | Installer artefact (CI) | `DentivaPro-Setup-4.1.2.exe` · 100 050 200 bytes · SHA-256 `bf31fcf665a6531ae63e05b61c51eb4c4abd12d00dbe47713e1bc8f9f3310b20` |
-| Tag `v4.1.2` | _created after the merge to `main`, pointing at `b86a1a3`_ |
-| Published release | _updated by the tag pipeline; link recorded in `docs/RELEASE_REPORT_V4.1.2.md`_ |
+| Merge to `main` | PR #28 merged 2026-10-14T09:24:15Z → merge commit `6f06351acd60f003b85a7d1dd5d4bdfb457e0287` on `main` |
+| Tag `v4.1.2` | annotated tag object `6c2fd1ea4d5abf7f270afdd0510d02ea424c6d34` → commit `b86a1a34412e6aa293c172ad14ea53d3e6c0dd70` (the CI-verified commit) |
+| Published release | _produced by the tag pipeline; link recorded in `docs/RELEASE_REPORT_V4.1.2.md`_ |
