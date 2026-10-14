@@ -21,7 +21,7 @@ import {
   restoreWhatsAppTemplate,
   saveWhatsAppTemplate,
 } from '../../src/main/services/whatsapp';
-import { DEFAULT_WHATSAPP_TEMPLATES } from '../../src/shared/whatsapp';
+import { DEFAULT_WHATSAPP_TEMPLATES, MAX_WHATSAPP_LINK_LENGTH } from '../../src/shared/whatsapp';
 
 const FIXTURE = path.join(__dirname, '..', 'fixtures', 'v3.0.3', 'dentiva-v3.0.3.db');
 
@@ -235,6 +235,98 @@ describe('message preparation', () => {
     const other = seedPatient({ name: 'Other Patient', phone: '01812345678', whatsappNumber: '01812345678', whatsappConsent: 'granted' });
     expect(() => prepareWhatsAppDocuments(ctx, { patientId: other.id, documents: [{ kind: 'invoice', documentId: invoiceId }] }))
       .toThrow(/does not belong to this patient/);
+  });
+
+  it('enforces the message limit on the rendered path, not only on edited text', () => {
+    const ctx = ownerCtx(env);
+    const p = seedPatient({ whatsappNumber: '01712345678', whatsappConsent: 'granted' });
+    const tpl = saveWhatsAppTemplate(ctx, {
+      name: 'Long body review', category: 'custom',
+      body: `${'ক'.repeat(3900)}{{বার্তার_মূল_বিষয়}}`,
+    });
+
+    // Rendered template + custom body: the final message is what counts.
+    expect(() => prepareWhatsAppMessage(ctx, {
+      patientId: p.id, category: 'custom', templateId: tpl.id, customBody: 'খ'.repeat(1000), dryRun: true,
+    })).toThrow(/Message is too long \(max 4000 characters\)/);
+
+    // The custom body is bounded as well, so the error names the real culprit.
+    expect(() => prepareWhatsAppMessage(ctx, {
+      patientId: p.id, category: 'custom', customBody: 'খ'.repeat(4001), dryRun: true,
+    })).toThrow(/Custom message body is too long \(max 4000 characters\)/);
+  });
+
+  it('accepts exactly the maximum message and refuses one character more', () => {
+    const ctx = ownerCtx(env);
+    const p = seedPatient({ whatsappNumber: '01712345678', whatsappConsent: 'granted' });
+
+    // A template that is nothing but the custom-body placeholder, so the
+    // rendered message length equals the custom body length exactly.
+    const bodyOnly = saveWhatsAppTemplate(ctx, {
+      name: 'Body only', category: 'custom', body: '{{বার্তার_মূল_বিষয়}}',
+    });
+    const atLimit = prepareWhatsAppMessage(ctx, {
+      patientId: p.id, category: 'custom', templateId: bodyOnly.id, customBody: 'ক'.repeat(4000), dryRun: true,
+    });
+    expect(atLimit.message).toHaveLength(4000);
+    expect(atLimit.url.length).toBeLessThanOrEqual(MAX_WHATSAPP_LINK_LENGTH);
+    expect(() => assertSafeWhatsAppOpenUrl(atLimit.url)).not.toThrow();
+    expect(atLimit.warnings.join(' ')).not.toMatch(/invalid text characters/i);
+
+    // One character more is refused by the unified post-render check…
+    expect(() => prepareWhatsAppMessage(ctx, {
+      patientId: p.id, category: 'custom', templateId: bodyOnly.id, customBody: 'খ'.repeat(4001), dryRun: true,
+    })).toThrow(/Custom message body is too long \(max 4000 characters\)/);
+    // …and the same limit applies to text the doctor edited by hand.
+    expect(() => prepareWhatsAppMessage(ctx, {
+      patientId: p.id, category: 'custom', dryRun: true, messageOverride: 'ক'.repeat(4001),
+    })).toThrow(/Message is too long \(max 4000 characters\)/);
+  });
+
+  it('refuses a Share-PDF introduction that would produce an unopenable link', () => {
+    const ctx = ownerCtx(env);
+    const p = seedPatient({ whatsappNumber: '01712345678', whatsappConsent: 'granted' });
+    const now = new Date().toISOString();
+    env.db.prepare(
+      "INSERT INTO invoices (number, patient_id, date, total_paisa, created_by, created_at) VALUES ('INV-77', ?, '2026-09-02', 42000, 1, ?)",
+    ).run(p.id, now);
+    const invoiceId = Number((env.db.prepare("SELECT id FROM invoices WHERE number = 'INV-77'").get() as { id: number }).id);
+
+    // A long clinic address plus a long PDF-introduction template pushes the
+    // rendered introduction past the message limit.
+    saveSettings(ctx, { clinic: { clinicName: 'BrightSmile Dental Clinic', address: 'A'.repeat(300) } } as any);
+    const intro = listWhatsAppTemplates(ctx).find((t) => t.category === 'pdf_introduction')!;
+    saveWhatsAppTemplate(ctx, {
+      id: intro.id, name: intro.name, category: intro.category,
+      body: `${'ক'.repeat(3900)}{{ক্লিনিকের_ঠিকানা}}`,
+    });
+
+    expect(() => prepareWhatsAppDocuments(ctx, { patientId: p.id, documents: [{ kind: 'invoice', documentId: invoiceId }] }))
+      .toThrow(/Message is too long \(max 4000 characters\)/);
+    // Nothing was prepared for sharing, so no temporary folder was created.
+    expect(fs.existsSync(path.join(env.paths.tempDir, 'whatsapp'))).toBe(false);
+  });
+
+  it('repairs malformed text instead of failing, and says so', () => {
+    const ctx = ownerCtx(env);
+    const p = seedPatient({ whatsappNumber: '01712345678', whatsappConsent: 'granted' });
+    const withSurrogate = prepareWhatsAppMessage(ctx, {
+      patientId: p.id, category: 'custom', dryRun: true,
+      messageOverride: `শুভ সকাল \uD800 ${'ক'.repeat(5)}`,
+    });
+    expect(withSurrogate.message).not.toMatch(/[\uD800-\uDFFF]/u);
+    expect(withSurrogate.message).toContain('\uFFFD');
+    expect(withSurrogate.warnings.join(' ')).toMatch(/invalid text characters/i);
+    expect(() => assertSafeWhatsAppOpenUrl(withSurrogate.url)).not.toThrow();
+
+    // Valid multilingual text is never altered or warned about.
+    const valid = `শুভ সকাল রহিমা — दंत चिकित्सा 🙂 مرحبا`;
+    const untouched = prepareWhatsAppMessage(ctx, {
+      patientId: p.id, category: 'custom', dryRun: true, messageOverride: valid,
+    });
+    expect(untouched.message).toBe(valid);
+    expect(untouched.warnings.join(' ')).not.toMatch(/invalid text characters/i);
+    expect(decodeURIComponent(untouched.url.split('?text=')[1])).toBe(valid);
   });
 
   it('rejects unsafe external links', () => {

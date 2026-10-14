@@ -77,6 +77,7 @@ export interface DentivaApi {
   'whatsapp/prepare'(input: WhatsAppPrepareInput): Promise<WhatsAppPrepareResult>;
   'whatsapp/prepare-documents'(input: { patientId: number; documents: WhatsAppDocumentSelection[] }): Promise<WhatsAppDocumentPrepareResult>;
   'whatsapp/open'(url: string): Promise<{ ok: true }>;
+  'whatsapp/copy-link'(url: string): Promise<{ ok: true }>;
   'whatsapp/history'(patientId: number): Promise<WhatsAppMessageLogDTO[]>;
   'whatsapp/history/status'(payload: { id: number; status: 'sent' | 'not_sent' | 'unknown' }): Promise<WhatsAppMessageLogDTO>;
 
@@ -477,6 +478,7 @@ export const IPC = {
   whatsappPrepare: 'whatsapp/prepare',
   whatsappPrepareDocuments: 'whatsapp/prepare-documents',
   whatsappOpen: 'whatsapp/open',
+  whatsappCopyLink: 'whatsapp/copy-link',
   whatsappHistory: 'whatsapp/history',
   whatsappHistoryStatus: 'whatsapp/history/status',
 } as const;

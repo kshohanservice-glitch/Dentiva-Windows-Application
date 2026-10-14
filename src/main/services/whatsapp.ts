@@ -11,10 +11,13 @@ import {
   DEFAULT_WHATSAPP_TEMPLATES,
   hasUnresolvedPlaceholders,
   isSafeWhatsAppUrl,
+  MAX_WHATSAPP_LINK_LENGTH,
+  MAX_WHATSAPP_MESSAGE_LENGTH,
   normalizeWhatsAppNumber,
   placeholderLabel,
   renderWhatsAppTemplate,
   resolveGreeting,
+  sanitizeUnpairedSurrogates,
   unknownPlaceholdersIn,
   type WhatsAppTemplateCategory,
 } from '../../shared/whatsapp';
@@ -257,7 +260,7 @@ export function saveWhatsAppTemplate(ctx: Ctx, input: WhatsAppTemplateSaveInput)
   requirePermission(ctx, 'patients.edit');
   const name = reqString(input?.name, 'Template name', { max: 80 });
   const category = oneOf(input?.category, CATEGORIES, 'Template category');
-  const body = reqString(input?.body, 'Template message', { max: 4000 });
+  const body = reqString(input?.body, 'Template message', { max: MAX_WHATSAPP_MESSAGE_LENGTH });
   assertBodyValid(body);
   const now = nowISO();
   if (input?.id) {
@@ -405,7 +408,7 @@ export function prepareWhatsAppMessage(ctx: Ctx, input: WhatsAppPrepareInput): W
     'নতুন_সময়': formatMessageTime(appointment?.time),
     'ডকুমেন্টের_নাম': documents.length ? documents.map((d) => (d.reference ? `${d.typeLabel} ${d.reference}` : d.typeLabel)).join(', ') : null,
     'ডকুমেন্টের_তারিখ': documents.length ? documents.map((d) => formatMessageDate(d.date) ?? d.date).join(', ') : null,
-    'বার্তার_মূল_বিষয়': input.customBody ?? null,
+    'বার্তার_মূল_বিষয়': optString(input.customBody, 'Custom message body', { max: MAX_WHATSAPP_MESSAGE_LENGTH }),
   };
 
   const resolved = resolveTemplateBody(ctx, input);
@@ -416,7 +419,6 @@ export function prepareWhatsAppMessage(ctx: Ctx, input: WhatsAppPrepareInput): W
     if (hasUnresolvedPlaceholders(message)) {
       throw validation('The message still contains unresolved placeholders ({{...}}). Replace or remove them before opening WhatsApp.');
     }
-    if (message.length > 4000) throw validation('Message is too long (max 4000 characters).');
   } else {
     const rendered = renderWhatsAppTemplate(resolved.body, context);
     message = rendered.text;
@@ -431,6 +433,23 @@ export function prepareWhatsAppMessage(ctx: Ctx, input: WhatsAppPrepareInput): W
     if (rendered.unknown.length > 0) {
       warnings.push(`Unknown placeholders were removed from the message: ${rendered.unknown.join(', ')}.`);
     }
+  }
+
+  // Applies to every preparation path — an edited message, a rendered template
+  // with real patient data, or a Share-PDF introduction — because the Click to
+  // Chat link grows with the encoded text and the main process refuses a link
+  // it cannot hand to the browser. Malformed text pasted from a damaged source
+  // is repaired (with a warning) so URL encoding can never throw.
+  const sanitized = sanitizeUnpairedSurrogates(message);
+  if (sanitized.changed) {
+    warnings.push('The message contained invalid text characters. They were replaced with “\uFFFD” in the prepared WhatsApp text — check the message before sending.');
+  }
+  message = sanitized.text;
+  if (message.length > MAX_WHATSAPP_MESSAGE_LENGTH) {
+    throw validation(
+      `Message is too long (max ${MAX_WHATSAPP_MESSAGE_LENGTH} characters). Shorten the message text ` +
+        'or the custom body text and try again — a longer message cannot be opened or copied as a WhatsApp link.',
+    );
   }
 
   const url = buildWhatsAppUrl(destination, message);
@@ -589,7 +608,7 @@ export function recordWhatsAppStatus(ctx: Ctx, logId: number, status: string): W
 
 /** The only external URLs this feature may open: official wa.me links. */
 export function assertSafeWhatsAppOpenUrl(value: unknown): string {
-  const url = optString(value, 'WhatsApp link', { max: 8000 });
+  const url = optString(value, 'WhatsApp link', { max: MAX_WHATSAPP_LINK_LENGTH });
   if (!url || !isSafeWhatsAppUrl(url)) {
     throw validation('Refusing to open an unsafe or invalid WhatsApp link.');
   }

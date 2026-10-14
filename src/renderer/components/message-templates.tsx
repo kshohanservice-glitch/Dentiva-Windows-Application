@@ -6,6 +6,7 @@ import { Field, Input, Select, Textarea } from './forms';
 import {
   DEFAULT_GREETING_RANGES,
   GREETING_OPTIONS,
+  MAX_WHATSAPP_MESSAGE_LENGTH,
   placeholdersIn,
   placeholderLabel,
   TEMPLATE_CATEGORY_LABELS,
@@ -271,7 +272,7 @@ export function MessageTemplatesPanel() {
               </Field>
             </div>
             <Field label="Message content (Bengali)" hint="This is the patient-facing message text. Placeholders are filled with real patient, clinic, appointment and document data.">
-              {(id) => <Textarea id={id} rows={12} value={body} onChange={setBody} />}
+              {(id) => <Textarea id={id} rows={12} value={body} maxLength={MAX_WHATSAPP_MESSAGE_LENGTH} onChange={setBody} />}
             </Field>
             <label className="checkbox">
               <input type="checkbox" checked={enabled} onChange={(e) => setEnabled(e.target.checked)} />

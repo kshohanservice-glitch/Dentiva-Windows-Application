@@ -7,10 +7,13 @@ import {
   greetingForMinutes,
   hasUnresolvedPlaceholders,
   isSafeWhatsAppUrl,
+  MAX_WHATSAPP_LINK_LENGTH,
+  MAX_WHATSAPP_MESSAGE_LENGTH,
   normalizeWhatsAppNumber,
   placeholdersIn,
   renderWhatsAppTemplate,
   resolveGreeting,
+  sanitizeUnpairedSurrogates,
   unknownPlaceholdersIn,
 } from '../../src/shared/whatsapp';
 
@@ -183,6 +186,49 @@ describe('Click to Chat URLs', () => {
     expect(() => buildWhatsAppUrl('123', 'hello')).toThrow(/invalid/i);
     expect(() => buildWhatsAppUrl('+8801712345678', 'hello')).toThrow(/invalid/i);
     expect(() => buildWhatsAppUrl('', 'hello')).toThrow(/invalid/i);
+  });
+
+  it('never lets the message limit produce a link the open guard would refuse', () => {
+    // The main process refuses links longer than MAX_WHATSAPP_LINK_LENGTH, so
+    // the longest message the app accepts must still fit inside that ceiling.
+    const longestAllowed = buildWhatsAppUrl('8801712345678', 'ক'.repeat(MAX_WHATSAPP_MESSAGE_LENGTH));
+    expect(longestAllowed.length).toBeLessThanOrEqual(MAX_WHATSAPP_LINK_LENGTH);
+    // Bengali costs nine encoded characters per letter (3 UTF-8 bytes).
+    expect(longestAllowed.length).toBeGreaterThan(MAX_WHATSAPP_MESSAGE_LENGTH * 8);
+  });
+
+  it('repairs unpaired surrogates instead of throwing, and never touches valid text', () => {
+    // Valid multilingual text (Bengali, Devanagari, Arabic, emoji + ZWJ
+    // sequence, combining marks) is returned byte-for-byte unchanged.
+    const valid = 'শুভ সকাল রহিমা আক্তার — दंत चिकित्सा — مرحبا — 👩‍⚕️ 🦷 🇧🇩 e\u0301';
+    const untouched = sanitizeUnpairedSurrogates(valid);
+    expect(untouched.text).toBe(valid);
+    expect(untouched.changed).toBe(false);
+
+    // Malformed input is repaired, never silently dropped or thrown on.
+    for (const malformed of ['\uD800', '\uDC00', 'abc\uD800def', 'end\uDBFF', '\uDC00start', 'a\uD83Db\uDE00c']) {
+      const repaired = sanitizeUnpairedSurrogates(malformed);
+      expect(repaired.changed).toBe(true);
+      expect(repaired.text).toContain('\uFFFD');
+      expect(repaired.text).not.toMatch(/\uD800|\uDC00/);
+    }
+
+    // A valid pair sitting next to a lone surrogate keeps the pair intact.
+    const mixed = sanitizeUnpairedSurrogates('\uD83E\uDDB7\uD800\uD83E\uDDB7');
+    expect(mixed.changed).toBe(true);
+    expect(mixed.text).toBe('\uD83E\uDDB7\uFFFD\uD83E\uDDB7');
+  });
+
+  it('builds a safe URL for malformed text instead of raising URIError', () => {
+    const url = buildWhatsAppUrl('8801712345678', 'শুভ সকাল \uD800');
+    expect(url.startsWith('https://wa.me/8801712345678?text=')).toBe(true);
+    expect(isSafeWhatsAppUrl(url)).toBe(true);
+    expect(decodeURIComponent(url.split('?text=')[1])).toContain('\uFFFD');
+  });
+
+  it('round-trips valid multilingual text through the URL unchanged', () => {
+    const message = 'শুভ সকাল, রহিমা আক্তার।\n\nআপনার অ্যাপয়েন্টমেন্ট 20 Oct 2026 — दंत 🦷 مرحبا';
+    expect(decodeURIComponent(buildWhatsAppUrl('8801712345678', message).split('?text=')[1])).toBe(message);
   });
 
   it('only accepts strict https wa.me URLs for opening', () => {
