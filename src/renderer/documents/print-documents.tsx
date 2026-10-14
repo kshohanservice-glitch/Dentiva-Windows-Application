@@ -187,12 +187,6 @@ export function prescriptionDoc(data: any): React.ReactNode {
     dentist?.email ? dentist.email : '',
   ].filter(Boolean);
 
-  // The optional single-line medicine instruction is printed only when it has
-  // content, so every prescription saved before this field existed — and every
-  // prescription written through the structured rows alone — prints exactly as
-  // it did before. It is a separate block: it never merges with, replaces or
-  // duplicates the structured medicine list.
-  const medicineInstruction = String(rx.medicineInstruction ?? '').trim();
   const clinicalFields = [
     { label: labels.cc || 'C/C', value: rx.cC },
     { label: labels.oe || 'O/E', value: rx.oE },
@@ -278,12 +272,18 @@ export function prescriptionDoc(data: any): React.ReactNode {
                     {it.strength && <span className="medication-strength" {...docEl('prescription.body.medicationStrength')}> {it.strength}</span>}
                   </div>
                   <div className="medication-instructions" {...docEl('prescription.body.medicationInstructions')}>
-                    {it.dosage && <span>{it.dosage}</span>}
-                    {it.frequency && <span>{it.frequency}</span>}
-                    {it.route && <span>{it.route}</span>}
-                    {it.duration && <span>{it.duration}</span>}
-                    {it.qty && <span>Qty: {it.qty}</span>}
-                    {it.instruction && <span>{it.instruction}</span>}
+                    {it.medicineInstruction?.trim() ? (
+                      <span className="medication-single-instruction">{it.medicineInstruction}</span>
+                    ) : (
+                      <>
+                        {it.dosage && <span>{it.dosage}</span>}
+                        {it.frequency && <span>{it.frequency}</span>}
+                        {it.route && <span>{it.route}</span>}
+                        {it.duration && <span>{it.duration}</span>}
+                        {it.qty && <span>Qty: {it.qty}</span>}
+                        {it.instruction && <span>{it.instruction}</span>}
+                      </>
+                    )}
                     {it.generic && <span className="muted">{it.generic}</span>}
                   </div>
                 </div>
@@ -292,17 +292,6 @@ export function prescriptionDoc(data: any): React.ReactNode {
               <div className="muted">No medicines recorded.</div>
             )}
           </div>
-
-          {medicineInstruction ? (
-            <div className="prescription-medicine-instruction">
-              <div className="prescription-section-label" {...docEl('prescription.body.medicineInstructionLabel')}>
-                {labels.medicineInstruction || 'Medicine Instruction'}
-              </div>
-              <div className="prescription-section-value" {...docEl('prescription.body.medicineInstructionValue')}>
-                {medicineInstruction}
-              </div>
-            </div>
-          ) : null}
 
           <div className="prescription-bottom">
             <div className="prescription-advice">
@@ -480,11 +469,11 @@ export function rxToDoc(rx: any) {
     dentistId: rx.dentistId, dentistName: rx.dentistName,
     cC: rx.cC, oE: rx.oE, rE: rx.rE, treatment: rx.treatment,
     diagnosis: rx.diagnosis, advice: rx.advice, followUp: rx.followUp,
-    medicineInstruction: rx.medicineInstruction ?? null,
     items: (rx.items ?? []).map((it: any, i: number) => ({
       seq: i + 1, medicineName: it.medicineName, generic: it.generic, strength: it.strength,
       form: it.form, dosage: it.dosage, frequency: it.frequency, duration: it.duration,
-      qty: it.qty, instruction: it.instruction, route: null as string | null,
+      qty: it.qty, instruction: it.instruction, medicineInstruction: it.medicineInstruction ?? null,
+      route: null as string | null,
     })),
   };
 }

@@ -97,7 +97,7 @@ function PaymentModal(props: { invoice: InvoiceDTO; onClose: () => void; onPaid:
             />
           )}
         </Field>
-        <Field label="Quick amount">
+        <Field label="Quick amount" labelFor={false}>
           {() => (
             <div className="row gap-2">
               <Button size="sm" variant="secondary" onClick={() => set('amountPaisa', due)}>Full balance</Button>
@@ -425,18 +425,18 @@ export function InvoicesPage() {
           <Input value={query} onChange={setQuery} placeholder="Search invoice number or patient…" ariaLabel="Search invoices" />
         </div>
         <Select
+          ariaLabel="Filter invoices by date"
           value={range}
           onChange={(v) => { setRange(v); setPage(1); }}
-          ariaLabel="Filter by date range"
           options={[
             { value: 'all', label: 'All time' }, { value: 'today', label: 'Today' },
             { value: '7', label: 'Last 7 days' }, { value: '30', label: 'Last 30 days' }, { value: '365', label: 'Last year' },
           ]}
         />
         <Select
+          ariaLabel="Filter invoices by payment status"
           value={status}
           onChange={(v) => { setStatus(v); setPage(1); }}
-          ariaLabel="Filter by payment status"
           placeholder="Any status"
           options={[
             { value: 'unpaid', label: 'Unpaid' }, { value: 'partial', label: 'Partial' },
@@ -536,18 +536,18 @@ export function PaymentsPage() {
 
       <TableToolbar>
         <Select
+          ariaLabel="Filter payments by date"
           value={range}
           onChange={(v) => { setRange(v); setPage(1); }}
-          ariaLabel="Filter by date range"
           options={[
             { value: 'all', label: 'All time' }, { value: 'today', label: 'Today' },
             { value: '7', label: 'Last 7 days' }, { value: '30', label: 'Last 30 days' },
           ]}
         />
         <Select
+          ariaLabel="Filter payments by method"
           value={method}
           onChange={(v) => { setMethod(v); setPage(1); }}
-          ariaLabel="Filter by payment method"
           placeholder="Any method"
           options={['cash', 'bkash', 'nagad', 'rocket', 'upay', 'card', 'bank', 'other'].map((m) => ({ value: m, label: m.toUpperCase() }))}
         />

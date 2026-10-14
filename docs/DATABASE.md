@@ -81,10 +81,7 @@ retained across migrations 003/004.
 
 ### Prescriptions
 - `prescriptions` — patient_id, visit_id?, dentist_id, date, c_c, o_e, r_e, diagnosis,
-  treatment, advice, follow_up, medicine_instruction? (migration 007: the optional
-  single-line medicine instruction, 500-char bound; `NULL` for every row written before
-  4.1.3 and for every prescription that used the structured rows only),
-  footer_override?, created_by, number (sequential per year).
+  treatment, advice, follow_up, footer_override?, created_by, number (sequential per year).
 - `prescription_items` — prescription_id, seq, medicine_name, generic, form, strength,
   dosage, frequency, morning, afternoon, night, timing(before/after/na), duration,
   qty, instruction, instruction_bn, note.

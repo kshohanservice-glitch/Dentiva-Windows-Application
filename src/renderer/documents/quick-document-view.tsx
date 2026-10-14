@@ -46,7 +46,6 @@ export function quickDocumentNode(input: QuickDocumentInput, ctx: QuickDocumentR
           diagnosis: p.diagnosis,
           advice: p.advice,
           followUp: p.followUp,
-          medicineInstruction: p.medicineInstruction,
           items: p.items.map((item, index) => ({ ...item, seq: index + 1 })),
         },
         patient: {

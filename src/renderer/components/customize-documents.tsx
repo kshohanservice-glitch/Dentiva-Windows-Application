@@ -6,13 +6,13 @@ import {
   type CustomizableDocumentType, type DocumentElementStyle, type DocumentSection, type DocumentStyleMap,
   type DocumentStylePropKey,
 } from '../../shared/document-styles';
-import type { ClinicSettings, SettingsDTO } from '../../shared/types';
+import type { DocumentWatermarkSettings } from '../../shared/document-watermark';
 import {
-  WATERMARK_DEFAULT, WATERMARK_LIMITS, WATERMARK_SCOPE_NOTE,
-  normalizeWatermarkSettings, watermarkAppliesTo, type WatermarkSettings,
-} from '../../shared/watermark';
+  DEFAULT_DOCUMENT_WATERMARK, normalizeDocumentWatermark, pageSizeForDocument, supportsLogoWatermark,
+} from '../../shared/document-watermark';
+import type { ClinicSettings, SettingsDTO } from '../../shared/types';
 import { Badge, Button, Card, Tabs, useToast } from './primitives';
-import { Select } from './forms';
+import { Field, Select } from './forms';
 import { DocumentPreview, sampleDocumentNode } from '../documents/document-preview';
 
 /**
@@ -29,16 +29,21 @@ import { DocumentPreview, sampleDocumentNode } from '../documents/document-previ
 export function CustomizeDocumentsPanel(props: {
   value: DocumentStyleMap;
   onChange: (next: DocumentStyleMap) => void;
-  /** Clinic-logo watermark configuration (page-level, not per element). */
-  watermark: WatermarkSettings;
-  onWatermarkChange: (next: WatermarkSettings) => void;
   clinic?: ClinicSettings | null;
   settings?: SettingsDTO | null;
+  watermark?: DocumentWatermarkSettings | null;
+  onWatermarkChange?: (next: DocumentWatermarkSettings) => void;
 }) {
   const toast = useToast();
+  const watermark = normalizeDocumentWatermark(props.watermark ?? DEFAULT_DOCUMENT_WATERMARK);
+  const setWatermark = (patch: Partial<DocumentWatermarkSettings>): void => {
+    props.onWatermarkChange?.({ ...watermark, ...patch });
+  };
   const [docType, setDocType] = useState<CustomizableDocumentType>('prescription');
   const [section, setSection] = useState<DocumentSection>('header');
   const [elementId, setElementId] = useState<string>('');
+  const pageSize = pageSizeForDocument(props.settings?.printProfiles, docType);
+  const watermarkSupported = supportsLogoWatermark(docType);
 
   const typeDef = documentTypeDef(docType);
   const sectionElements = useMemo(
@@ -96,9 +101,9 @@ export function CustomizeDocumentsPanel(props: {
         </p>
         <div className="form-grid">
           <Select
+            ariaLabel="Document to customize"
             value={docType}
             onChange={(v) => { setDocType(v as CustomizableDocumentType); setSection('header'); }}
-            ariaLabel="Document to customize"
             options={DOCUMENT_TYPE_DEFS.map((d) => ({ value: d.type, label: d.label }))}
           />
           <div className="row gap-2 wrap" style={{ alignItems: 'center' }}>
@@ -130,12 +135,76 @@ export function CustomizeDocumentsPanel(props: {
         </div>
       </Card>
 
-      <WatermarkPanel
-        watermark={props.watermark}
-        onChange={props.onWatermarkChange}
-        logoDataUrl={props.clinic?.logoDataUrl ?? null}
-        documentType={docType}
-      />
+      <Card
+        title="Clinic logo watermark"
+        actions={<Badge tone={watermark.enabled ? 'info' : 'neutral'}>{watermark.enabled ? 'Enabled' : 'Disabled'}</Badge>}
+      >
+        <p className="small muted" style={{ marginTop: 0 }}>
+          Use the clinic logo saved in Settings → Clinic. The mark is centered in page coordinates, keeps the logo's
+          original aspect ratio, and applies to prescriptions, invoices, visit summaries, appointment cards and reports.
+          Receipts and stock labels are intentionally left unchanged.
+        </p>
+        {!props.clinic?.logoDataUrl && (
+          <div className="callout callout-info small" role="note">
+            Upload and save a clinic logo in Settings → Clinic to see it here and on printed documents.
+          </div>
+        )}
+        {!watermarkSupported && (
+          <div className="callout callout-warning small" role="note">
+            The selected document type does not use the clinic-logo watermark.
+          </div>
+        )}
+        <div className="form-grid mt-3">
+          <Field label="Watermark" labelFor={false} className="span-2">
+            {() => (
+              <label className="checkbox">
+                <input
+                  type="checkbox"
+                  checked={watermark.enabled}
+                  onChange={(event) => setWatermark({ enabled: event.target.checked })}
+                />
+                <span>Enable the clinic-logo watermark (off by default)</span>
+              </label>
+            )}
+          </Field>
+          <Field label={`Logo size (${watermark.sizePercent}%)`} hint="Maximum logo dimension as a share of the page's shorter edge.">
+            {(id) => (
+              <div className="row gap-2 watermark-slider-row">
+                <input
+                  id={id}
+                  className="watermark-slider"
+                  type="range"
+                  min={15}
+                  max={70}
+                  step={1}
+                  value={watermark.sizePercent}
+                  aria-valuetext={`${watermark.sizePercent} percent of the page's shorter edge`}
+                  onChange={(event) => setWatermark({ sizePercent: Number(event.target.value) })}
+                />
+                <span className="xsmall muted num">{watermark.sizePercent}%</span>
+              </div>
+            )}
+          </Field>
+          <Field label={`Opacity (${Math.round(watermark.opacity * 100)}%)`} hint="Keep the logo subtle so printed text stays legible.">
+            {(id) => (
+              <div className="row gap-2 watermark-slider-row">
+                <input
+                  id={id}
+                  className="watermark-slider"
+                  type="range"
+                  min={4}
+                  max={30}
+                  step={1}
+                  value={Math.round(watermark.opacity * 100)}
+                  aria-valuetext={`${Math.round(watermark.opacity * 100)} percent opacity`}
+                  onChange={(event) => setWatermark({ opacity: Number(event.target.value) / 100 })}
+                />
+                <span className="xsmall muted num">{Math.round(watermark.opacity * 100)}%</span>
+              </div>
+            )}
+          </Field>
+        </div>
+      </Card>
 
       <div className="customize-grid">
         <Card title="Elements" className="customize-elements">
@@ -201,141 +270,16 @@ export function CustomizeDocumentsPanel(props: {
       <Card title="Preview" actions={<span className="xsmall muted">Real document renderer · sample content</span>}>
         <DocumentPreview
           styles={props.value}
+          watermark={watermark}
+          clinic={props.clinic}
+          documentType={docType}
+          pageSize={pageSize}
           zoom={0.72}
-          watermark={props.watermark}
-          logoDataUrl={props.clinic?.logoDataUrl ?? null}
-          documentKind={docType}
         >
           {preview}
         </DocumentPreview>
-        <p className="xsmall muted mt-2" style={{ marginBottom: 0 }}>
-          {watermarkAppliesTo(docType)
-            ? 'The preview above shows the watermark exactly where it will print.'
-            : 'This compact document deliberately never carries the watermark.'}
-        </p>
       </Card>
     </div>
-  );
-}
-
-/* ------------------------------------------------------- watermark panel */
-
-/**
- * Clinic-logo watermark settings.
- *
- * The watermark is page-level (one centred mark per page), not an element of a
- * document, so it lives next to the element customizations instead of inside
- * them. Everything written here is validated and clamped by
- * `shared/watermark.ts`, and the preview above renders it through the same
- * `WatermarkLayer` the print window uses.
- */
-function WatermarkPanel(props: {
-  watermark: WatermarkSettings;
-  onChange: (next: WatermarkSettings) => void;
-  logoDataUrl: string | null;
-  documentType: CustomizableDocumentType;
-}): React.ReactElement {
-  const toast = useToast();
-  const sizeId = useId();
-  const opacityId = useId();
-  const settings = normalizeWatermarkSettings(props.watermark);
-  const appliesHere = watermarkAppliesTo(props.documentType);
-  const missingLogo = settings.enabled && !props.logoDataUrl;
-  const isDefault = settings.enabled === WATERMARK_DEFAULT.enabled
-    && settings.sizePercent === WATERMARK_DEFAULT.sizePercent
-    && settings.opacity === WATERMARK_DEFAULT.opacity;
-
-  const update = (patch: Partial<WatermarkSettings>) => props.onChange({ ...settings, ...patch });
-
-  return (
-    <Card
-      title="Clinic logo watermark"
-      actions={<Badge tone={settings.enabled ? 'info' : 'neutral'}>{settings.enabled ? 'enabled' : 'disabled (default)'}</Badge>}
-    >
-      <p className="small muted" style={{ marginTop: 0 }}>
-        {WATERMARK_SCOPE_NOTE}
-      </p>
-      <label className="checkbox">
-        <input
-          type="checkbox"
-          checked={settings.enabled}
-          onChange={(e) => update({ enabled: e.target.checked })}
-        />
-        <span>Print the clinic logo as a centred watermark on applicable documents</span>
-      </label>
-
-      <div className="form-grid mt-4">
-        <div className="field">
-          <label htmlFor={sizeId}>Watermark size</label>
-          <div className="row gap-2" style={{ alignItems: 'center' }}>
-            <input
-              id={sizeId}
-              className="input"
-              type="range"
-              min={WATERMARK_LIMITS.sizePercent.min}
-              max={WATERMARK_LIMITS.sizePercent.max}
-              step={WATERMARK_LIMITS.sizePercent.step}
-              value={settings.sizePercent}
-              disabled={!settings.enabled}
-              style={{ padding: 0, border: 'none', background: 'transparent' }}
-              onChange={(e) => update({ sizePercent: Number(e.target.value) })}
-            />
-            <strong className="num" style={{ minWidth: 44, textAlign: 'right' }}>{settings.sizePercent}%</strong>
-          </div>
-          <div className="hint">Percentage of the page width and height — the logo scales with the paper size.</div>
-        </div>
-
-        <div className="field">
-          <label htmlFor={opacityId}>Transparency</label>
-          <div className="row gap-2" style={{ alignItems: 'center' }}>
-            <input
-              id={opacityId}
-              className="input"
-              type="range"
-              min={WATERMARK_LIMITS.opacity.min}
-              max={WATERMARK_LIMITS.opacity.max}
-              step={WATERMARK_LIMITS.opacity.step}
-              value={settings.opacity}
-              disabled={!settings.enabled}
-              style={{ padding: 0, border: 'none', background: 'transparent' }}
-              onChange={(e) => update({ opacity: Number(e.target.value) })}
-            />
-            <strong className="num" style={{ minWidth: 56, textAlign: 'right' }}>{Math.round(settings.opacity * 100)}% visible</strong>
-          </div>
-          <div className="hint">
-            Lower is fainter. The mark always prints behind the text, so patient details and totals stay legible.
-          </div>
-        </div>
-      </div>
-
-      {missingLogo && (
-        <div className="callout callout-warning mt-4" role="status">
-          <strong>No clinic logo configured.</strong> Upload one in Settings → Clinic; documents print without a
-          watermark until a logo exists, and nothing else breaks.
-        </div>
-      )}
-
-      {!appliesHere && (
-        <div className="callout callout-info mt-4" role="status">
-          The compact stock &amp; expiry label sheet never carries the watermark — its labels are small and a mark
-          would reduce legibility. Every other document type uses the setting above.
-        </div>
-      )}
-
-      <div className="row gap-2 mt-4 wrap">
-        <Button
-          size="sm"
-          variant="secondary"
-          disabled={isDefault}
-          onClick={() => { props.onChange({ ...WATERMARK_DEFAULT }); toast.success('Watermark reset to the default (off)'); }}
-        >
-          Reset watermark to defaults
-        </Button>
-        <span className="xsmall muted" style={{ alignSelf: 'center' }}>
-          Remember to save the settings page to store this.
-        </span>
-      </div>
-    </Card>
   );
 }
 

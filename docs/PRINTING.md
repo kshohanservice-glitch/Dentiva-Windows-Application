@@ -51,35 +51,6 @@ override, and resetting an element/section/document restores the original.
 * Geometry is untouched by customization: page size, margins, scale and copies remain owned by
   `profilePageCss()` and the selected print profile.
 
-## Clinic-logo watermark (Settings → Customize Documents)
-
-A clinic can print its own logo as a faint, exactly page-centred mark behind the content of every
-document it issues. It is **off by default**: an installation that never enables it prints the same
-bytes it printed in 4.1.2, and `WatermarkLayer` renders nothing at all (not an empty element).
-
-* Model and geometry: `src/shared/watermark.ts` — `WATERMARK_DEFAULT { enabled: false, sizePercent:
-  55, opacity: 0.08 }`, `WATERMARK_LIMITS` (size 10–100 %, opacity 0.02–0.5), `normalizeWatermarkSettings()`
-  (unknown values dropped, out-of-range numbers clamped, missing/non-numeric values fall back to the
-  default) and `watermarkBoxMm()`.
-* Size is a percentage of the **real page width and height in millimetres**, taken from the selected
-  print profile, so the same setting produces the same placement on A4, A5, custom paper, portrait
-  and landscape — never on window size, preview zoom or a hard-coded offset. The logo is fitted
-  inside that box (`object-fit: contain`), so it is scaled, never stretched and never clipped.
-* Opacity applies to the logo only. The layer is painted under the document content
-  (`z-index: -1` inside the `.print-doc` stacking context) and is repeated on every printed page
-  (`position: fixed` under `@media print`), so a multi-page document carries the same mark per page
-  and patient details, totals and signatures stay legible.
-* Coverage is an explicit allow-list: prescriptions (including the duplicate copy), invoices,
-  receipts, visit summaries, appointment cards and reports — in both the stored-patient and the
-  walk-in workflows. The compact stock & expiry label sheet (`stock-labels`, `quick-stock-labels`)
-  is deliberately excluded: its labels are small and a mark would reduce legibility.
-* A missing or unreadable clinic logo degrades to “no watermark” — never a broken image and never a
-  failed document. The settings panel says so, and refuses nothing.
-* Preview: the Settings panel embeds the real `WatermarkLayer` through `DocumentPreview`, so the mark
-  is shown exactly where it will print. It is an operator setting, not a document element: it lives
-  outside the element registry of `document-styles.ts` and therefore cannot leak into an element
-  override, and it is not part of `documentStyleCss()`.
-
 ## Walk-in / Quick Documents
 
 `src/renderer/pages/QuickDocuments.tsx` (sidebar: **Walk-in / Quick Docs**) produces a prescription,
@@ -103,6 +74,4 @@ Printed headers show the configured clinic name and logo (see `src/renderer/comp
 
 ## Verification still required
 
-Automated unit checks cover print dimensions, format helpers, the real-amount render contract, the absence of a media swap (`tests/unit/print-money.test.ts`), the watermark geometry/validation/rendering contract (`tests/unit/watermark.test.ts`) and the single-line medicine instruction (`tests/unit/prescription-instruction-print.test.ts`). The print-window assertion in `tests/e2e/app.spec.ts` additionally requires that no `****` appears anywhere in the rendered `.print-doc`. Physical printer, PDF content, on-paper watermark centring and multi-page repetition, the printed
-single-line medicine instruction, Bengali glyph shaping, long-page overflow, paper sizes,
-orientation, DPI/layout and a real print window have **not** been verified in this sandbox, because no Electron/Chromium binary can be downloaded here. Before release, run these checks on a Windows device using disposable patient data. Do not claim successful printer or PDF output solely because the renderer build passes.
+Automated unit checks cover print dimensions, format helpers, the real-amount render contract and the absence of a media swap (`tests/unit/print-money.test.ts`). The print-window assertion in `tests/e2e/app.spec.ts` additionally requires that no `****` appears anywhere in the rendered `.print-doc`. Physical printer, PDF content, Bengali glyph shaping, long-page overflow, paper sizes, orientation, DPI/layout and a real print window have **not** been verified in this sandbox, because no Electron/Chromium binary can be downloaded here. Before release, run these checks on a Windows device using disposable patient data. Do not claim successful printer or PDF output solely because the renderer build passes.

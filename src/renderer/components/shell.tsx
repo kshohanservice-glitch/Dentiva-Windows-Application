@@ -6,7 +6,7 @@ import { useApp } from '../state/app-context';
 import { ClinicLogo, ClinicName } from './clinic-brand';
 import { PRODUCT_NAME } from '../../shared/branding';
 import { Badge, Button, ErrorState, IconButton, Kbd, Spinner, useToast } from './primitives';
-import { Field, Input } from './forms';
+import { Input } from './forms';
 import { SearchHitRow } from '../components/search-hit-row';
 import type { NotificationDTO, SearchHit } from '../../shared/types';
 import { formatDate } from '../format';
@@ -170,6 +170,7 @@ function GlobalSearch({ open, onClose }: { open: boolean; onClose: () => void })
             ref={inputRef}
             value={query}
             placeholder="Search patients, invoices, prescriptions, staff…"
+            aria-label="Global search"
             onChange={(e) => setQuery(e.target.value)}
             onKeyDown={(e) => {
               if (e.key === 'Escape') onClose();
@@ -298,21 +299,7 @@ export function LockOverlay() {
           </p>
         </div>
         <div className="col" style={{ width: '100%' }}>
-          {/* A visible label, not a placeholder: the lock screen is the one form
-              every member of staff has to complete. */}
-          <Field label="Password" required>
-            {(id) => (
-              <Input
-                id={id}
-                value={password}
-                onChange={setPassword}
-                type="password"
-                placeholder="Your login password"
-                autoFocus
-                autoComplete="current-password"
-              />
-            )}
-          </Field>
+          <Input value={password} onChange={setPassword} type="password" placeholder="Password" ariaLabel="Password" autoFocus autoComplete="current-password" />
           {error && <div className="auth-error" role="alert">{error}</div>}
           <Button type="submit" variant="primary" block loading={pending} onClick={() => void submit()}>Unlock</Button>
         </div>

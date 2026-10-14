@@ -10,8 +10,7 @@ import { peekNextInvoiceNumber, parseInvoiceNumber } from '../core/sequences';
 import { reqString } from '../core/validate';
 import { DEFAULT_GREETING_RANGES, isValidTimeOfDay, type GreetingRange } from '../../shared/whatsapp';
 import { normalizeDocumentStyles } from '../../shared/document-styles';
-import { normalizeWatermarkSettings } from '../../shared/watermark';
-import { PRESCRIPTION_LABEL_KEYS, normalizePrescriptionLabels, type PrescriptionLabels } from '../../shared/clinical';
+import { DEFAULT_DOCUMENT_WATERMARK, normalizeDocumentWatermark } from '../../shared/document-watermark';
 
 function readSetting<T>(ctx: Ctx, key: string, fallback: T): T {
   const row = ctx.db.prepare('SELECT value_json FROM settings WHERE key = ?').get(key) as { value_json: string } | undefined;
@@ -54,11 +53,7 @@ function clinicLogoDataUrl(ctx: Ctx, logoPath?: string | null): string | null {
 export function getSettings(ctx: Ctx): SettingsDTO {
   const clinic = readSetting(ctx, 'clinic', {} as SettingsDTO['clinic']);
   const logoDataUrl = clinicLogoDataUrl(ctx, clinic.logoPath);
-  const prescriptionRaw = readSetting<Partial<SettingsDTO['prescription']>>(ctx, 'prescription', {});
-  // Labels are completed from the defaults so a legacy or partial settings row
-  // can never produce an empty label on a printed prescription or an undefined
-  // value in the settings form.
-  const prescription = { ...prescriptionRaw, labels: normalizePrescriptionLabels(prescriptionRaw.labels) } as SettingsDTO['prescription'];
+  const prescription = readSetting(ctx, 'prescription', {} as SettingsDTO['prescription']);
   const rawInvoice = readSetting(ctx, 'invoice', {} as Partial<SettingsDTO['invoice']>);
   const invoice = { ...rawInvoice, nextNumber: rawInvoice.nextNumber || peekNextInvoiceNumber(ctx.db, todayISO()) } as SettingsDTO['invoice'];
   const security = readSetting<SettingsDTO['security']>(ctx, 'security', { autoLockMinutes: 10, minPasswordLength: 8, maxFailedLogins: 5 });
@@ -71,10 +66,9 @@ export function getSettings(ctx: Ctx): SettingsDTO {
   // keeps its original design; validation drops anything unrecognized so an old
   // or hand-edited settings row can never break rendering.
   const documentStyles = normalizeDocumentStyles(readSetting(ctx, 'documentStyles', {}));
-  // Clinic-logo watermark (Settings → Customize Documents). Always normalized so
-  // a hand-edited or legacy settings row can never carry an out-of-range size or
-  // opacity into document rendering. Absent/disabled keeps the original design.
-  const watermark = normalizeWatermarkSettings(readSetting(ctx, 'watermark', {}));
+  const documentWatermark = normalizeDocumentWatermark(
+    readSetting(ctx, 'documentWatermark', DEFAULT_DOCUMENT_WATERMARK),
+  );
   const whatsappRaw = readSetting<Partial<SettingsDTO['whatsapp']>>(ctx, 'whatsapp', {});
   const whatsapp: SettingsDTO['whatsapp'] = {
     timezone: typeof whatsappRaw.timezone === 'string' && whatsappRaw.timezone.trim() ? whatsappRaw.timezone.trim() : null,
@@ -95,7 +89,7 @@ export function getSettings(ctx: Ctx): SettingsDTO {
     expenseCategories: ctx.db.prepare("SELECT name FROM account_categories WHERE kind = 'expense' ORDER BY name").all<{ name: string }>().map((r) => r.name),
     printProfiles,
     documentStyles,
-    watermark,
+    documentWatermark,
   };
 }
 
@@ -124,15 +118,9 @@ export function saveSettings(ctx: Ctx, patch: Partial<SettingsDTO>): SettingsDTO
 
     if (patch.prescription) {
       const current = readSetting<SettingsDTO['prescription']>(ctx, 'prescription', {} as any);
-      // Reads are lenient (a legacy row without a label gets its default, see
-      // `normalizePrescriptionLabels`); writes are strict: any label the form
-      // sends must be non-blank and at most 60 characters, so a heading can
-      // never be stored as an empty string. Unknown keys are ignored.
-      const labels: PrescriptionLabels = { ...normalizePrescriptionLabels(current.labels) };
-      const incoming = (patch.prescription.labels ?? {}) as Partial<Record<keyof PrescriptionLabels, unknown>>;
-      for (const key of PRESCRIPTION_LABEL_KEYS) {
-        if (!(key in incoming)) continue;
-        labels[key] = reqString(incoming[key], `Prescription label "${key}"`, { max: 60 });
+      const labels = { ...current.labels, ...(patch.prescription.labels ?? {}) };
+      for (const [k, v] of Object.entries(labels)) {
+        labels[k as keyof typeof labels] = reqString(v, `Prescription label "${k}"`, { max: 60 });
       }
       writeSetting(ctx, 'prescription', {
         footerMessage: patch.prescription.footerMessage !== undefined ? patch.prescription.footerMessage : current.footerMessage ?? null,
@@ -239,11 +227,8 @@ export function saveSettings(ctx: Ctx, patch: Partial<SettingsDTO>): SettingsDTO
     if (patch.documentStyles) {
       writeSetting(ctx, 'documentStyles', normalizeDocumentStyles(patch.documentStyles));
     }
-
-    if (patch.watermark) {
-      // Validated and clamped in shared code so the panel, the print window and
-      // a hand-edited settings row all agree on what a legal watermark is.
-      writeSetting(ctx, 'watermark', normalizeWatermarkSettings(patch.watermark));
+    if (patch.documentWatermark !== undefined) {
+      writeSetting(ctx, 'documentWatermark', normalizeDocumentWatermark(patch.documentWatermark));
     }
 
     if (patch.printProfiles) {

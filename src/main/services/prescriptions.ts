@@ -3,24 +3,22 @@ import type { Paged, PrescriptionDTO, PrescriptionItemDTO } from '../../shared/t
 import { notFound, validation } from '../errors';
 import { audit, requirePermission, tx } from '../core/context';
 import { nextPrescriptionNumber } from '../core/sequences';
-import { optString, pageParams, reqDate, reqInt, reqString, oneOf } from '../core/validate';
+import { optString, optVerbatimString, pageParams, reqDate, reqInt, reqString, oneOf } from '../core/validate';
 import { nowISO, todayISO } from '../../shared/currency';
-import { MEDICINE_INSTRUCTION_MAX } from '../../shared/clinical';
 
 interface ItemRow {
   id?: number; seq: number; medicine_name: string; generic: string | null; form: string | null;
   strength: string | null; dosage: string | null; frequency: string | null;
   morning: number; afternoon: number; night: number; timing: string;
   duration: string | null; qty: string | null; instruction: string | null;
-  instruction_bn: string | null; note: string | null;
+  instruction_bn: string | null; note: string | null; medicine_instruction: string | null;
 }
 
 interface RxRow {
   id: number; number: string; patient_id: number; patient_name: string; patient_code: string;
   visit_id: number | null; dentist_id: number; dentist_name: string; date: string;
   c_c: string | null; o_e: string | null; r_e: string | null; diagnosis: string | null;
-  treatment: string | null; advice: string | null; follow_up: string | null;
-  medicine_instruction: string | null; created_at: string;
+  treatment: string | null; advice: string | null; follow_up: string | null; created_at: string;
 }
 
 function toItemDTO(r: ItemRow): PrescriptionItemDTO {
@@ -30,6 +28,7 @@ function toItemDTO(r: ItemRow): PrescriptionItemDTO {
     morning: !!r.morning, afternoon: !!r.afternoon, night: !!r.night,
     timing: r.timing as PrescriptionItemDTO['timing'], duration: r.duration, qty: r.qty,
     instruction: r.instruction, instructionBn: r.instruction_bn, note: r.note,
+    medicineInstruction: r.medicine_instruction,
   };
 }
 
@@ -48,8 +47,7 @@ function hydrate(ctx: Ctx, row: RxRow): PrescriptionDTO {
     patientCode: row.patient_code, visitId: row.visit_id, dentistId: row.dentist_id,
     dentistName: row.dentist_name, date: row.date, cC: row.c_c, oE: row.o_e, rE: row.r_e,
     diagnosis: row.diagnosis, treatment: row.treatment, advice: row.advice,
-    followUp: row.follow_up, medicineInstruction: row.medicine_instruction,
-    items: items.map(toItemDTO), createdAt: row.created_at,
+    followUp: row.follow_up, items: items.map(toItemDTO), createdAt: row.created_at,
   };
 }
 
@@ -100,8 +98,6 @@ export interface PrescriptionInput {
   patientId: number; visitId?: number | null; dentistId: number; date?: string;
   cC?: string | null; oE?: string | null; rE?: string | null;
   diagnosis?: string | null; treatment?: string | null; advice?: string | null; followUp?: string | null;
-  /** Optional single-line medicine instruction (see `shared/clinical.ts`). */
-  medicineInstruction?: string | null;
   items: Partial<PrescriptionItemDTO>[];
   saveAsTemplate?: string | null;
 }
@@ -132,6 +128,7 @@ export function createPrescription(ctx: Ctx, raw: unknown): PrescriptionDTO {
     duration: optString(it.duration, 'Duration', { max: 60 }),
     qty: optString(it.qty, 'Quantity', { max: 40 }),
     instruction: optString(it.instruction, 'Instruction', { max: 500 }),
+    medicineInstruction: optVerbatimString(it.medicineInstruction, 'One-line medicine instruction', { max: 500 }),
     instructionBn: optString(it.instructionBn, 'Bengali instruction', { max: 500 }),
     note: optString(it.note, 'Note', { max: 500 }),
   }));
@@ -142,8 +139,8 @@ export function createPrescription(ctx: Ctx, raw: unknown): PrescriptionDTO {
     const info = ctx.db
       .prepare(
         `INSERT INTO prescriptions (number, patient_id, visit_id, dentist_id, date, c_c, o_e, r_e,
-           diagnosis, treatment, advice, follow_up, medicine_instruction, created_by, created_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+           diagnosis, treatment, advice, follow_up, created_by, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       )
       .run(
         number, patientId, input.visitId ?? null, dentistId, date,
@@ -154,19 +151,18 @@ export function createPrescription(ctx: Ctx, raw: unknown): PrescriptionDTO {
         optString(input.treatment, 'Treatment', { max: 20000 }),
         optString(input.advice, 'Advice', { max: 20000 }),
         optString(input.followUp, 'Follow-up', { max: 200 }),
-        optString(input.medicineInstruction, 'Medicine instruction', { max: MEDICINE_INSTRUCTION_MAX }),
         ctx.session.userId, nowISO(),
       );
     const rxId = Number(info.lastInsertRowid);
     const insItem = ctx.db.prepare(
       `INSERT INTO prescription_items (prescription_id, seq, medicine_name, generic, form, strength, dosage,
-         frequency, morning, afternoon, night, timing, duration, qty, instruction, instruction_bn, note)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+         frequency, morning, afternoon, night, timing, duration, qty, instruction, medicine_instruction, instruction_bn, note)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     );
     for (const it of cleanItems) {
       insItem.run(rxId, it.seq, it.medicineName, it.generic, it.form, it.strength, it.dosage,
         it.frequency, it.morning, it.afternoon, it.night, it.timing, it.duration, it.qty,
-        it.instruction, it.instructionBn, it.note);
+        it.instruction, it.medicineInstruction, it.instructionBn, it.note);
     }
     if (input.saveAsTemplate) {
       const tName = reqString(input.saveAsTemplate, 'Template name', { max: 120 });

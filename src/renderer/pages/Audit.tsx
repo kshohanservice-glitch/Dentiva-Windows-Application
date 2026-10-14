@@ -70,9 +70,9 @@ export function AuditPage() {
           <Input value={query} onChange={(v) => { setQuery(v); setPage(1); }} placeholder="Search summary, entity, user…" ariaLabel="Search audit log" />
         </div>
         <Select
+          ariaLabel="Filter audit log by action"
           value={action}
           onChange={(v) => { setAction(v); setPage(1); }}
-          ariaLabel="Filter by action"
           placeholder="All actions"
           options={[
             { value: 'patient.', label: 'Patient actions' },

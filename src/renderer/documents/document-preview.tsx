@@ -1,9 +1,13 @@
 import React from 'react';
+import type { DocumentPageSize, DocumentWatermarkSettings } from '../../shared/document-watermark';
+import {
+  DEFAULT_DOCUMENT_WATERMARK, normalizeDocumentWatermark, pageSizeFromProfile,
+  supportsLogoWatermark, watermarkImageBounds,
+} from '../../shared/document-watermark';
+import type { ClinicSettings } from '../../shared/types';
 import type { CustomizableDocumentType, DocumentStyleMap } from '../../shared/document-styles';
 import { DOCUMENT_SAMPLES } from './samples';
 import { DocumentStyleSheet } from './document-style-sheet';
-import { WatermarkLayer } from './watermark-layer';
-import type { WatermarkSettings } from '../../shared/watermark';
 import {
   appointmentCardDoc, invoiceDoc, prescriptionDoc, receiptDoc, reportDoc, stockLabelDoc, visitSummaryDoc,
 } from './print-documents';
@@ -45,6 +49,32 @@ export function sampleDocumentNode(
   }
 }
 
+/** The logo stays within physical page bounds and retains its source aspect ratio. */
+export function ClinicLogoWatermark(props: {
+  clinic?: Pick<ClinicSettings, 'logoDataUrl'> | null;
+  settings?: DocumentWatermarkSettings | null;
+  documentType?: string | null;
+  pageSize?: DocumentPageSize | null;
+}): React.ReactElement | null {
+  const watermark = normalizeDocumentWatermark(props.settings ?? DEFAULT_DOCUMENT_WATERMARK);
+  const logoDataUrl = props.clinic?.logoDataUrl;
+  if (!watermark.enabled || !logoDataUrl || !supportsLogoWatermark(props.documentType)) return null;
+
+  const pageSize = props.pageSize ?? pageSizeFromProfile();
+  const bounds = watermarkImageBounds(pageSize, watermark.sizePercent);
+  const imageStyle = {
+    '--watermark-opacity': watermark.opacity,
+    '--watermark-max-width': `${bounds.maxWidthMm}mm`,
+    '--watermark-max-height': `${bounds.maxHeightMm}mm`,
+  } as React.CSSProperties;
+
+  return (
+    <div className="print-logo-watermark" aria-hidden="true" style={imageStyle}>
+      <img src={logoDataUrl} alt="" draggable={false} />
+    </div>
+  );
+}
+
 /**
  * Screen frame around a real printable document. The inner `.print-doc` is the
  * same element the print window renders, so spacing, fonts, tables and page
@@ -53,31 +83,31 @@ export function sampleDocumentNode(
 export function DocumentPreview(props: {
   children: React.ReactNode;
   styles?: DocumentStyleMap | null;
+  watermark?: DocumentWatermarkSettings | null;
+  clinic?: ClinicSettings | null;
+  documentType?: string | null;
+  pageSize?: DocumentPageSize | null;
   /** Chromium CSS zoom keeps the preview readable in a panel without changing layout. */
   zoom?: number;
   className?: string;
-  /** Clinic-logo watermark shown exactly as it will print (see `watermark-layer.tsx`). */
-  watermark?: WatermarkSettings | null;
-  logoDataUrl?: string | null;
-  documentKind?: string | null;
-  /**
-   * Preview page size in millimetres. Defaults to the A4 portrait page the
-   * preview frame renders; the watermark size is a percentage of the page, so
-   * the preview and a different paper size in the print window stay equivalent.
-   */
-  pageWidthMm?: number;
-  pageHeightMm?: number;
 }): React.ReactElement {
+  const pageSize = props.pageSize ?? pageSizeFromProfile();
   return (
     <div className={`doc-preview-frame ${props.className ?? ''}`.trim()}>
       <DocumentStyleSheet styles={props.styles} />
-      <div className="print-doc doc-preview" style={props.zoom && props.zoom !== 1 ? { zoom: props.zoom } : undefined}>
-        <WatermarkLayer
-          settings={props.watermark ?? null}
-          logoDataUrl={props.logoDataUrl ?? null}
-          pageWidthMm={props.pageWidthMm ?? 210}
-          pageHeightMm={props.pageHeightMm ?? 297}
-          documentKind={props.documentKind ?? null}
+      <div
+        className="print-doc doc-preview"
+        style={{
+          width: `${pageSize.widthMm}mm`,
+          minHeight: `${pageSize.heightMm}mm`,
+          zoom: props.zoom && props.zoom !== 1 ? props.zoom : undefined,
+        }}
+      >
+        <ClinicLogoWatermark
+          clinic={props.clinic}
+          settings={props.watermark}
+          documentType={props.documentType}
+          pageSize={pageSize}
         />
         {props.children}
       </div>

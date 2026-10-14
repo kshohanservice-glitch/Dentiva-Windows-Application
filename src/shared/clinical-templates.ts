@@ -17,6 +17,11 @@ export function hasTemplateDraftContent(body: ClinicalTemplateBody): boolean {
   return Object.values(body).some((value) => typeof value === 'string' && !!value.trim());
 }
 
+/** Medicine templates replace complete prescription rows; protect typed drafts first. */
+export function hasMedicineDraftContent(items: readonly object[]): boolean {
+  return items.some((item) => Object.values(item).some((value) => typeof value === 'string' && !!value.trim()));
+}
+
 export interface ClinicalTemplate {
   id: number;
   kind: ClinicalTemplateKind;

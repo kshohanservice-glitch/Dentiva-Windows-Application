@@ -1,13 +1,10 @@
 import { useEffect, useMemo, useState } from 'react';
 import { api, useAsync } from '../api';
 import { useApp } from '../state/app-context';
-import { Badge, Button, Card, ConfirmDialog, Tabs, useToast } from '../components/primitives';
+import { Badge, Button, Card, Tabs, useToast } from '../components/primitives';
 import { Field, Input, Select, Textarea } from '../components/forms';
-import {
-  MedicineInstructionField, MedicineRowsEditor,
-  medicineDraftsFromTemplate, medicineDraftsToInput, type MedicineDraft,
-} from '../components/medicine-entry';
 import { ClinicalTemplatePicker } from '../components/ClinicalTemplatePicker';
+import { MedicineEntryEditor, type MedicineEntryValues } from '../components/medicine-entry-editor';
 import { Money } from '../components/money';
 import { DocumentPreview } from '../documents/document-preview';
 import { quickDocumentNode, quickDocumentTitle } from '../documents/quick-document-view';
@@ -17,9 +14,9 @@ import {
   type QuickDocumentInput, type QuickDocumentKind,
 } from '../../shared/quick-documents';
 import { formatBdt, parseBdtToPaisa, todayISO } from '../../shared/currency';
-import {
-  CHIEF_COMPLAINT_OPTIONS, CLINICAL_OTHER_VALUE, EXAMINATION_OPTIONS, MEDICINE_INSTRUCTION_MAX,
-} from '../../shared/clinical';
+import { computeInvoiceTotals } from '../../shared/billing-math';
+import { CHIEF_COMPLAINT_OPTIONS, EXAMINATION_OPTIONS, clinicalChoice } from '../../shared/clinical-options';
+import { pageSizeForDocument } from '../../shared/document-watermark';
 import type { DentistDTO, TreatmentDTO } from '../../shared/types';
 
 /**
@@ -85,16 +82,16 @@ export function QuickDocumentsPage() {
             reference, date: form.date, customer,
             dentistId: form.dentistId ? Number(form.dentistId) : null,
             dentistName: form.dentistName || dentistName(form.dentistId),
-            cC: (form.cC === CLINICAL_OTHER_VALUE ? form.cCOther : form.cC) || null,
-            oE: (form.oE === CLINICAL_OTHER_VALUE ? form.oEOther : form.oE) || null,
+            cC: (form.cC === 'Other' ? form.ccOther : form.cC) || null,
+            oE: (form.oE === 'Other' ? form.oeOther : form.oE) || null,
             rE: form.rE || null,
             diagnosis: form.diagnosis || null, treatment: form.treatment || null,
             advice: form.advice || null, followUp: form.followUp || null,
-            medicineInstruction: form.medicineInstruction?.trim() || null,
-            items: medicineDraftsToInput(form.medicines as MedicineDraft[]).map((m) => ({
+            items: form.medicines.filter((m: any) => m.medicineName.trim()).map((m: any) => ({
               medicineName: m.medicineName, generic: m.generic || null, strength: m.strength || null,
               form: m.form || null, dosage: m.dosage || null, frequency: m.frequency || null,
               duration: m.duration || null, qty: m.qty || null, instruction: m.instruction || null,
+              medicineInstruction: m.medicineInstruction || null,
             })),
           },
         };
@@ -253,7 +250,7 @@ export function QuickDocumentsPage() {
             )}
           </div>
 
-          {kind === 'prescription' && <PrescriptionFields form={form} set={set} />}
+          {kind === 'prescription' && <PrescriptionFields form={form} set={set} showNameErrors={errors.some((error) => /medicine/i.test(error))} />}
           {kind === 'invoice' && <InvoiceFields form={form} set={set} treatments={treatments.data ?? []} />}
           {kind === 'receipt' && <ReceiptFields form={form} set={set} />}
           {kind === 'visit-summary' && <VisitFields form={form} set={set} treatments={treatments.data ?? []} />}
@@ -273,9 +270,10 @@ export function QuickDocumentsPage() {
               <DocumentPreview
                 key={previewKey}
                 zoom={0.6}
-                watermark={settings?.watermark}
-                logoDataUrl={settings?.clinic?.logoDataUrl ?? null}
-                documentKind={`quick-${kind}`}
+                watermark={settings?.documentWatermark}
+                clinic={previewCtx.clinic}
+                documentType={validated.input.kind}
+                pageSize={pageSizeForDocument(settings?.printProfiles, validated.input.kind)}
               >
                 {quickDocumentNode(validated.input, previewCtx)}
               </DocumentPreview>
@@ -298,238 +296,199 @@ export function QuickDocumentsPage() {
 
 /* --------------------------------------------------------------- sections */
 
-function PrescriptionFields({ form, set }: { form: any; set: (p: string[], v: unknown) => void }) {
-  const toast = useToast();
-  const rows: MedicineDraft[] = form.medicines;
-  const { data: medicineTemplates } = useAsync(() => api['prescriptions/templates'](), []);
-  const [pendingMedicineSet, setPendingMedicineSet] = useState<{ name: string; rows: MedicineDraft[] } | null>(null);
-
-  /** Fills the rows below from a saved medicine template, after confirmation. */
-  const applyMedicineSet = (templateId: string) => {
-    const tpl = (medicineTemplates ?? []).find((t) => String(t.id) === templateId);
-    if (!tpl) return;
-    const next = medicineDraftsFromTemplate(tpl.items);
-    if (next.length === 0) {
-      toast.warning('Template is empty', `${tpl.name} contains no medicines.`);
-      return;
-    }
-    const replace = () => {
-      set(['medicines'], next.map((row) => ({ ...row })));
-      toast.success('Medicine template applied', `${tpl.name} · ${next.length} medicine${next.length === 1 ? '' : 's'}`);
-    };
-    if (medicineDraftsToInput(rows).length === 0) replace();
-    else setPendingMedicineSet({ name: tpl.name, rows: next });
+function PrescriptionFields({
+  form,
+  set,
+  showNameErrors,
+}: {
+  form: any;
+  set: (path: string[], value: unknown) => void;
+  showNameErrors: boolean;
+}) {
+  const rows: MedicineEntryValues[] = form.medicines;
+  const setRow = (index: number, patch: Partial<MedicineEntryValues>) => {
+    const next = rows.map((row, i) => (i === index ? { ...row, ...patch } : row));
+    set(['medicines'], next);
   };
-
-  const chiefComplaintHint = CHIEF_COMPLAINT_OPTIONS.find((o) => o.value === form.cC)?.hint
-    ?? 'Pick a common complaint, or choose “Other” and type it.';
-  const examinationHint = EXAMINATION_OPTIONS.find((o) => o.value === form.oE)?.hint
-    ?? 'Pick a common finding, or choose “Other” and type it.';
-  const instructionRowCount = medicineDraftsToInput(rows).length;
-
+  const applyPrescriptionText = (body: Record<string, string>) => {
+    const cc = clinicalChoice(body.cC, CHIEF_COMPLAINT_OPTIONS);
+    const oe = clinicalChoice(body.oE, EXAMINATION_OPTIONS);
+    set(['cC'], cc.choice);
+    set(['ccOther'], cc.other);
+    set(['oE'], oe.choice);
+    set(['oeOther'], oe.other);
+    set(['rE'], body.rE ?? '');
+    set(['diagnosis'], body.diagnosis ?? '');
+    set(['treatment'], body.treatment ?? '');
+    set(['advice'], body.advice ?? '');
+    set(['followUp'], body.followUp ?? '');
+  };
   return (
     <>
-      <div className="form-grid mt-4">
-        <Field label="C/C — chief complaint" className="span-2" hint={chiefComplaintHint}>
-          {(id) => (
-            <Select
-              id={id}
-              value={form.cC}
-              onChange={(v) => set(['cC'], v)}
-              placeholder="Select chief complaint…"
-              options={CHIEF_COMPLAINT_OPTIONS.map(({ value, label }) => ({ value, label }))}
-            />
-          )}
-        </Field>
-        {form.cC === CLINICAL_OTHER_VALUE && (
-          <Field label="C/C — write the chief complaint" className="span-2" hint="Free text: this is what prints under the C/C heading.">
-            {(id) => <Input id={id} value={form.cCOther} onChange={(v) => set(['cCOther'], v)} placeholder="e.g. Pain in the upper left back tooth" />}
-          </Field>
-        )}
-        <Field label="O/E — on examination" className="span-2" hint={examinationHint}>
-          {(id) => (
-            <Select
-              id={id}
-              value={form.oE}
-              onChange={(v) => set(['oE'], v)}
-              placeholder="Select examination finding…"
-              options={EXAMINATION_OPTIONS.map(({ value, label }) => ({ value, label }))}
-            />
-          )}
-        </Field>
-        {form.oE === CLINICAL_OTHER_VALUE && (
-          <Field label="O/E — write the examination finding" className="span-2" hint="Free text: this is what prints under the O/E heading.">
-            {(id) => <Input id={id} value={form.oEOther} onChange={(v) => set(['oEOther'], v)} placeholder="e.g. Deep caries 36, tender on percussion" />}
-          </Field>
-        )}
-        <Field label="R/E — radiographic examination" className="span-2" hint="X-ray and investigation findings (free text).">
-          {(id) => <Textarea id={id} rows={2} value={form.rE} onChange={(v) => set(['rE'], v)} placeholder="e.g. IOPA 36 — radiolucency approaching the pulp" />}
-        </Field>
-        <Field label="Diagnosis">{(id) => <Input id={id} value={form.diagnosis} onChange={(v) => set(['diagnosis'], v)} placeholder="e.g. Irreversible pulpitis 36" />}</Field>
-        <Field label="Treatment / procedure">{(id) => <Input id={id} value={form.treatment} onChange={(v) => set(['treatment'], v)} placeholder="e.g. Access opening" />}</Field>
-        <Field label="Follow-up date" hint="Printed on the prescription. It does not create an appointment.">
-          {(id) => <Input id={id} type="date" value={form.followUp} onChange={(v) => set(['followUp'], v)} />}
-        </Field>
-        <Field label="Advice" className="span-2" hint="What the patient should do at home. Printed under the Advice heading.">
-          {(id) => <Textarea id={id} rows={2} value={form.advice} onChange={(v) => set(['advice'], v)} />}
-        </Field>
-      </div>
-
       <ClinicalTemplatePicker
         kind="prescription"
         label="Prescription text"
-        readOnly
         getBody={() => ({
-          cC: form.cC === CLINICAL_OTHER_VALUE ? form.cCOther : form.cC,
-          oE: form.oE === CLINICAL_OTHER_VALUE ? form.oEOther : form.oE,
-          rE: form.rE, diagnosis: form.diagnosis, treatment: form.treatment,
-          advice: form.advice, followUp: form.followUp,
+          cC: form.cC === 'Other' ? form.ccOther : form.cC,
+          oE: form.oE === 'Other' ? form.oeOther : form.oE,
+          rE: form.rE,
+          diagnosis: form.diagnosis,
+          treatment: form.treatment,
+          advice: form.advice,
+          followUp: form.followUp,
         })}
-        onApply={(body) => {
-          if ('items' in body) return;
-          set(['cC'], body.cC ? CLINICAL_OTHER_VALUE : '');
-          set(['cCOther'], body.cC ?? '');
-          set(['oE'], body.oE ? CLINICAL_OTHER_VALUE : '');
-          set(['oEOther'], body.oE ?? '');
-          set(['rE'], body.rE ?? '');
-          set(['diagnosis'], body.diagnosis ?? '');
-          set(['treatment'], body.treatment ?? '');
-          set(['advice'], body.advice ?? '');
-          set(['followUp'], body.followUp ?? '');
-        }}
+        onApply={(body) => { if (!('items' in body)) applyPrescriptionText(body); }}
       />
       <ClinicalTemplatePicker
         kind="instructions"
         label="Prescription instructions"
-        readOnly
         getBody={() => ({ advice: form.advice })}
         onApply={(body) => { if (!('items' in body)) set(['advice'], body.advice ?? ''); }}
       />
-
-      <div className="form-section mt-4">
-        <MedicineRowsEditor
-          rows={rows}
-          onChange={(next) => set(['medicines'], next)}
-          max={60}
-          before={(
-            <Field
-              label="Apply a saved medicine template"
-              className="mt-4"
-              hint="Fills the rows below with medicines saved earlier. Existing rows are replaced only after you confirm."
-            >
-              {(id) => (
-                <Select
-                  id={id}
-                  value=""
-                  onChange={applyMedicineSet}
-                  placeholder={(medicineTemplates ?? []).length > 0 ? 'Choose a saved medicine template…' : 'No saved medicine templates yet'}
-                  options={(medicineTemplates ?? []).map((t) => ({ value: String(t.id), label: t.name }))}
-                />
-              )}
-            </Field>
+      <div className="form-grid mt-4">
+        <Field
+          label="C/C (chief complaint)"
+          hint="Choose a common entry, or select Other to type the patient's own words."
+        >
+          {(id) => (
+            <Select
+              id={id}
+              value={form.cC}
+              onChange={(value) => set(['cC'], value)}
+              placeholder="Select chief complaint…"
+              options={CHIEF_COMPLAINT_OPTIONS}
+            />
           )}
-        />
-        <div className="divider" />
-        <MedicineInstructionField
-          value={form.medicineInstruction}
-          onChange={(v) => set(['medicineInstruction'], v)}
-          structuredCount={instructionRowCount}
-          error={form.medicineInstruction.length > MEDICINE_INSTRUCTION_MAX
-            ? `The medicine instruction must be ${MEDICINE_INSTRUCTION_MAX} characters or fewer.`
-            : null}
+        </Field>
+        {form.cC === 'Other' && (
+          <Field label="C/C — Other">
+            {(id) => <Input id={id} value={form.ccOther} onChange={(value) => set(['ccOther'], value)} placeholder="Write the chief complaint…" />}
+          </Field>
+        )}
+        <Field
+          label="O/E (on examination)"
+          hint="Choose a listed finding, or select Other to enter the clinician's own text."
+        >
+          {(id) => (
+            <Select
+              id={id}
+              value={form.oE}
+              onChange={(value) => set(['oE'], value)}
+              placeholder="Select examination finding…"
+              options={EXAMINATION_OPTIONS}
+            />
+          )}
+        </Field>
+        {form.oE === 'Other' && (
+          <Field label="O/E — Other">
+            {(id) => <Input id={id} value={form.oeOther} onChange={(value) => set(['oeOther'], value)} placeholder="Write the examination finding…" />}
+          </Field>
+        )}
+        <Field label="R/E (radiographic examination)">
+          {(id) => <Input id={id} value={form.rE} onChange={(value) => set(['rE'], value)} />}
+        </Field>
+        <Field label="Diagnosis">{(id) => <Input id={id} value={form.diagnosis} onChange={(value) => set(['diagnosis'], value)} />}</Field>
+        <Field label="Treatment / procedure">{(id) => <Input id={id} value={form.treatment} onChange={(value) => set(['treatment'], value)} />}</Field>
+        <Field label="Follow-up date">{(id) => <Input id={id} type="date" value={form.followUp} onChange={(value) => set(['followUp'], value)} />}</Field>
+        <Field label="Advice" className="span-2">{(id) => <Textarea id={id} rows={2} value={form.advice} onChange={(value) => set(['advice'], value)} />}</Field>
+      </div>
+      <div className="mt-4">
+        <MedicineEntryEditor
+          items={rows}
+          onChange={setRow}
+          onAdd={() => set(['medicines'], [...rows, emptyMedicine()])}
+          onRemove={(index) => set(['medicines'], rows.filter((_, row) => row !== index))}
+          allowRemoveLast
+          showNameErrors={showNameErrors}
         />
       </div>
-
-      {pendingMedicineSet && (
-        <ConfirmDialog
-          title="Replace the medicines in this form?"
-          body={<>Applying <strong>{pendingMedicineSet.name}</strong> replaces the {instructionRowCount} medicine row(s) already entered here.</>}
-          confirmLabel="Replace medicines"
-          danger
-          onCancel={() => setPendingMedicineSet(null)}
-          onConfirm={() => {
-            const next = pendingMedicineSet.rows;
-            setPendingMedicineSet(null);
-            set(['medicines'], next.map((row) => ({ ...row })));
-            toast.success('Medicine template applied');
-          }}
-        />
-      )}
     </>
   );
 }
 
 function InvoiceFields({ form, set, treatments }: { form: any; set: (p: string[], v: unknown) => void; treatments: TreatmentDTO[] }) {
   const rows: any[] = form.lines;
-  const setRow = (index: number, patch: Record<string, unknown>) => set(['lines'], rows.map((r, i) => (i === index ? { ...r, ...patch } : r)));
-  const subtotal = rows.reduce((sum, r) => sum + (Number(r.qty) || 0) * (parseBdtToPaisa(r.unitPrice) ?? 0) - (parseBdtToPaisa(r.discount) ?? 0), 0);
+  const setRow = (index: number, patch: Record<string, unknown>) => set(['lines'], rows.map((row, i) => (i === index ? { ...row, ...patch } : row)));
   const invoiceDiscount = parseBdtToPaisa(form.invoiceDiscount) ?? 0;
-  const total = Math.max(0, subtotal - invoiceDiscount);
   const received = parseBdtToPaisa(form.amountReceived) ?? 0;
+  const totals = computeInvoiceTotals(rows.map((row) => ({
+    description: row.description,
+    qty: Number(row.qty) || 0,
+    unitPricePaisa: parseBdtToPaisa(row.unitPrice) ?? 0,
+    discountPaisa: parseBdtToPaisa(row.discount) ?? 0,
+  })), invoiceDiscount);
+  const amountAfterLineDiscounts = Math.max(0, totals.subtotalPaisa - totals.lineDiscountPaisa);
   return (
     <>
-      <div className="row space-between wrap gap-2 mt-4">
-        <strong className="small">Lines</strong>
+      <div className="row space-between mt-4">
+        <strong className="small">Invoice lines</strong>
         <div className="row gap-2">
           <Select
-            value="" placeholder="+ Add from treatments"
-            ariaLabel="Add a line from the saved treatment list"
-            onChange={(v) => {
-              const t = treatments.find((x) => String(x.id) === v);
-              if (t) set(['lines'], [...rows, { description: t.name, qty: 1, unitPrice: String(t.defaultPricePaisa / 100), discount: '', treatmentId: t.id }]);
+            value=""
+            ariaLabel="Add an invoice line from saved treatments"
+            placeholder="+ Add from treatments"
+            onChange={(value) => {
+              const treatment = treatments.find((candidate) => String(candidate.id) === value);
+              if (treatment) set(['lines'], [...rows, { description: treatment.name, qty: 1, unitPrice: String(treatment.defaultPricePaisa / 100), discount: '', treatmentId: treatment.id }]);
             }}
-            options={treatments.map((t) => ({ value: String(t.id), label: `${t.name} · ${formatBdt(t.defaultPricePaisa)}` }))}
+            options={treatments.map((treatment) => ({ value: String(treatment.id), label: `${treatment.name} · ${formatBdt(treatment.defaultPricePaisa)}` }))}
           />
           <Button size="sm" variant="secondary" onClick={() => set(['lines'], [...rows, emptyLine()])}>+ Add line</Button>
         </div>
       </div>
-      <div className="mt-2">
-        {rows.map((row, i) => (
-          <div className="invoice-line invoice-line-discount" key={i}>
-            <Field label="Treatment / service" hint="What is being charged.">
-              {(id) => <Input id={id} value={row.description} onChange={(v) => setRow(i, { description: v })} placeholder="e.g. Scaling (full mouth)" />}
-            </Field>
-            <Field label="Quantity" hint="Units charged.">
-              {(id) => <Input id={id} type="number" min={1} value={String(row.qty)} onChange={(v) => setRow(i, { qty: v })} />}
-            </Field>
-            <Field label="Unit price (৳)" hint="Price of one unit.">
-              {(id) => <Input id={id} type="number" min={0} step="0.01" value={String(row.unitPrice)} onChange={(v) => setRow(i, { unitPrice: v })} placeholder="0.00" />}
-            </Field>
-            <Field label="Line discount (৳)" hint="Optional reduction on this line.">
-              {(id) => <Input id={id} type="number" min={0} step="0.01" value={String(row.discount)} onChange={(v) => setRow(i, { discount: v })} placeholder="0.00" />}
-            </Field>
-            <Field label="Line total (৳)" hint="Calculated.">
-              {() => (
-                <div className="input" role="status" aria-readonly="true" style={{ display: 'flex', alignItems: 'center', minHeight: 36 }}>
-                  <Money paisa={(Number(row.qty) || 0) * (parseBdtToPaisa(row.unitPrice) ?? 0) - (parseBdtToPaisa(row.discount) ?? 0)} />
-                </div>
-              )}
-            </Field>
-            <Button size="sm" variant="ghost" aria-label={`Remove line ${i + 1}`} title={`Remove line ${i + 1}`} onClick={() => set(['lines'], rows.filter((_, x) => x !== i))}>Remove</Button>
+      <p className="xsmall muted mt-2" style={{ marginBottom: 0 }}>
+        Quantity × unit price gives the line amount. A line discount applies only to that line; the invoice-wide discount is applied once after all lines.
+      </p>
+      <div className="col gap-3 mt-3">
+        {rows.map((row, index) => (
+          <div className="quick-line-card" key={index}>
+            <div className="row between quick-line-card-heading">
+              <strong className="small">Line {index + 1}</strong>
+              <Button size="sm" variant="ghost" ariaLabel={`Remove invoice line ${index + 1}`} onClick={() => set(['lines'], rows.filter((_, rowIndex) => rowIndex !== index))}>Remove</Button>
+            </div>
+            <div className="quick-line-grid">
+              <Field label="Item or procedure" required className="quick-line-description">
+                {(id) => <Input id={id} value={row.description} onChange={(value) => setRow(index, { description: value })} placeholder="e.g. Consultation, scaling" required />}
+              </Field>
+              <Field label="Quantity">
+                {(id) => <Input id={id} type="number" min={1} step={1} value={String(row.qty)} onChange={(value) => setRow(index, { qty: value })} />}
+              </Field>
+              <Field label="Unit price (৳)" hint="Price for one item or procedure.">
+                {(id) => <Input id={id} type="number" min={0} step="0.01" value={String(row.unitPrice)} onChange={(value) => setRow(index, { unitPrice: value })} />}
+              </Field>
+              <Field label="Line discount (৳)" hint="Optional; deducted from this line only.">
+                {(id) => <Input id={id} type="number" min={0} step="0.01" value={String(row.discount)} onChange={(value) => setRow(index, { discount: value })} />}
+              </Field>
+              <Field label="Line total (৳)" labelFor={false} className="quick-line-total">
+                {() => <div className="input quick-line-total-value" aria-readonly="true"><Money paisa={totals.lines[index]?.totalPaisa ?? 0} /></div>}
+              </Field>
+            </div>
           </div>
         ))}
-        {rows.length === 0 && <p className="xsmall muted" style={{ margin: 0 }}>Add at least one line — an invoice cannot be printed empty.</p>}
+        {rows.length === 0 && <p className="small muted" style={{ margin: 0 }}>Add at least one invoice line.</p>}
       </div>
       <div className="form-grid mt-4">
-        <Field label="Invoice discount (৳)" hint="Whole-invoice reduction, applied after line discounts.">
-          {(id) => <Input id={id} type="number" min={0} step="0.01" value={String(form.invoiceDiscount)} onChange={(v) => set(['invoiceDiscount'], v)} />}
+        <Field label="Invoice-wide discount (৳)" hint="Applied once after line discounts.">
+          {(id) => <Input id={id} type="number" min={0} step="0.01" value={String(form.invoiceDiscount)} onChange={(value) => set(['invoiceDiscount'], value)} />}
         </Field>
-        <Field label="Amount received now (৳)" hint="Money handed over at the counter. Leave empty when nothing was paid.">
-          {(id) => <Input id={id} type="number" min={0} step="0.01" value={String(form.amountReceived)} onChange={(v) => set(['amountReceived'], v)} />}
+        <Field label="Amount received now (৳)" hint="Used to calculate the balance due; it does not change the invoice total.">
+          {(id) => <Input id={id} type="number" min={0} step="0.01" value={String(form.amountReceived)} onChange={(value) => set(['amountReceived'], value)} />}
         </Field>
         <Field label="Payment method" hint="Shown on the invoice when an amount is received">
           {(id) => (
-            <Select id={id} value={form.method || 'Cash'} onChange={(v) => set(['method'], v)}
-              options={QUICK_PAYMENT_METHODS.map((m) => ({ value: m, label: m }))} />
+            <Select id={id} value={form.method || 'Cash'} onChange={(value) => set(['method'], value)}
+              options={QUICK_PAYMENT_METHODS.map((method) => ({ value: method, label: method }))} />
           )}
         </Field>
-        <Field label="Note (printed on the invoice)">{(id) => <Input id={id} value={form.note} onChange={(v) => set(['note'], v)} />}</Field>
+        <Field label="Note (printed on the invoice)">{(id) => <Input id={id} value={form.note} onChange={(value) => set(['note'], value)} />}</Field>
       </div>
-      <div className="row gap-4 mt-2 small wrap">
-        <span>Subtotal (before invoice discount) <strong className="num"><Money paisa={subtotal} /></strong></span>
-        <span>Invoice discount <strong className="num"><Money paisa={invoiceDiscount} /></strong></span>
-        <span>Total payable <strong className="num"><Money paisa={total} /></strong></span>
-        <span>Still due after the amount received <strong className="num"><Money paisa={Math.max(0, total - received)} /></strong></span>
+      <div className="quick-invoice-summary mt-3 small" aria-label="Invoice calculation summary">
+        <span>Gross subtotal <strong className="num"><Money paisa={totals.subtotalPaisa} /></strong></span>
+        <span>Line discounts <strong className="num"><Money paisa={totals.lineDiscountPaisa} /></strong></span>
+        <span>After line discounts <strong className="num"><Money paisa={amountAfterLineDiscounts} /></strong></span>
+        <span>Invoice-wide discount <strong className="num"><Money paisa={totals.invoiceDiscountPaisa} /></strong></span>
+        <span>Total <strong className="num"><Money paisa={totals.totalPaisa} /></strong></span>
+        <span>Balance due <strong className="num"><Money paisa={Math.max(0, totals.totalPaisa - received)} /></strong></span>
       </div>
     </>
   );
@@ -569,8 +528,7 @@ function VisitFields({ form, set, treatments }: { form: any; set: (p: string[], 
       <div className="row space-between mt-4">
         <strong className="small">Procedures</strong>
         <div className="row gap-2">
-          <Select value="" placeholder="+ Add from treatments"
-            ariaLabel="Add a procedure from the saved treatment list"
+          <Select value="" ariaLabel="Add a procedure from saved treatments" placeholder="+ Add from treatments"
             onChange={(v) => {
               const t = treatments.find((x) => String(x.id) === v);
               if (t) set(['procedures'], [...rows, { toothNumber: '', treatmentName: t.name, qty: 1, unitPrice: String(t.defaultPricePaisa / 100) }]);
@@ -579,22 +537,27 @@ function VisitFields({ form, set, treatments }: { form: any; set: (p: string[], 
           <Button size="sm" variant="secondary" onClick={() => set(['procedures'], [...rows, { toothNumber: '', treatmentName: '', qty: 1, unitPrice: '' }])}>+ Add procedure</Button>
         </div>
       </div>
-      <div className="mt-2">
+      <div className="col gap-2 mt-2">
         {rows.map((row, i) => (
-          <div className="invoice-line row-editor-procedure" key={i}>
-            <Field label="Tooth" hint="FDI number, e.g. 36.">
-              {(id) => <Input id={id} value={row.toothNumber} onChange={(v) => setRow(i, { toothNumber: v })} placeholder="36" />}
-            </Field>
-            <Field label="Procedure" hint="What was done.">
-              {(id) => <Input id={id} value={row.treatmentName} onChange={(v) => setRow(i, { treatmentName: v })} placeholder="e.g. Composite filling" />}
-            </Field>
-            <Field label="Quantity" hint="Units performed.">
-              {(id) => <Input id={id} type="number" min={1} value={String(row.qty)} onChange={(v) => setRow(i, { qty: v })} />}
-            </Field>
-            <Field label="Unit price (৳)" hint="Price of one unit.">
-              {(id) => <Input id={id} type="number" min={0} step="0.01" value={String(row.unitPrice)} onChange={(v) => setRow(i, { unitPrice: v })} placeholder="0.00" />}
-            </Field>
-            <Button size="sm" variant="ghost" aria-label={`Remove procedure ${i + 1}`} title={`Remove procedure ${i + 1}`} onClick={() => set(['procedures'], rows.filter((_, x) => x !== i))}>Remove</Button>
+          <div className="quick-line-card" key={i}>
+            <div className="row between quick-line-card-heading">
+              <strong className="small">Procedure {i + 1}</strong>
+              <Button size="sm" variant="ghost" ariaLabel={`Remove procedure ${i + 1}`} onClick={() => set(['procedures'], rows.filter((_, x) => x !== i))}>Remove</Button>
+            </div>
+            <div className="quick-line-grid quick-procedure-grid">
+              <Field label="Tooth number">
+                {(id) => <Input id={id} value={row.toothNumber} onChange={(v) => setRow(i, { toothNumber: v })} placeholder="Optional" />}
+              </Field>
+              <Field label="Procedure">
+                {(id) => <Input id={id} value={row.treatmentName} onChange={(v) => setRow(i, { treatmentName: v })} placeholder="e.g. Scaling" />}
+              </Field>
+              <Field label="Quantity">
+                {(id) => <Input id={id} type="number" min={1} step={1} value={String(row.qty)} onChange={(v) => setRow(i, { qty: v })} />}
+              </Field>
+              <Field label="Unit price (৳)" hint="Price for one procedure.">
+                {(id) => <Input id={id} type="number" min={0} step="0.01" value={String(row.unitPrice)} onChange={(v) => setRow(i, { unitPrice: v })} />}
+              </Field>
+            </div>
           </div>
         ))}
         {rows.length === 0 && <p className="xsmall muted" style={{ margin: 0 }}>Procedures are optional.</p>}
@@ -627,8 +590,7 @@ function emptyForm(kind: QuickDocumentKind): any {
     dentistName: '',
     customer: { name: '', phone: '', ageYears: '', gender: '' },
     // prescription
-    cC: '', cCOther: '', oE: '', oEOther: '', rE: '', diagnosis: '', treatment: '', advice: '', followUp: '',
-    medicineInstruction: '',
+    cC: '', ccOther: '', oE: '', oeOther: '', rE: '', diagnosis: '', treatment: '', advice: '', followUp: '',
     medicines: [emptyMedicine()],
     // invoice
     lines: [emptyLine()],
@@ -648,10 +610,10 @@ function emptyForm(kind: QuickDocumentKind): any {
   };
 }
 
-function emptyMedicine(): MedicineDraft {
+function emptyMedicine(): any {
   return {
-    medicineName: '', form: '', strength: '', generic: '', dosage: '', frequency: '',
-    duration: '', qty: '', instruction: '',
+    medicineName: '', generic: '', strength: '', form: '', dosage: '', frequency: '',
+    duration: '', qty: '', instruction: '', medicineInstruction: '',
   };
 }
 

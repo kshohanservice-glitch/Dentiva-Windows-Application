@@ -9,12 +9,6 @@ export function ClinicalTemplatePicker(props: {
   kind: ClinicalTemplateKind; label: string;
   getBody: () => ClinicalTemplateBody;
   onApply: (body: ClinicalTemplateBody) => void;
-  /**
-   * Read-only mode: apply an existing template, but never create or delete one.
-   * Used by Walk-in / Quick Documents, whose contract is that preparing a
-   * document writes nothing but an audit entry.
-   */
-  readOnly?: boolean;
 }) {
   const { data, reload, loading } = useAsync(() => api['clinical-templates/list'](props.kind), [props.kind]);
   const [selected, setSelected] = useState('');
@@ -72,25 +66,19 @@ export function ClinicalTemplatePicker(props: {
           if (hasTemplateDraftContent(current) && JSON.stringify(current) !== JSON.stringify(item.body)) setConfirm('apply');
           else apply();
         }}>Apply to draft</Button>
-        {!props.readOnly && <Button size="sm" variant="ghost" disabled={!item || pending} onClick={() => setConfirm('delete')}>Delete</Button>}
+        <Button size="sm" variant="ghost" disabled={!item || pending} onClick={() => setConfirm('delete')}>Delete</Button>
       </div>
-      {!props.readOnly && (
-        <div className="row gap-2 wrap mt-2" style={{ alignItems: 'flex-end' }}>
-          <Field label="New template name" className="flex-1">
-            {(id) => <Input id={id} value={name} onChange={setName} placeholder="New template name" />}
-          </Field>
-          <Button size="sm" loading={pending} onClick={() => {
-            if (!name.trim()) { toast.warning('Enter a template name'); return; }
-            if (data?.some((t) => t.name.toLowerCase() === name.trim().toLowerCase())) setConfirm('replace');
-            else void save();
-          }}>Save current draft</Button>
-        </div>
-      )}
-      <div className="xsmall muted mt-2">
-        {props.readOnly
-          ? 'Templates are shared with the rest of the clinic and can only be changed in Settings → Message Templates and the prescription form; using one here never saves anything.'
-          : 'Templates are shared with staff who can create this kind of record. Do not save patient-specific details.'}
+      <div className="row gap-2 wrap mt-2 clinical-template-name-row">
+        <Field label="Template name" className="clinical-template-name">
+          {(fieldId) => <Input id={fieldId} value={name} onChange={setName} placeholder="e.g. Routine follow-up" />}
+        </Field>
+        <Button size="sm" loading={pending} onClick={() => {
+          if (!name.trim()) { toast.warning('Enter a template name'); return; }
+          if (data?.some((t) => t.name.toLowerCase() === name.trim().toLowerCase())) setConfirm('replace');
+          else void save();
+        }}>Save current draft</Button>
       </div>
+      <div className="xsmall muted mt-2">Templates are shared with staff who can create this kind of record. Do not save patient-specific details.</div>
       {confirm && <ConfirmDialog
         title={confirm === 'delete' ? 'Delete template?' : confirm === 'apply' ? 'Replace entered draft fields?' : 'Replace saved template?'}
         body={confirm === 'delete' ? `Delete “${item?.name}”? Existing clinical records remain unchanged.` :

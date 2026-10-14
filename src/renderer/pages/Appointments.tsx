@@ -223,9 +223,10 @@ function AppointmentFormModal(props: {
 
         <div className="form-grid">
           <Field label="Patient" required className="span-2" error={errors.patient}>
-            {() => (
+            {(id) => (
               <div className="col" style={{ gap: 6 }}>
                 <Input
+                  id={id}
                   value={patientQuery}
                   onChange={(v) => { setPatientQuery(v); setPatientId(null); setPatientName(''); }}
                   placeholder="Search by name, phone or patient ID…"
@@ -480,14 +481,11 @@ export function AppointmentsPage() {
             value={searchInput}
             onChange={(e) => setSearchInput(e.target.value)}
           />
-          <Select value={dentistId} onChange={setDentistId} ariaLabel="Filter by dentist"
-          placeholder="All dentists"
+          <Select ariaLabel="Filter appointments by dentist" value={dentistId} onChange={setDentistId} placeholder="All dentists"
             options={(dentists ?? []).map((d) => ({ value: String(d.id), label: d.name }))} />
-          <Select value={reasonFilter} onChange={setReasonFilter} ariaLabel="Filter by reason"
-          placeholder="Any reason"
+          <Select ariaLabel="Filter appointments by reason" value={reasonFilter} onChange={setReasonFilter} placeholder="Any reason"
             options={REASONS.map((r) => ({ value: r, label: r }))} />
-          <Select value={statusFilter} onChange={setStatusFilter} ariaLabel="Filter by status"
-          placeholder="Open & upcoming"
+          <Select ariaLabel="Filter appointments by status" value={statusFilter} onChange={setStatusFilter} placeholder="Open & upcoming"
             options={[
               { value: 'scheduled', label: 'Scheduled' }, { value: 'confirmed', label: 'Confirmed' },
               { value: 'completed', label: 'Completed' }, { value: 'cancelled', label: 'Cancelled' },

@@ -33,7 +33,6 @@ import { QuickDocumentsPage } from '../../src/renderer/pages/QuickDocuments';
 import { CustomizeDocumentsPanel } from '../../src/renderer/components/customize-documents';
 import { ToastProvider } from '../../src/renderer/components/primitives';
 import { DOCUMENT_TYPE_DEFS, elementDef } from '../../src/shared/document-styles';
-import { WATERMARK_DEFAULT } from '../../src/shared/watermark';
 
 /** Every `for="x"` in the markup must have a matching `id="x"`. */
 function assertLabelsResolve(html: string, where: string): void {
@@ -72,8 +71,6 @@ describe('customize documents panel — form labels', () => {
     const panel = createElement(CustomizeDocumentsPanel, {
       value: {},
       onChange: () => undefined,
-      watermark: WATERMARK_DEFAULT,
-      onWatermarkChange: () => undefined,
       clinic: null,
       settings: null,
     });
@@ -87,8 +84,6 @@ describe('customize documents panel — form labels', () => {
     const panel = createElement(CustomizeDocumentsPanel, {
       value: {},
       onChange: () => undefined,
-      watermark: WATERMARK_DEFAULT,
-      onWatermarkChange: () => undefined,
       clinic: null,
       settings: null,
     });

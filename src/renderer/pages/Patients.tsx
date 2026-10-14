@@ -2,7 +2,9 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { Money } from '../components/money';
 import { ClinicalTemplatePicker } from '../components/ClinicalTemplatePicker';
-import type { InvoiceTemplateItem } from '../../shared/clinical-templates';
+import { MedicineEntryEditor, type MedicineEntryValues } from '../components/medicine-entry-editor';
+import { hasMedicineDraftContent, type InvoiceTemplateItem } from '../../shared/clinical-templates';
+import { CHIEF_COMPLAINT_OPTIONS, EXAMINATION_OPTIONS, clinicalChoice } from '../../shared/clinical-options';
 import { api, useAsync } from '../api';
 import { useApp } from '../state/app-context';
 import {
@@ -19,13 +21,6 @@ import type { PatientInputPayload, ReferralRecord, ReferralInput } from '../../s
 import { hasInvoiceDraftChanges } from '../../shared/unsaved';
 import { WhatsAppHub } from '../components/whatsapp-hub';
 import { normalizeWhatsAppNumber } from '../../shared/whatsapp';
-import {
-  MedicineInstructionField, MedicineRowsEditor, emptyMedicineDraft, medicineDraftsFromTemplate,
-  medicineDraftsToInput, type MedicineDraft,
-} from '../components/medicine-entry';
-import {
-  CHIEF_COMPLAINT_OPTIONS, CLINICAL_OTHER_VALUE, EXAMINATION_OPTIONS, MEDICINE_INSTRUCTION_MAX,
-} from '../../shared/clinical';
 
 /* ================================ List ================================= */
 
@@ -242,7 +237,7 @@ function PatientFormModal(props: { open: boolean; initial?: (PatientDTO & Partia
             />
           )}
         </Field>
-        <Field label="WhatsApp options">
+        <Field label="WhatsApp options" labelFor={false}>
           {() => (
             <div className="col gap-2">
               <label className="checkbox">
@@ -274,7 +269,6 @@ function PatientFormModal(props: { open: boolean; initial?: (PatientDTO & Partia
               <Select
                 value={values.whatsappConsent ?? 'unknown'}
                 onChange={(v) => set('whatsappConsent', v as PatientFormValues['whatsappConsent'])}
-                ariaLabel="WhatsApp consent recorded for this patient"
                 options={[
                   { value: 'unknown', label: 'Consent not recorded' },
                   { value: 'granted', label: 'WhatsApp consent granted' },
@@ -463,9 +457,9 @@ export function PatientsPage() {
           <Input value={query} onChange={(v) => { setQuery(v); setPage(1); }} placeholder="Search name, phone, patient ID, tag…" ariaLabel="Search patients" />
         </div>
         <Select
+          ariaLabel="Filter patients by date"
           value={range}
           onChange={(v) => { setRange(v); setPage(1); }}
-          ariaLabel="Filter by date range"
           options={[
             { value: 'all', label: 'All time' }, { value: 'today', label: 'Today' },
             { value: '7', label: 'Last 7 days' }, { value: '30', label: 'Last 30 days' },
@@ -473,9 +467,9 @@ export function PatientsPage() {
           ]}
         />
         <Select
+          ariaLabel="Filter patients by status"
           value={status}
           onChange={(v) => { setStatus(v); setPage(1); }}
-          ariaLabel="Filter by patient status"
           options={[
             { value: 'active', label: 'Active' }, { value: 'archived', label: 'Archived' },
             { value: 'blocked', label: 'Blocked' }, { value: '', label: 'Any status' },
@@ -894,12 +888,6 @@ export function RxDetailModal(props: { rx: PrescriptionDTO; onClose: () => void;
         {rx.rE && <div className="kv"><span className="k">R/E</span><span className="v">{rx.rE}</span></div>}
         {rx.treatment && <div className="kv"><span className="k">Treatment</span><span className="v">{rx.treatment}</span></div>}
         {rx.advice && <div className="kv"><span className="k">Advice</span><span className="v">{rx.advice}</span></div>}
-        {rx.medicineInstruction && (
-          <div className="kv">
-            <span className="k">Medicine instruction</span>
-            <span className="v">{rx.medicineInstruction}</span>
-          </div>
-        )}
         {rx.followUp && <div className="kv"><span className="k">Follow-up</span><span className="v">{formatDate(rx.followUp)}</span></div>}
       </div>
       <table className="table">
@@ -1175,35 +1163,30 @@ export function VisitFormModal(props: { patientId: number; onClose: () => void; 
       }
     >
       {!props.patientId && (
-        <>
-        <Field
-          label="Patient"
-          required
-          className="mb-4"
-          hint="Type at least two characters, then pick the matching patient from the list."
-        >
-          {(fieldId) => (
-            <Input
-              id={fieldId}
-              value={chosenPatient ? `${chosenPatient.name} · ${chosenPatient.code}` : patientQuery}
-              onChange={(v) => { setChosenPatient(null); setPatientQuery(v); }}
-              placeholder="Search patient by name, phone or ID…"
-              autoFocus
-            />
+        <Field label="Patient" required className="mb-4">
+          {(id) => (
+            <>
+              <Input
+                id={id}
+                value={chosenPatient ? `${chosenPatient.name} · ${chosenPatient.code}` : patientQuery}
+                onChange={(v) => { setChosenPatient(null); setPatientQuery(v); }}
+                placeholder="Search patient by name, phone or ID…"
+                autoFocus
+              />
+              {!chosenPatient && patientMatches.length > 0 && (
+                <div className="list" style={{ border: '1px solid var(--line)', borderRadius: 6, marginTop: 6, maxHeight: 150, overflowY: 'auto' }}>
+                  {patientMatches.map((m) => (
+                    <div key={m.id} className="list-row clickable" style={{ padding: '8px 10px' }}
+                      onClick={() => { setChosenPatient(m); setPatientQuery(m.name); }}>
+                      <strong className="flex-1">{m.name}</strong>
+                      <span className="xsmall muted mono">{m.code}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </>
           )}
         </Field>
-            {!chosenPatient && patientMatches.length > 0 && (
-              <div className="list" style={{ border: '1px solid var(--line)', borderRadius: 6, marginTop: 6, maxHeight: 150, overflowY: 'auto' }}>
-                {patientMatches.map((m) => (
-                  <div key={m.id} className="list-row clickable" style={{ padding: '8px 10px' }}
-                    onClick={() => { setChosenPatient(m); setPatientQuery(m.name); }}>
-                    <strong className="flex-1">{m.name}</strong>
-                    <span className="xsmall muted mono">{m.code}</span>
-                  </div>
-                ))}
-              </div>
-            )}
-        </>
       )}
       <div className="form-grid">
         <Field label="Date & time" required error={errors.datetime}>
@@ -1278,12 +1261,7 @@ export function VisitFormModal(props: { patientId: number; onClose: () => void; 
               return (
                 <div className="list-row" key={sel.treatmentId}>
                   <span className="flex-1">{t?.name ?? `Treatment #${sel.treatmentId}`}</span>
-                  <Input
-                    value={String(sel.qty)}
-                    onChange={(v) => set('treatments', values.treatments.map((x) => x.treatmentId === sel.treatmentId ? { ...x, qty: Math.max(1, Number(v) || 1) } : x))}
-                    type="number"
-                    ariaLabel={`Quantity of ${t?.name ?? `treatment ${sel.treatmentId}`}`}
-                  />
+                  <Input value={String(sel.qty)} onChange={(v) => set('treatments', values.treatments.map((x) => x.treatmentId === sel.treatmentId ? { ...x, qty: Math.max(1, Number(v) || 1) } : x))} type="number" />
                   <span className="num small"><Money paisa={sel.qty * sel.unitPricePaisa} /></span>
                   <Button size="sm" variant="ghost" onClick={() => set('treatments', values.treatments.filter((x) => x.treatmentId !== sel.treatmentId))}>✕</Button>
                 </div>
@@ -1308,17 +1286,14 @@ export function RxFormModal(props: { patientId: number; visitId?: number | null;
   const { values, set, setMany, validate, errors } = useForm({
     dentistId: '', date: isoDate(new Date()), cC: '', oE: '', rE: '', diagnosis: '', treatment: '', advice: '', followUp: '',
     ccOther: '', oeOther: '',
-    // Optional single-line medicine instruction — additive to the structured rows.
-    medicineInstruction: '',
-    items: [emptyMedicineDraft()] as MedicineDraft[],
+    items: [{ medicineName: '', strength: '', dosage: '', frequency: '', duration: '', generic: '', form: '', qty: '', instruction: '', medicineInstruction: '' }] as MedicineEntryValues[],
     saveAsTemplate: '',
   });
   const { data: dentists } = useAsync(() => api['dentists/list'](), []);
   const { data: templates, reload: reloadTemplates } = useAsync(() => api['prescriptions/templates'](), []);
   const [deleteTemplate, setDeleteTemplate] = useState<{ id: number; name: string } | null>(null);
-  const [pendingTemplate, setPendingTemplate] = useState<{ id: number; name: string; action: () => void } | null>(null);
+  const [replaceMedicineTemplate, setReplaceMedicineTemplate] = useState<{ id: number; name: string; items: any[] } | null>(null);
   const [pending, setPending] = useState(false);
-  const [missingMedicineNames, setMissingMedicineNames] = useState(false);
   const [discardOpen, setDiscardOpen] = useState(false);
   const requestInFlight = React.useRef(false);
   const initialSnapshot = React.useRef(JSON.stringify(values));
@@ -1328,14 +1303,6 @@ export function RxFormModal(props: { patientId: number; visitId?: number | null;
     patientId ? { id: patientId, name: '', code: '' } : null,
   );
   const [patientMatches, setPatientMatches] = useState<{ id: number; name: string; code: string }[]>([]);
-  // Explains the selected C/C and O/E abbreviation in plain words under the
-  // dropdown, so nobody has to remember what "BDR/BDC" stands for.
-  const chiefComplaintHint = CHIEF_COMPLAINT_OPTIONS.find((o) => o.value === values.cC)?.hint
-    ?? 'Pick a common complaint, or choose “Other” and type it.';
-  const examinationHint = EXAMINATION_OPTIONS.find((o) => o.value === values.oE)?.hint
-    ?? 'Pick a common finding, or choose “Other” and type it.';
-  const instructionRowCount = medicineDraftsToInput(values.items).length;
-
   const requestClose = () => {
     if (requestInFlight.current) return;
     if (JSON.stringify(values) !== initialSnapshot.current || (!props.patientId && !!patientQuery)) setDiscardOpen(true);
@@ -1353,34 +1320,35 @@ export function RxFormModal(props: { patientId: number; visitId?: number | null;
     return () => clearTimeout(t);
   }, [patientQuery, patientId]);
 
-  /** Replace the whole medicine list only after the operator confirmed it when
-   *  the draft already holds medicines — applying a template must never silently
-   *  discard typed rows. */
+  const setItem = (i: number, patch: Partial<typeof values.items[0]>): void => {
+    set('items', values.items.map((it, j) => (j === i ? { ...it, ...patch } : it)));
+  };
+
+  const applyMedicineTemplateNow = (tpl: { id: number; name: string; items: any[] }): void => {
+    set('items', tpl.items.map((it) => ({
+      medicineName: it.medicineName ?? '', strength: it.strength ?? '', dosage: it.dosage ?? '',
+      frequency: it.frequency ?? '', duration: it.duration ?? '', generic: it.generic ?? '',
+      form: it.form ?? '', qty: it.qty ?? '', instruction: it.instruction ?? '',
+      medicineInstruction: it.medicineInstruction ?? '',
+    })));
+    setReplaceMedicineTemplate(null);
+    toast.success('Template applied', tpl.name);
+  };
+
   const applyTemplate = (tplId: string): void => {
     const tpl = (templates ?? []).find((t) => String(t.id) === tplId);
     if (!tpl) return;
-    const rows = medicineDraftsFromTemplate(tpl.items);
-    if (rows.length === 0) {
-      toast.warning('Template is empty', `${tpl.name} contains no medicines.`);
+    if (hasMedicineDraftContent(values.items)) {
+      setReplaceMedicineTemplate(tpl);
       return;
     }
-    const replace = () => {
-      set('items', rows.map((row) => ({ ...row })));
-      toast.success('Template applied', `${tpl.name} · ${rows.length} medicine${rows.length === 1 ? '' : 's'}`);
-    };
-    if (medicineDraftsToInput(values.items).length === 0) replace();
-    else setPendingTemplate({ id: tpl.id, name: tpl.name, action: replace });
+    applyMedicineTemplateNow(tpl);
   };
 
   const submit = async () => {
-    const hasUnnamedRow = values.items.some((i) => !i.medicineName.trim());
-    setMissingMedicineNames(hasUnnamedRow);
     const ok = validate((v) => ({
       dentistId: !v.dentistId ? 'Select the prescribing dentist.' : '',
       items: v.items.some((i) => !i.medicineName.trim()) ? 'Every medicine row needs a name.' : '',
-      medicineInstruction: v.medicineInstruction.trim().length > MEDICINE_INSTRUCTION_MAX
-        ? `The medicine instruction must be ${MEDICINE_INSTRUCTION_MAX} characters or fewer.`
-        : '',
     }));
     if (!ok) return;
     if (!patientId && !chosenPatient) { toast.warning('Select a patient', 'Search and choose the patient first.'); return; }
@@ -1393,12 +1361,11 @@ export function RxFormModal(props: { patientId: number; visitId?: number | null;
         visitId: props.visitId ?? null,
         dentistId: Number(values.dentistId),
         date: values.date,
-        cC: (values.cC === CLINICAL_OTHER_VALUE ? values.ccOther : values.cC) || null,
-        oE: (values.oE === CLINICAL_OTHER_VALUE ? values.oeOther : values.oE) || null, rE: values.rE || null,
+        cC: (values.cC === 'Other' ? values.ccOther : values.cC) || null,
+        oE: (values.oE === 'Other' ? values.oeOther : values.oE) || null, rE: values.rE || null,
         diagnosis: values.diagnosis || null, treatment: values.treatment || null,
         advice: values.advice || null, followUp: values.followUp || null,
-        medicineInstruction: values.medicineInstruction.trim() || null,
-        items: medicineDraftsToInput(values.items),
+        items: values.items.filter((i) => i.medicineName.trim()),
         saveAsTemplate: values.saveAsTemplate || null,
       });
       toast.success('Prescription created', rx.number);
@@ -1433,47 +1400,44 @@ export function RxFormModal(props: { patientId: number; visitId?: number | null;
       }
     >
       {!patientId && (
-        <>
-        <Field
-          label="Patient"
-          required
-          className="mb-4"
-          hint="Type at least two characters, then pick the matching patient from the list."
-        >
-          {(fieldId) => (
-            <Input
-              id={fieldId}
-              value={chosenPatient ? `${chosenPatient.name} · ${chosenPatient.code}` : patientQuery}
-              onChange={(v) => { setChosenPatient(null); setPatientQuery(v); }}
-              placeholder="Search patient by name, phone or ID…"
-              autoFocus
-            />
+        <Field label="Patient" required className="mb-4">
+          {(id) => (
+            <>
+              <Input
+                id={id}
+                value={chosenPatient ? `${chosenPatient.name} · ${chosenPatient.code}` : patientQuery}
+                onChange={(v) => { setChosenPatient(null); setPatientQuery(v); }}
+                placeholder="Search patient by name, phone or ID…"
+                autoFocus
+              />
+              {!chosenPatient && patientMatches.length > 0 && (
+                <div className="list" style={{ border: '1px solid var(--line)', borderRadius: 6, marginTop: 6, maxHeight: 150, overflowY: 'auto' }}>
+                  {patientMatches.map((m) => (
+                    <div key={m.id} className="list-row clickable" style={{ padding: '8px 10px' }}
+                      onClick={() => { setChosenPatient(m); setPatientQuery(m.name); }}>
+                      <strong className="flex-1">{m.name}</strong>
+                      <span className="xsmall muted mono">{m.code}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </>
           )}
         </Field>
-            {!chosenPatient && patientMatches.length > 0 && (
-              <div className="list" style={{ border: '1px solid var(--line)', borderRadius: 6, marginTop: 6, maxHeight: 150, overflowY: 'auto' }}>
-                {patientMatches.map((m) => (
-                  <div key={m.id} className="list-row clickable" style={{ padding: '8px 10px' }}
-                    onClick={() => { setChosenPatient(m); setPatientQuery(m.name); }}>
-                    <strong className="flex-1">{m.name}</strong>
-                    <span className="xsmall muted mono">{m.code}</span>
-                  </div>
-                ))}
-              </div>
-            )}
-        </>
       )}
       <ClinicalTemplatePicker kind="prescription" label="Prescription text" getBody={() => ({
-        cC: values.cC === CLINICAL_OTHER_VALUE ? values.ccOther : values.cC,
-        oE: values.oE === CLINICAL_OTHER_VALUE ? values.oeOther : values.oE, rE: values.rE,
+        cC: values.cC === 'Other' ? values.ccOther : values.cC,
+        oE: values.oE === 'Other' ? values.oeOther : values.oE, rE: values.rE,
         diagnosis: values.diagnosis, treatment: values.treatment, advice: values.advice, followUp: values.followUp,
       })} onApply={(body) => {
         if ('items' in body) return;
+        const cc = clinicalChoice(body.cC, CHIEF_COMPLAINT_OPTIONS);
+        const oe = clinicalChoice(body.oE, EXAMINATION_OPTIONS);
         setMany({
           rE: body.rE ?? '', diagnosis: body.diagnosis ?? '', treatment: body.treatment ?? '',
           advice: body.advice ?? '', followUp: body.followUp ?? '',
-          cC: body.cC ? CLINICAL_OTHER_VALUE : '', ccOther: body.cC ?? '',
-          oE: body.oE ? CLINICAL_OTHER_VALUE : '', oeOther: body.oE ?? '',
+          cC: cc.choice, ccOther: cc.other,
+          oE: oe.choice, oeOther: oe.other,
         });
       }} />
       <ClinicalTemplatePicker kind="instructions" label="Prescription instructions" getBody={() => ({ advice: values.advice })}
@@ -1504,9 +1468,9 @@ export function RxFormModal(props: { patientId: number; visitId?: number | null;
           )}
         </Field>
         <Field
-          label={<>C/C — chief complaint</>}
+          label={<>C/C <span className="muted">(chief complaint)</span></>}
           className="span-2"
-          hint={chiefComplaintHint}
+          hint="Choose a common entry, or select Other to type the patient's own words."
         >
           {(id) => (
             <Select
@@ -1514,37 +1478,33 @@ export function RxFormModal(props: { patientId: number; visitId?: number | null;
               value={values.cC}
               onChange={(v) => set('cC', v)}
               placeholder="Select chief complaint…"
-              options={CHIEF_COMPLAINT_OPTIONS.map(({ value, label }) => ({ value, label }))}
+              options={CHIEF_COMPLAINT_OPTIONS}
             />
           )}
         </Field>
-        {values.cC === CLINICAL_OTHER_VALUE && (
-          <Field
-            label="C/C — write the chief complaint"
-            className="span-2"
-            hint="Free text: this is what prints under the C/C heading."
-          >
-            {(id) => <Input id={id} value={values.ccOther} onChange={(v) => set('ccOther', v)} placeholder="e.g. Pain in the upper left back tooth" />}
+        {values.cC === 'Other' && (
+          <Field label="C/C — Other" className="span-2">
+            {(id) => <Input id={id} value={values.ccOther} onChange={(v) => set('ccOther', v)} placeholder="Write the chief complaint…" />}
           </Field>
         )}
-        <Field label={<>O/E — on examination</>} className="span-2" hint={examinationHint}>
+        <Field
+          label={<>O/E <span className="muted">(on examination)</span></>}
+          className="span-2"
+          hint="Choose a listed finding, or select Other to enter the clinician's own text."
+        >
           {(id) => (
             <Select
               id={id}
               value={values.oE}
               onChange={(v) => set('oE', v)}
               placeholder="Select examination finding…"
-              options={EXAMINATION_OPTIONS.map(({ value, label }) => ({ value, label }))}
+              options={EXAMINATION_OPTIONS}
             />
           )}
         </Field>
-        {values.oE === CLINICAL_OTHER_VALUE && (
-          <Field
-            label="O/E — write the examination finding"
-            className="span-2"
-            hint="Free text: this is what prints under the O/E heading."
-          >
-            {(id) => <Input id={id} value={values.oeOther} onChange={(v) => set('oeOther', v)} placeholder="e.g. Deep caries 36, tender on percussion" />}
+        {values.oE === 'Other' && (
+          <Field label="O/E — Other" className="span-2">
+            {(id) => <Input id={id} value={values.oeOther} onChange={(v) => set('oeOther', v)} placeholder="Write the examination finding…" />}
           </Field>
         )}
         <Field label={<>R/E <span className="muted">(radiographic examination)</span></>} className="span-2">
@@ -1565,42 +1525,28 @@ export function RxFormModal(props: { patientId: number; visitId?: number | null;
       </div>
 
       <div className="form-section mt-4">
-        <MedicineRowsEditor
-          rows={values.items}
-          onChange={(next) => set('items', next)}
-          listError={errors.items ?? null}
-          markMissingNames={missingMedicineNames}
-          max={60}
+        <MedicineEntryEditor
+          items={values.items}
+          onChange={setItem}
+          onAdd={() => set('items', [...values.items, {
+            medicineName: '', strength: '', dosage: '', frequency: '', duration: '', generic: '', form: '', qty: '', instruction: '', medicineInstruction: '',
+          }])}
+          onRemove={(index) => set('items', values.items.filter((_, row) => row !== index))}
+          formError={errors.items}
+          showNameErrors={!!errors.items}
         />
-        <div className="divider" />
-        <MedicineInstructionField
-          value={values.medicineInstruction}
-          onChange={(v) => set('medicineInstruction', v)}
-          structuredCount={instructionRowCount}
-          error={errors.medicineInstruction ?? null}
-        />
-        <Field
-          label="Save the medicine rows as a template"
-          className="mt-4"
-          hint="Optional. Reuses an existing template name or creates a new one for the next patient on the same medicines."
-        >
+        <Field label="Save as template (optional name)" className="mt-4">
           {(id) => <Input id={id} value={values.saveAsTemplate} onChange={(v) => set('saveAsTemplate', v)} placeholder="e.g. Standard post-extraction" />}
         </Field>
       </div>
 
-      {pendingTemplate && <ConfirmDialog
-        title="Replace the medicines in this draft?"
-        body={<>
-          Applying <strong>{pendingTemplate.name}</strong> replaces the {instructionRowCount} medicine
-          row(s) already entered in this prescription. Rows are only replaced after you confirm, and nothing
-          has been saved yet.
-        </>}
+      {replaceMedicineTemplate && <ConfirmDialog
+        title="Replace medicine draft?"
+        body={`Applying “${replaceMedicineTemplate.name}” will replace the medicine rows you have entered in this unsaved prescription. Saved records and the saved template are unchanged.`}
         confirmLabel="Replace medicines"
-        danger
-        onCancel={() => setPendingTemplate(null)}
-        onConfirm={() => { const action = pendingTemplate.action; setPendingTemplate(null); action(); }}
+        onConfirm={() => applyMedicineTemplateNow(replaceMedicineTemplate)}
+        onCancel={() => setReplaceMedicineTemplate(null)}
       />}
-
       {deleteTemplate && <ConfirmDialog
         title="Delete medicine template?"
         body={`${deleteTemplate.name} will be permanently deleted from saved prescription templates.`}
@@ -1722,41 +1668,36 @@ export function InvoiceFormModal(props: { patientId: number; visitId?: number | 
       }
     >
       {!props.patientId && (
-        <>
-        <Field
-          label="Patient"
-          required
-          className="mb-4"
-          hint="Type at least two characters, then pick the matching patient from the list."
-        >
-          {(fieldId) => (
-            <Input
-              id={fieldId}
-              value={chosenPatient ? `${chosenPatient.name} · ${chosenPatient.code}` : patientQuery}
-              onChange={(v) => { setChosenPatient(null); setPatientQuery(v); }}
-              placeholder="Search patient by name, phone or ID…"
-              autoFocus
-            />
+        <Field label="Patient" required className="mb-4">
+          {(id) => (
+            <>
+              <Input
+                id={id}
+                value={chosenPatient ? `${chosenPatient.name} · ${chosenPatient.code}` : patientQuery}
+                onChange={(v) => { setChosenPatient(null); setPatientQuery(v); }}
+                placeholder="Search patient by name, phone or ID…"
+                autoFocus
+              />
+              {!chosenPatient && patientMatches.length > 0 && (
+                <div className="list" style={{ border: '1px solid var(--line)', borderRadius: 6, marginTop: 6, maxHeight: 150, overflowY: 'auto' }}>
+                  {patientMatches.map((m) => (
+                    <div key={m.id} className="list-row clickable" style={{ padding: '8px 10px' }}
+                      onClick={() => { setChosenPatient(m); setPatientQuery(m.name); }}>
+                      <strong className="flex-1">{m.name}</strong>
+                      <span className="xsmall muted mono">{m.code}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </>
           )}
         </Field>
-            {!chosenPatient && patientMatches.length > 0 && (
-              <div className="list" style={{ border: '1px solid var(--line)', borderRadius: 6, marginTop: 6, maxHeight: 150, overflowY: 'auto' }}>
-                {patientMatches.map((m) => (
-                  <div key={m.id} className="list-row clickable" style={{ padding: '8px 10px' }}
-                    onClick={() => { setChosenPatient(m); setPatientQuery(m.name); }}>
-                    <strong className="flex-1">{m.name}</strong>
-                    <span className="xsmall muted mono">{m.code}</span>
-                  </div>
-                ))}
-              </div>
-            )}
-        </>
       )}
       <div className="form-grid">
         <Field label="Invoice date" required>
           {(id) => <Input id={id} type="date" value={values.date} onChange={(v) => set('date', v)} />}
         </Field>
-        <Field label="Discount (৳)" error={errors.discountPaisa}>
+        <Field label="Invoice-wide discount (৳)" hint="Applied once to the invoice after the line amounts are added." error={errors.discountPaisa}>
           {(id) => (
             <Input
               id={id} type="number" min={0}
@@ -1797,30 +1738,24 @@ export function InvoiceFormModal(props: { patientId: number; visitId?: number | 
         </div>
         {values.items.map((line, i) => (
           <div className="invoice-line" key={i}>
-            <Field
-              label="Treatment / service"
-              className="invoice-line-field-wide"
-              hint="What was done — printed on the invoice exactly as typed."
-            >
-              {(id) => <Input id={id} value={line.description} onChange={(v) => setItem(i, { description: v })} placeholder="e.g. Root canal treatment (36)" />}
+            <Field label="Description">
+              {(id) => <Input id={id} value={line.description} onChange={(v) => setItem(i, { description: v })} placeholder="Treatment or item" />}
             </Field>
-            <Field label="Quantity" hint="How many units were charged.">
+            <Field label="Quantity">
               {(id) => <Input id={id} type="number" min={1} value={String(line.qty)} onChange={(v) => setItem(i, { qty: Math.max(1, Number(v) || 1) })} />}
             </Field>
-            <Field label="Unit price (৳)" hint="Price of one unit, before any discount.">
+            <Field label="Unit price (৳)" hint="Price for one item or procedure.">
               {(id) => <Input id={id} type="number" min={0} step="0.01" value={String(line.unitPricePaisa / 100)} onChange={(v) => setItem(i, { unitPricePaisa: Math.round((Number(v) || 0) * 100) })} />}
             </Field>
-            <Field label="Line total (৳)" hint="Quantity × unit price. Calculated, not editable.">
-              {() => <div className="input" style={{ display: 'flex', alignItems: 'center', minHeight: 36 }} aria-readonly="true" role="status"><Money paisa={line.qty * line.unitPricePaisa} /></div>}
+            <Field label="Line total (৳)" hint="Quantity × unit price; the invoice-wide discount is applied below." labelFor={false}>
+              {() => <div className="input" style={{ display: 'flex', alignItems: 'center', minHeight: 34 }} aria-readonly="true"><Money paisa={line.qty * line.unitPricePaisa} /></div>}
             </Field>
             <Button variant="ghost" size="sm" onClick={() => set('items', values.items.filter((_, j) => j !== i))} title="Remove line">✕</Button>
           </div>
         ))}
-        <div className="row between mt-4 wrap gap-2">
-          <span className="small muted">
-            Subtotal (all lines) <Money paisa={subtotal} /> · Invoice discount <Money paisa={values.discountPaisa} />
-          </span>
-          <strong>Total payable: <Money paisa={total} /></strong>
+        <div className="row between mt-4">
+          <span className="small muted">Gross subtotal <Money paisa={subtotal} /> · Invoice-wide discount <Money paisa={values.discountPaisa} /></span>
+          <strong>Payable: <Money paisa={total} /></strong>
         </div>
       </div>
     </Modal>

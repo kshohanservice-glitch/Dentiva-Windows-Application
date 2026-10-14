@@ -296,8 +296,6 @@ const PRESCRIPTION_ELEMENTS: DocumentElementDef[] = [
   el('prescription.body.medicationTitle', 'Medicine name', 'body', INLINE),
   el('prescription.body.medicationStrength', 'Medicine strength', 'body', INLINE),
   el('prescription.body.medicationInstructions', 'Medicine instructions line', 'body', INLINE),
-  el('prescription.body.medicineInstructionLabel', 'Medicine instruction label', 'body', INLINE, { optional: true, hint: 'Printed with the optional single-line medicine instruction.' }),
-  el('prescription.body.medicineInstructionValue', 'Medicine instruction text', 'body', LINE, { optional: true, hint: 'The optional single-line medicine instruction, printed only when the doctor entered one.' }),
   el('prescription.body.adviceLabel', 'Advice label', 'body', INLINE),
   el('prescription.body.adviceValue', 'Advice text', 'body', INLINE),
   el('prescription.body.followUpLabel', 'Follow-up label', 'body', INLINE),

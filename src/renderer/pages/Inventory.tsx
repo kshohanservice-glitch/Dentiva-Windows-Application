@@ -394,8 +394,8 @@ export function InventoryPage() {
         {tab === 'batches' && (
           <>
             <TableToolbar right={<Button size="sm" variant="ghost" onClick={() => void printLabels(true)}>Print expiring labels</Button>}>
-              <Field label="Expiring within (days)" className="row" >
-                {() => <Input type="number" min={1} value={expiringDays} onChange={setExpiringDays} style={{ width: 120 }} />}
+              <Field label="Expiring within (days)" className="row">
+                {(id) => <Input id={id} type="number" min={1} value={expiringDays} onChange={setExpiringDays} style={{ width: 120 }} />}
               </Field>
             </TableToolbar>
             <Card pad={false}>

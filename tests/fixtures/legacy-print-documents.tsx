@@ -173,11 +173,6 @@ export function prescriptionDoc(data: any): React.ReactNode {
     dentist?.email ? dentist.email : '',
   ].filter(Boolean);
 
-  // v4.1.3 review note: the frozen pre-customization renderer below carries the
-  // reviewed addition of the optional single-line medicine instruction, so the
-  // byte-identical comparison keeps covering the whole prescription document
-  // (including that block) instead of skipping it.
-  const medicineInstruction = String(rx.medicineInstruction ?? '').trim();
   const clinicalFields = [
     { label: labels.cc || 'C/C', value: rx.cC },
     { label: labels.oe || 'O/E', value: rx.oE },
@@ -277,17 +272,6 @@ export function prescriptionDoc(data: any): React.ReactNode {
               <div className="muted">No medicines recorded.</div>
             )}
           </div>
-
-          {medicineInstruction ? (
-            <div className="prescription-medicine-instruction">
-              <div className="prescription-section-label">
-                {labels.medicineInstruction || 'Medicine Instruction'}
-              </div>
-              <div className="prescription-section-value">
-                {medicineInstruction}
-              </div>
-            </div>
-          ) : null}
 
           <div className="prescription-bottom">
             <div className="prescription-advice">

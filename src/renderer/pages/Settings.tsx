@@ -8,20 +8,6 @@ import { ClinicLogo } from '../components/clinic-brand';
 import { MessageTemplatesPanel } from '../components/message-templates';
 import { CustomizeDocumentsPanel } from '../components/customize-documents';
 import type { DocumentStyleMap } from '../../shared/document-styles';
-import { WATERMARK_DEFAULT } from '../../shared/watermark';
-import type { PrescriptionLabels } from '../../shared/clinical';
-
-/** Operator-facing names for the printed prescription field labels. */
-const PRESCRIPTION_LABEL_FIELDS: { key: keyof PrescriptionLabels; label: string; hint: string }[] = [
-  { key: 'cc', label: 'Chief complaint (C/C)', hint: 'Printed label for the presenting complaint.' },
-  { key: 'oe', label: 'On examination (O/E)', hint: 'Printed label for the examination findings.' },
-  { key: 're', label: 'Radiographic examination (R/E)', hint: 'Printed label for X-ray / investigation notes.' },
-  { key: 'diagnosis', label: 'Diagnosis', hint: 'Printed label for the diagnosis.' },
-  { key: 'treatment', label: 'Treatment', hint: 'Printed label for the treatment given.' },
-  { key: 'advice', label: 'Advice', hint: 'Printed label for the advice section.' },
-  { key: 'followUp', label: 'Follow-up', hint: 'Printed label for the follow-up date.' },
-  { key: 'medicineInstruction', label: 'Medicine instruction', hint: 'Printed label for the optional single-line medicine instruction.' },
-];
 
 type SetTab = 'clinic' | 'security' | 'appearance' | 'notifications' | 'billing' | 'prescription' | 'templates'
   | 'print' | 'documents' | 'data' | 'shortcuts';
@@ -69,8 +55,9 @@ export function SettingsPage() {
       // WhatsApp greeting settings are managed by the Message Templates tab;
       // never overwrite them with this form's snapshot.
       const { whatsapp: _whatsapp, ...rest } = form;
-      await api['settings/save'](rest);
+      const saved = await api['settings/save'](rest);
       await refreshSettings();
+      setForm(JSON.parse(JSON.stringify(saved)));
       setDirty(false);
       toast.success('Settings saved');
     } catch (err) {
@@ -114,16 +101,16 @@ export function SettingsPage() {
           <Card title="Clinic information">
             <div className="form-grid">
               <Field label="Clinic name" className="span-2">
-                {() => <Input value={form.clinic.clinicName} onChange={(v) => set(['clinic', 'clinicName'], v)} />}
+                {(id) => <Input id={id} value={form.clinic.clinicName} onChange={(v) => set(['clinic', 'clinicName'], v)} />}
               </Field>
-              <Field label="Bengali name">{() => <Input value={form.clinic.clinicNameBn ?? ''} onChange={(v) => set(['clinic', 'clinicNameBn'], v)} />}</Field>
-              <Field label="Phone">{() => <Input value={form.clinic.phone ?? ''} onChange={(v) => set(['clinic', 'phone'], v)} />}</Field>
-              <Field label="Email">{() => <Input value={form.clinic.email ?? ''} onChange={(v) => set(['clinic', 'email'], v)} />}</Field>
-              <Field label="Website">{() => <Input value={form.clinic.website ?? ''} onChange={(v) => set(['clinic', 'website'], v)} />}</Field>
-              <Field label="Address" className="span-2">{() => <Textarea rows={2} value={form.clinic.address ?? ''} onChange={(v) => set(['clinic', 'address'], v)} />}</Field>
-              <Field label="Operating hours">{() => <Input value={form.clinic.operatingHours ?? ''} onChange={(v) => set(['clinic', 'operatingHours'], v)} placeholder="10:00 – 20:00" />}</Field>
-              <Field label="Visiting days">{() => <Input value={form.clinic.visitingDays ?? ''} onChange={(v) => set(['clinic', 'visitingDays'], v)} placeholder="Sat – Thu" />}</Field>
-              <Field label="Logo" hint="Shown on the sign-in screen, the app header and printed documents">
+              <Field label="Bengali name">{(id) => <Input id={id} value={form.clinic.clinicNameBn ?? ''} onChange={(v) => set(['clinic', 'clinicNameBn'], v)} />}</Field>
+              <Field label="Phone">{(id) => <Input id={id} value={form.clinic.phone ?? ''} onChange={(v) => set(['clinic', 'phone'], v)} />}</Field>
+              <Field label="Email">{(id) => <Input id={id} value={form.clinic.email ?? ''} onChange={(v) => set(['clinic', 'email'], v)} />}</Field>
+              <Field label="Website">{(id) => <Input id={id} value={form.clinic.website ?? ''} onChange={(v) => set(['clinic', 'website'], v)} />}</Field>
+              <Field label="Address" className="span-2">{(id) => <Textarea id={id} rows={2} value={form.clinic.address ?? ''} onChange={(v) => set(['clinic', 'address'], v)} />}</Field>
+              <Field label="Operating hours">{(id) => <Input id={id} value={form.clinic.operatingHours ?? ''} onChange={(v) => set(['clinic', 'operatingHours'], v)} placeholder="10:00 – 20:00" />}</Field>
+              <Field label="Visiting days">{(id) => <Input id={id} value={form.clinic.visitingDays ?? ''} onChange={(v) => set(['clinic', 'visitingDays'], v)} placeholder="Sat – Thu" />}</Field>
+              <Field label="Logo" labelFor={false} hint="Shown on the sign-in screen, the app header and printed documents">
                 {() => (
                   <div className="row gap-3">
                     <ClinicLogo clinic={settings?.clinic} size={44} rounded={10} />
@@ -142,7 +129,10 @@ export function SettingsPage() {
                         }}
                       >Upload logo…</Button>
                       {form.clinic.logoPath && (
-                        <Button variant="ghost" onClick={() => set(['clinic', 'logoPath'], null)}>Remove</Button>
+                        <Button variant="ghost" onClick={() => {
+                          set(['clinic', 'logoPath'], null);
+                          set(['clinic', 'logoDataUrl'], null);
+                        }}>Remove</Button>
                       )}
                     </div>
                   </div>
@@ -173,7 +163,7 @@ export function SettingsPage() {
                     ]} />
                 )}
               </Field>
-              <Field label="Animations">
+              <Field label="Animations" labelFor={false}>
                 {() => (
                   <label className="checkbox">
                     <input type="checkbox" checked={form.appearance.animations} onChange={(e) => set(['appearance', 'animations'], e.target.checked)} />
@@ -181,7 +171,7 @@ export function SettingsPage() {
                   </label>
                 )}
               </Field>
-              <Field label="Sidebar">
+              <Field label="Sidebar" labelFor={false}>
                 {() => (
                   <label className="checkbox">
                     <input type="checkbox" checked={form.appearance.sidebarCollapsed} onChange={(e) => set(['appearance', 'sidebarCollapsed'], e.target.checked)} />
@@ -253,7 +243,7 @@ export function SettingsPage() {
             <div className="form-grid">
               <Field label="Visiting hours line">{(id) => <Input id={id} value={form.prescription.visitingHours ?? ''} onChange={(v) => set(['prescription', 'visitingHours'], v)} />}</Field>
               <Field label="Footer message">{(id) => <Input id={id} value={form.prescription.footerMessage ?? ''} onChange={(v) => set(['prescription', 'footerMessage'], v)} />}</Field>
-              <Field label="Signature area reserved" >
+              <Field label="Signature area reserved" labelFor={false}>
                 {() => (
                   <label className="checkbox">
                     <input type="checkbox" checked={form.prescription.signatureReserved} onChange={(e) => set(['prescription', 'signatureReserved'], e.target.checked)} />
@@ -265,15 +255,9 @@ export function SettingsPage() {
             <div className="divider" />
             <h4 className="small">Form labels</h4>
             <div className="form-grid mt-2">
-              {PRESCRIPTION_LABEL_FIELDS.map(({ key, label, hint }) => (
-                <Field key={key} label={label} hint={hint}>
-                  {(id) => (
-                    <Input
-                      id={id}
-                      value={form.prescription.labels[key] ?? ''}
-                      onChange={(v) => set(['prescription', 'labels', key], v)}
-                    />
-                  )}
+              {(Object.keys(form.prescription.labels) as string[]).map((k) => (
+                <Field key={k} label={k.toUpperCase()}>
+                  {(id) => <Input id={id} value={form.prescription.labels[k]} onChange={(v) => set(['prescription', 'labels', k], v)} />}
                 </Field>
               ))}
             </div>
@@ -288,10 +272,10 @@ export function SettingsPage() {
           <CustomizeDocumentsPanel
             value={(form.documentStyles ?? {}) as DocumentStyleMap}
             onChange={(next) => set(['documentStyles'], next)}
-            watermark={form.watermark ?? WATERMARK_DEFAULT}
-            onWatermarkChange={(next) => set(['watermark'], next)}
             clinic={form.clinic}
             settings={form}
+            watermark={form.documentWatermark}
+            onWatermarkChange={(next) => set(['documentWatermark'], next)}
           />
         )}
 

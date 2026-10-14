@@ -2,17 +2,22 @@ import React, { useEffect, useId, useRef, useState } from 'react';
 
 export function Field(props: {
   label?: React.ReactNode; required?: boolean; hint?: string; error?: string | null;
-  children: (id: string) => React.ReactNode; className?: string;
+  children: (id: string) => React.ReactNode; className?: string; labelFor?: boolean;
 }) {
   const id = useId();
   return (
     <div className={`field ${props.className ?? ''}`}>
-      {props.label && (
+      {props.label && (props.labelFor === false ? (
+        <div className="field-label">
+          {props.label}
+          {props.required && <span className="req" aria-hidden>*</span>}
+        </div>
+      ) : (
         <label htmlFor={id}>
           {props.label}
           {props.required && <span className="req" aria-hidden>*</span>}
         </label>
-      )}
+      ))}
       {props.children(id)}
       {props.hint && !props.error && <div className="hint">{props.hint}</div>}
       {props.error && <div className="error" role="alert">{props.error}</div>}
@@ -22,14 +27,9 @@ export function Field(props: {
 
 export const Input = React.forwardRef<HTMLInputElement, {
   value: string; onChange: (v: string) => void; type?: string; placeholder?: string;
-  /**
-   * Accessible name for a control that carries no visible label (a filter in a
-   * toolbar, a search box). Controls on data-entry forms use a visible `Field`
-   * label instead — a placeholder is never a label.
-   */
-  ariaLabel?: string;
   invalid?: boolean; disabled?: boolean; autoFocus?: boolean; id?: string; name?: string;
   min?: string | number; max?: string | number; step?: string | number; autoComplete?: string;
+  ariaLabel?: string; maxLength?: number; required?: boolean;
   onKeyDown?: (e: React.KeyboardEvent) => void;
   inputMode?: 'none' | 'text' | 'tel' | 'url' | 'email' | 'numeric' | 'decimal' | 'search';
   spellCheck?: boolean; style?: React.CSSProperties; readOnly?: boolean;
@@ -39,7 +39,6 @@ export const Input = React.forwardRef<HTMLInputElement, {
       ref={ref}
       id={props.id}
       name={props.name}
-      aria-label={props.ariaLabel}
       className={`input ${props.invalid ? 'invalid' : ''}`}
       type={props.type ?? 'text'}
       lang={props.type === 'date' || props.type === 'datetime-local' ? 'en-GB' : undefined}
@@ -51,6 +50,9 @@ export const Input = React.forwardRef<HTMLInputElement, {
       max={props.max}
       step={props.step}
       autoComplete={props.autoComplete}
+      aria-label={props.ariaLabel}
+      maxLength={props.maxLength}
+      required={props.required}
       onKeyDown={props.onKeyDown}
       inputMode={props.inputMode}
       spellCheck={props.spellCheck}
@@ -63,18 +65,16 @@ export const Input = React.forwardRef<HTMLInputElement, {
 
 export function Select(props: {
   value: string; onChange: (v: string) => void;
-  options: { value: string; label: string; disabled?: boolean }[];
-  invalid?: boolean; disabled?: boolean; id?: string; placeholder?: string;
-  /** Accessible name for a filter dropdown that has no visible label. */
-  ariaLabel?: string;
+  options: readonly { value: string; label: string; disabled?: boolean }[];
+  invalid?: boolean; disabled?: boolean; id?: string; placeholder?: string; ariaLabel?: string;
 }) {
   return (
     <select
       id={props.id}
-      aria-label={props.ariaLabel}
       className={`select ${props.invalid ? 'invalid' : ''}`}
       value={props.value}
       disabled={props.disabled}
+      aria-label={props.ariaLabel}
       onChange={(e) => props.onChange(e.target.value)}
     >
       {props.placeholder && <option value="">{props.placeholder}</option>}
@@ -87,20 +87,18 @@ export function Select(props: {
 
 export function Textarea(props: {
   value: string; onChange: (v: string) => void; rows?: number; placeholder?: string;
-  invalid?: boolean; disabled?: boolean; id?: string; monospace?: boolean; maxLength?: number;
-  /** Accessible name for a control without a visible label. */
-  ariaLabel?: string;
+  invalid?: boolean; disabled?: boolean; id?: string; monospace?: boolean; maxLength?: number; ariaLabel?: string;
 }) {
   return (
     <textarea
       id={props.id}
-      aria-label={props.ariaLabel}
       className={`textarea ${props.invalid ? 'invalid' : ''}`}
       rows={props.rows ?? 3}
       placeholder={props.placeholder}
       disabled={props.disabled}
       value={props.value}
       maxLength={props.maxLength}
+      aria-label={props.ariaLabel}
       spellCheck={false}
       style={props.monospace ? { fontFamily: 'ui-monospace, monospace' } : undefined}
       onChange={(e) => props.onChange(e.target.value)}

@@ -264,8 +264,6 @@ export interface PrescriptionCreatePayload {
   patientId: number; visitId?: number | null; dentistId: number; date?: string;
   cC?: string | null; oE?: string | null; rE?: string | null;
   diagnosis?: string | null; treatment?: string | null; advice?: string | null; followUp?: string | null;
-  /** Optional single-line medicine instruction, printed on its own line. */
-  medicineInstruction?: string | null;
   items: Partial<PatientItemPayload>[];
   saveAsTemplate?: string | null;
 }
@@ -275,6 +273,8 @@ export interface PatientItemPayload {
   strength?: string | null; dosage?: string | null; frequency?: string | null;
   morning?: boolean; afternoon?: boolean; night?: boolean; timing?: 'before' | 'after' | 'na';
   duration?: string | null; qty?: string | null; instruction?: string | null;
+  /** Optional one-line print instruction; existing clients may omit it. */
+  medicineInstruction?: string | null;
   instructionBn?: string | null; note?: string | null;
 }
 

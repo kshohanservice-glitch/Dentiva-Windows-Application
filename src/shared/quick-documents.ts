@@ -16,7 +16,6 @@
  *   - there is no WhatsApp surface anywhere in this model.
  */
 import type { PermissionKey } from './permissions';
-import { MEDICINE_INSTRUCTION_MAX } from './clinical';
 
 export type QuickDocumentKind = 'prescription' | 'invoice' | 'receipt' | 'visit-summary' | 'appointment-card';
 
@@ -110,6 +109,8 @@ export interface QuickMedicineItem {
   duration: string | null;
   qty: string | null;
   instruction: string | null;
+  /** Optional one-line medicine instruction; absent in older transient payloads. */
+  medicineInstruction?: string | null;
 }
 
 export interface QuickInvoiceLine {
@@ -139,8 +140,6 @@ export interface QuickPrescriptionPayload {
   treatment: string | null;
   advice: string | null;
   followUp: string | null;
-  /** Optional single-line medicine instruction — see `shared/clinical.ts`. */
-  medicineInstruction: string | null;
   items: QuickMedicineItem[];
 }
 
@@ -245,6 +244,21 @@ function str(value: unknown, max: number, label: string, errors: string[], requi
   return trimmed;
 }
 
+/** Optional one-line text kept verbatim (including spacing); whitespace-only values become null. */
+function verbatimStr(value: unknown, max: number, label: string, errors: string[]): string | null {
+  if (value === null || value === undefined || value === '') return null;
+  if (typeof value !== 'string') {
+    errors.push(`${label} must be text.`);
+    return null;
+  }
+  if (value.trim() === '') return null;
+  if (value.length > max) {
+    errors.push(`${label} must be ${max} characters or fewer.`);
+    return null;
+  }
+  return value;
+}
+
 function int(value: unknown, min: number, max: number, label: string, errors: string[]): number {
   const n = Number(value);
   if (!Number.isFinite(n)) {
@@ -322,7 +336,8 @@ function medicineItems(raw: unknown, errors: string[]): QuickMedicineItem[] {
       frequency: str(source.frequency, LIMITS.medicine, `Medicine #${index + 1} frequency`, errors),
       duration: str(source.duration, LIMITS.medicine, `Medicine #${index + 1} duration`, errors),
       qty: str(source.qty, LIMITS.medicine, `Medicine #${index + 1} quantity`, errors),
-      instruction: str(source.instruction, LIMITS.medicine, `Medicine #${index + 1} instruction`, errors),
+      instruction: str(source.instruction, LIMITS.medicine, `Medicine #${index + 1} administration note`, errors),
+      medicineInstruction: verbatimStr(source.medicineInstruction, 500, `Medicine #${index + 1} one-line instruction`, errors),
     });
   });
   if (items.length === 0 && errors.length === 0) errors.push('Add at least one medicine.');
@@ -405,7 +420,6 @@ export function validateQuickDocumentInput(raw: unknown): QuickValidationResult 
         treatment: str(payload.treatment, LIMITS.short, 'Treatment', errors),
         advice: str(payload.advice, LIMITS.text, 'Advice', errors),
         followUp: isoDate(payload.followUp, 'Follow-up date', errors, false),
-        medicineInstruction: str(payload.medicineInstruction, MEDICINE_INSTRUCTION_MAX, 'Medicine instruction', errors),
         items: medicineItems(payload.items, errors),
       } satisfies QuickPrescriptionPayload;
       break;

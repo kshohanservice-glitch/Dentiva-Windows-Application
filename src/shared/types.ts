@@ -1,7 +1,6 @@
 import type { PermissionKey } from './permissions';
 import type { DocumentStyleMap } from './document-styles';
-import type { WatermarkSettings } from './watermark';
-import type { PrescriptionLabels } from './clinical';
+import type { DocumentWatermarkSettings } from './document-watermark';
 import type { GreetingRange, WhatsAppTemplateCategory } from './whatsapp';
 
 /* ----------------------------- Session ----------------------------- */
@@ -109,6 +108,8 @@ export interface PrescriptionItemDTO {
   frequency: string | null; morning: boolean; afternoon: boolean; night: boolean;
   timing: 'before' | 'after' | 'na'; duration: string | null; qty: string | null;
   instruction: string | null; instructionBn: string | null; note: string | null;
+  /** Optional one-line print instruction; absent on records/templates from older versions. */
+  medicineInstruction?: string | null;
 }
 
 export interface PrescriptionDTO {
@@ -116,14 +117,6 @@ export interface PrescriptionDTO {
   visitId: number | null; dentistId: number; dentistName: string;
   date: string; cC: string | null; oE: string | null; rE: string | null;
   diagnosis: string | null; treatment: string | null; advice: string | null;
-  /**
-   * Optional free-text single-line medicine instruction ("Tab.Napa - 100MG -
-   * 1+0+1 - 7 days - after meals"). Additive: `null` for every prescription
-   * saved before v4.1.3 and for every prescription whose doctor filled the
-   * structured rows only. It prints as its own labelled line and never merges
-   * with, replaces or duplicates the structured medicine rows.
-   */
-  medicineInstruction: string | null;
   followUp: string | null; items: PrescriptionItemDTO[]; createdAt: string;
 }
 
@@ -325,8 +318,7 @@ export interface SettingsDTO {
   clinic: ClinicSettings;
   prescription: {
     footerMessage: string | null; visitingHours: string | null;
-    /** Printed prescription field labels — always complete (see `normalizePrescriptionLabels`). */
-    labels: PrescriptionLabels;
+    labels: { cc: string; oe: string; re: string; diagnosis: string; treatment: string; advice: string; followUp: string };
     signatureReserved: boolean;
   };
   invoice: { nextNumber: string; footerNote: string | null };
@@ -344,12 +336,8 @@ export interface SettingsDTO {
    * original document design”; see `src/shared/document-styles.ts`.
    */
   documentStyles: DocumentStyleMap;
-  /**
-   * Clinic-logo watermark for printable documents (Settings → Customize
-   * Documents). Disabled by default; validated and clamped by
-   * `src/shared/watermark.ts`.
-   */
-  watermark: WatermarkSettings;
+  /** Disabled-by-default clinic-logo watermark preferences (JSON settings key). */
+  documentWatermark: DocumentWatermarkSettings;
 }
 
 /* ------------------------------- Reports ---------------------------- */

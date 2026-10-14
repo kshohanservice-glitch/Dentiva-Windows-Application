@@ -312,7 +312,7 @@ export function StaffPage() {
           }
         >
           <div style={{ minWidth: 260, flex: '1 1 260px' }}>
-            <Input value={query} onChange={setQuery} placeholder="Search name or phone…" ariaLabel="Search staff" />
+            <Input value={query} onChange={setQuery} placeholder="Search name or phone…" ariaLabel="Search staff and dentists" />
           </div>
         </TableToolbar>
 

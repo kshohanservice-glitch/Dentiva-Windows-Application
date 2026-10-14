@@ -32,8 +32,16 @@
   align-items: start;
 }
 
-/* v4.1.3: the walk-in prescription/invoice rows use the labelled, responsive
-   `.rx-item` / `.invoice-line` grids instead of this unlabelled 116 px strip. */
+.line-editor {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(116px, 1fr)) 30px;
+  gap: 6px;
+  align-items: center;
+  padding: 6px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  background: var(--surface-2);
+}
 
 /* ------------------------------------------------ customize documents tab */
 
