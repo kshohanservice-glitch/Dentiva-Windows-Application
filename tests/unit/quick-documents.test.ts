@@ -241,3 +241,61 @@ describe('the walk-in workflow has no WhatsApp surface', () => {
     expect(read('src/renderer/pages/Patients.tsx')).toContain("import { WhatsAppHub } from '../components/whatsapp-hub'");
   });
 });
+
+describe('walk-in one-line medicine instruction bounds', () => {
+  const payload = (extra: Record<string, unknown>) => ({
+    reference: 'QP-20261014-101500',
+    date: '2026-10-14',
+    customer,
+    dentistName: 'Dr. Ayesha Rahman',
+    items: [{ medicineName: 'Amoxicillin' }],
+    ...extra,
+  });
+
+  it('keeps a blank or missing instruction as null instead of inventing text', () => {
+    for (const value of [undefined, null, '', '   ']) {
+      const result = validateQuickDocumentInput({
+        kind: 'prescription',
+        payload: payload({ items: [{ medicineName: 'Amoxicillin', medicineInstruction: value }] }),
+      });
+      expect(result.errors, String(value)).toEqual([]);
+      if (!result.input || !('items' in result.input.payload)) throw new Error('Expected a prescription payload.');
+      expect(result.input.payload.items[0].medicineInstruction, String(value)).toBeNull();
+    }
+  });
+
+  it('rejects an over-long instruction instead of truncating it', () => {
+    const result = validateQuickDocumentInput({
+      kind: 'prescription',
+      payload: payload({ items: [{ medicineName: 'Amoxicillin', medicineInstruction: 'x'.repeat(501) }] }),
+    });
+    expect(result.input).toBeNull();
+    expect(result.errors.some((error) => /one-line instruction must be 500 characters or fewer/i.test(error))).toBe(true);
+  });
+
+  it('rejects a non-text instruction', () => {
+    const result = validateQuickDocumentInput({
+      kind: 'prescription',
+      payload: payload({ items: [{ medicineName: 'Amoxicillin', medicineInstruction: 42 }] }),
+    });
+    expect(result.input).toBeNull();
+    expect(result.errors.some((error) => /one-line instruction must be text/i.test(error))).toBe(true);
+  });
+
+  it('keeps the exact typed text, spacing included, for each medicine', () => {
+    const first = "Tab.Napa - 100MG - 1+0+1/ or 2 Times -1 Tab - 7 Days - After Meals";
+    const second = 'Apply twice daily  on the  gum';
+    const result = validateQuickDocumentInput({
+      kind: 'prescription',
+      payload: payload({
+        items: [
+          { medicineName: 'Napa', medicineInstruction: first },
+          { medicineName: 'Metronidazole', medicineInstruction: second },
+        ],
+      }),
+    });
+    expect(result.errors).toEqual([]);
+    if (!result.input || !('items' in result.input.payload)) throw new Error('Expected a prescription payload.');
+    expect(result.input.payload.items.map((item) => item.medicineInstruction)).toEqual([first, second]);
+  });
+});

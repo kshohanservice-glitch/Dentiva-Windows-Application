@@ -84,7 +84,8 @@ export function DocumentPreview(props: {
   children: React.ReactNode;
   styles?: DocumentStyleMap | null;
   watermark?: DocumentWatermarkSettings | null;
-  clinic?: ClinicSettings | null;
+  /** Only the logo is needed: the preview never reads other clinic fields. */
+  clinic?: Pick<ClinicSettings, 'logoDataUrl'> | null;
   documentType?: string | null;
   pageSize?: DocumentPageSize | null;
   /** Chromium CSS zoom keeps the preview readable in a panel without changing layout. */
@@ -109,7 +110,8 @@ export function DocumentPreview(props: {
           documentType={props.documentType}
           pageSize={pageSize}
         />
-        {props.children}
+        {/* Content layer: paints above the logo watermark (see print.css). */}
+        <div className="print-doc-content">{props.children}</div>
       </div>
     </div>
   );

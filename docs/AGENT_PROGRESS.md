@@ -1,146 +1,97 @@
-# Dentiva Pro — comprehensive product-quality upgrade (v4.1.3) — durable progress log
+# Dentiva Pro — release-hardening progress log (v4.2.1) — durable recovery record
 
-This file is the interruption-recovery record for the **v4.1.3** effort (comprehensive audit,
-mandatory UI/workflow changes, watermark feature, testing, Windows build, release). It is updated
-after every meaningful milestone. A task is only marked **done** when its result was *observed*,
-never when it was started.
+This file is the interruption-recovery record for the **v4.2.1** effort: merging the parallel v4.2.0
+release back into this session's branch, auditing and repairing the merged implementation, keeping the
+branch's unique labelling policy, and publishing a verified release. It is updated after every
+meaningful milestone. A task is only marked **done** when its result was *observed*, never when it was
+started.
 
-## 0. Branch / commit policy for this release
+## 0. Branch / commit policy
 
-- Development branch: `arena/892cf688-dentiva-windows-application` (this Arena session's branch —
-  the name is session-fixed and cannot be renamed). Branched from `main` at
+- Development branch: `arena/892cf688-dentiva-windows-application` (this Arena session's branch — the
+  name is session-fixed and cannot be renamed). Branched from `main` at
   `1c901a34f2d0160b614a751684cacee80fff544b`.
-- All v4.1.3 work happens on this branch; the release is published from a commit that is on `main`
-  (CI enforces `git merge-base --is-ancestor` against `main` before publishing).
+- `main` has since advanced to `06831e3` (merge of PR #31, release **v4.2.0**, tag on `f5d6874`). That
+  release independently implemented the same mandatory items under different module names, so this
+  branch was **merged with `origin/main`** instead of publishing a competing 4.1.3.
+- The release is published from a commit that is on `main` (CI enforces `git merge-base --is-ancestor`
+  before publishing) and only for a tag whose version matches `package.json`.
 
-## 1. Baseline (recorded before any source change)
+## 1. Baseline and current state
 
 | Item | Value |
 | --- | --- |
-| Starting commit | `1c901a34f2d0160b614a751684cacee80fff544b` (merge of PR #29 on `main`) |
-| Working tree | clean |
-| `package.json` version | `4.1.2` |
-| Latest published release | [Dentiva Pro 4.1.2](https://github.com/kshohanservice-glitch/Dentiva-Windows-Application/releases/tag/v4.1.2) (*Latest*, tag `v4.1.2` → `b86a1a3…`) |
-| Existing tags | `v2.0.x`, `v3.0.0`–`v3.0.3`, `v3.1.0`, `v4.0.0`, `v4.1.0`, `v4.1.1`, `v4.1.2` (no `v4.1.3`) |
-| Schema version | 6 (migrations `001_init` … `006_whatsapp`) |
-| Test suite | Vitest **43 files / 472 tests — all passing** (`npm test`, 18.11 s) |
-| Typecheck | `tsc -p tsconfig.renderer.json --noEmit` → 0; `tsc -p tsconfig.node.json --noEmit` → 0 |
-| Lint | `npx eslint .` → 0 |
-| Production build | `npm run build` → clean |
+| Branch tip before the merge | `0161f72` (feat 4.1.3 + docs 4.1.3), PR **#32** open with all three CI checks green |
+| `origin/main` at merge time | `06831e3` — `package.json` = `4.2.0`, release v4.2.0 published 2026-10-14T15:40:58Z |
+| Merge strategy | `git merge origin/main`; every content conflict resolved to **main's** implementation (it is the released, Windows-CI-verified behaviour), then this branch's genuinely unique files kept and the audit fixes below added on top |
+| Unique files kept from this branch | `tests/unit/form-label-policy.test.ts`, `docs/KNOWN_LIMITATIONS.md`, this log |
+| Modules dropped in favour of main's equivalents | `src/shared/{clinical,watermark}.ts` → `clinical-options.ts` / `document-watermark.ts`; `medicine-entry.tsx` → `medicine-entry-editor.tsx`; migration `007_medicine_instruction` → `007_prescription_medicine_instruction` |
+| Schema version | 7 (both migrations 007 variants add the same nullable instruction column; exactly one survives the merge) |
+| Install command for this sandbox | `ELECTRON_SKIP_BINARY_DOWNLOAD=1 npm ci --force --ignore-scripts` |
 | Electron E2E / NSIS installer | **not runnable in this sandbox** (Linux container, no display, Electron binary intentionally not downloaded). Windows CI (`windows-latest`) is the E2E + installer + installed-smoke-test gate. |
 
-Install command that works in this sandbox (the repo pins a Windows-only optional dependency and
-`node-gyp` cannot fetch headers here):
-
-```
-ELECTRON_SKIP_BINARY_DOWNLOAD=1 npm ci --force --ignore-scripts
-```
-
-`better-sqlite3` 13.x ships its own `prebuilds/` inside the npm tarball, so the SQLite-backed
-integration tests run here without compilation.
-
-## 2. Architecture findings relevant to this release
-
-| Area | Finding |
-| --- | --- |
-| Prescription form (Main) | `RxFormModal` in `src/renderer/pages/Patients.tsx`. C/C and O/E are **hard-coded option arrays inside the component**; "Other" reveals a free-text field. Medicine rows are `.rx-item` cards with 8 labelled fields (name, generic, strength, dosage, frequency, duration, quantity, instruction). Layout: `.rx-grid`. |
-| Prescription form (Walk-in) | `QuickDocuments.tsx` → `PrescriptionFields`. C/C, O/E and R/E are **plain unlabelled free-text inputs**, medicine rows are a `.line-editor` grid of nine inputs that carry **only placeholders** (no labels at all) — this is the "field showing F / 3" class of defect: the clipped placeholder of a 116 px column is the only affordance. |
-| Medicine persistence | `prescription_items` (structured: name/generic/form/strength/dosage/frequency/morning/afternoon/night/timing/duration/qty/instruction/instruction_bn/note). Walk-in prescriptions are transient and never stored (documented contract). |
-| Templates | `medicine_templates` (medicine sets, applied by the Main form) and `clinical_templates` (kinds `visit`,`plan`,`notes`,`prescription`,`instructions`,`invoice_items`). `ClinicalTemplatePicker` is already shared. |
-| Print pipeline | Every printable document is produced by `src/renderer/documents/print-documents.tsx` in the print window (`PrintPage.tsx`). `tests/unit/document-layout.test.ts` pins the *default* markup against a frozen pre-4.1.2 copy — proof that the original design is the source of truth. |
-| Existing watermark | Only `prescription-duplicate` renders `.print-watermark` with the diagonal word "Specimen" (`position: fixed`). There is no configurable logo watermark. |
-| Invoice model | `invoice_items(description, treatment_id, qty, unit_price_paisa, discount_paisa, total_paisa)`; `qty` = integer count, `unit_price_paisa` = price of one unit, `discount_paisa` = optional line discount. Invoice totals come from `src/shared/billing-math.ts` (shared with the walk-in path). The printed invoice table labels its price column "Unit", which is the reported confusion. |
-| Settings | One JSON row per key in `settings`; `getSettings`/`saveSettings` validate and normalize. `documentStyles` is the existing customization map; `Settings.tsx` saves the whole form object, so a new key needs only DTO + service validation. |
-
-## 3. Task board
+## 2. Task board
 
 | Task | Status |
 | --- | --- |
-| Repository inspection + baseline capture | done — §1 |
-| Durable progress log | done — this file |
-| Mandatory 1 — clear labels for every unclear input (app-wide) | implemented — label policy enforced by `tests/unit/form-label-policy.test.ts`; remaining accessible-name-only controls listed in `docs/KNOWN_LIMITATIONS.md` §1.2 |
-| Mandatory 2 — consistent medicine-entry layout in both prescription modules | implemented — both modules render the shared `MedicineRowsEditor` |
-| Mandatory 3 — Walk-in C/C + O/E sub-options and templates | implemented — shared option lists + “Other” free text; read-only clinical templates + medicine templates |
-| Mandatory 4 — optional single-line medicine instruction (both modules + print) | implemented — migration 007, both forms, both print paths, single-output rule |
-| Mandatory 5 — clarify Main + Walk-in invoice fields | implemented — labels/hints only, no arithmetic change |
-| Mandatory 6 — configurable, centered clinic-logo watermark | implemented — Settings panel + preview + print layer; disabled by default |
-| Mandatory 7 — autonomous whole-application audit and fixes | in progress — see §4.5, findings recorded in `docs/KNOWN_LIMITATIONS.md` |
-| Tests (unit / integration / layout / E2E) | unit + integration done locally; E2E runs on Windows CI |
-| Build + Windows packaging | `npm run build` local; NSIS + installed smoke test on Windows CI |
-| Version + tag + GitHub release | bumped to 4.1.3; tag/release pending CI packaging |
+| Merge `origin/main` (v4.2.0) into this branch, one behaviour per module | done — conflicts resolved to main's released implementation, unique files preserved |
+| Mandatory 1 — clear labels for every unclear input (app-wide) | done — label policy enforced by `tests/unit/form-label-policy.test.ts`; the one remaining unlabelled control found by the gate fixed; accessible-name-only controls documented in `docs/KNOWN_LIMITATIONS.md` §1.2 |
+| Mandatory 2 — consistent medicine-entry layout in both prescription modules | done (main's `MedicineEntryEditor`; verified in the merged tree) |
+| Mandatory 3 — Walk-in C/C + O/E options with manual entry | done (main's `CHIEF_COMPLAINT_OPTIONS` / `EXAMINATION_OPTIONS` + “Other” free text in both modules) |
+| Mandatory 4 — optional single-line medicine instruction | done; documented that the line **replaces** structured dosing in print, with an in-form warning |
+| Mandatory 5 — clarify Main + Walk-in invoice fields | done (labels/hints only, no arithmetic change) |
+| Mandatory 6 — configurable, centered clinic-logo watermark | done — plus two audit fixes: invisible-layering bug, corrupt-settings normalization; reset control added |
+| Mandatory 7 — autonomous whole-application audit | done for this pass — four real defects found and fixed (§4) |
+| Tests | unit + integration green locally (47 files / 514 tests, main's suite plus the restored coverage); E2E on Windows CI |
+| Build + Windows packaging | `npm run build` clean locally; NSIS + installed smoke test on Windows CI |
+| Version + tag + GitHub release | `package.json` → 4.2.1, `docs/RELEASE_NOTES_4.2.1.md`; tag/release after CI packaging |
 
-## 4. Mandatory work — implementation notes
+## 3. What this branch adds on top of main's v4.2.0
 
-### 4.1 Shared clinical option registry (Mandatory 1 + 3)
+1. **Label policy as an executable gate** — `tests/unit/form-label-policy.test.ts` reads the renderer
+   source and fails on any `Input`/`Select`/`Textarea` without a visible label or an explicit
+   accessible name, and on any CSS that hides a field label.
+2. **`docs/KNOWN_LIMITATIONS.md`** — what is labelled, what is named for assistive technology only, and
+   what was deliberately not changed (Bengali labels, raw HTML controls, autocomplete, instruction
+   semantics, unverified on-paper behaviour).
+3. **Audit fixes** — see §4; three of them are defects in the shipped v4.2.0 code.
+4. **Restored test depth** — the branch-specific assertions that the merge would otherwise have dropped
+   (500-character bound, omitted/blank → `NULL`, verbatim spacing, option-list integrity, watermark
+   normalization edges, CSS layering, settings persistence) now live inside main's own test files, so
+   there is one suite per subject rather than two competing ones.
 
-`src/shared/clinical.ts` gains `CHIEF_COMPLAINT_OPTIONS` and `EXAMINATION_OPTIONS` — the exact
-option **values** already stored by Main Prescription (`Pain On`, `G. Carries`, `BDR/BDC`, …) with
-clear, correctly-spelled dropdown **labels** and short explanations. Values are preserved verbatim
-on purpose: they are what existing rows contain and what the printed document shows, so old
-prescriptions print byte-identically (`docs/` records this decision).
+## 4. Audit findings fixed in this pass (Mandatory 7)
 
-### 4.2 Shared medicine-row editor (Mandatory 1 + 2 + 4)
+| # | Finding | Evidence | Fix |
+| --- | --- | --- | --- |
+| 1 | **Clinic-logo watermark was invisible on screen and on paper.** `.print-logo-watermark` used `z-index: -1`, so the mark painted *below* the white page backgrounds of `.print-stage` / `.print-doc` (and of the print root). The markup tests could not see this because they render the mark in isolation. | CSS painting order; `print.css` backgrounds at `html, body, #root, .print-root`, `.print-stage`, `.print-doc` | Watermark paints at `z-index: 0`; document body wrapped in `.print-doc-content` (`position: relative; z-index: 1`), `.print-doc` made the positioning context; `tests/unit/document-watermark.test.ts` asserts the layering rules from the stylesheet |
+| 2 | **Corrupt watermark settings silently became the smallest mark.** `normalizeDocumentWatermark` used `Number(value)`, and `Number(null) === 0` / `Number('') === 0`, so a hand-edited `opacity: null` clamped *up* to the 0.04 minimum instead of falling back to the 0.12 default (same for `sizePercent`, and numeric strings were accepted). | Repairing the branch's own ported integration expectation exposed it: expected default `0.12`, got `0.04` | New `numericSetting()` accepts only a real finite `number`; everything else falls back to `DEFAULT_DOCUMENT_WATERMARK`. Asserted in unit and integration tests |
+| 3 | **Unlabelled control in the visit form.** The per-treatment quantity `Input` in `Patients.tsx` had no label and no accessible name (the label-policy gate flagged `Patients.tsx:1264`). | `npx vitest run tests/unit/form-label-policy.test.ts` → 1 failed control | Added `ariaLabel={\`Quantity of ${treatment name}\`}` |
+| 4 | **Dead CSS.** `.line-editor` was still defined in `documents.css` although no markup renders it after the shared editor replacement. | `grep -rn "line-editor" src/` → only the stylesheet | Rule removed |
 
-New `src/renderer/components/medicine-entry.tsx` — one labelled, responsive row editor used by
-*Main Prescription and Walk-in Prescription*, so the two screens cannot drift apart again.
-
-### 4.3 Optional single-line medicine instruction (Mandatory 4)
-
-- Schema: migration **007** adds the nullable `prescriptions.medicine_instruction` column
-  (additive; existing rows keep `NULL` and open exactly as before).
-- Both forms expose `Medicine instruction (optional)` beneath the structured rows.
-- Output rule (deterministic, documented in `docs/PRESCRIPTIONS.md`): structured rows keep their
-  existing output; the free-text line renders as its own labelled block and is **never** merged
-  into or repeated alongside a structured row. When both are present the form shows a warning
-  telling the operator that both will print — nothing is silently dropped or duplicated.
-
-### 4.4 Clinic-logo watermark (Mandatory 6) — implemented
-
-`src/shared/watermark.ts` (model, bounds, normalization, geometry) + `WatermarkLayer`
-(`src/renderer/documents/watermark-layer.tsx`) rendered by the print window (`PrintPage.tsx`) and by
-`DocumentPreview` (Settings preview and the walk-in preview), so preview and print cannot disagree.
-Disabled by default; page-centered from the real page geometry in millimetres; aspect ratio preserved
-(`object-fit: contain`); behind document content; applied to every printable document except the
-compact stock/expiry label sheet (deliberate exception, `WATERMARK_EXCLUDED_KINDS`). The panel lives
-in Settings → Customize Documents (`WatermarkPanel`) with enable, size, transparency, live preview,
-reset and a missing-logo warning.
-
-### 4.5 Labelling policy (Mandatory 1) — implemented
-
-`Field` supplies visible labels and ids; a new `ariaLabel` prop on `Input`/`Select`/`Textarea`
-supplies an accessible name for toolbar filters and search boxes, which keeps the policy honest:
-`tests/unit/form-label-policy.test.ts` fails on any renderer control that has neither. What remains
-accessible-name-only is listed, with the reason, in `docs/KNOWN_LIMITATIONS.md` §1.2 — the sweep is
-reported as a policy plus a documented exception list, not as an unverifiable "everything is fixed".
+Also checked and found **correct** (no change): the watermark allow-list (receipts and stock labels
+excluded), the aspect-ratio contract (no `width`/`height` attributes, `object-fit: contain`),
+`@media print` repetition via `position: fixed`, the label/id wiring of the watermark sliders and the
+walk-in fields (`tests/unit/document-forms-a11y.test.ts` asserts every `for=`/`id=` resolves), the
+“no patient row is written” walk-in contract, the invoice arithmetic (`shared/billing-math.ts`
+untouched), and instruction storage/validation (500-character bound, verbatim text, `NULL` for blank).
 
 ## 5. Milestone log
 
 | # | Milestone | Evidence |
 | --- | --- | --- |
-| 1 | Baseline captured on `1c901a3` | §1 — 43 files / 472 tests, typecheck + lint + build clean |
-| 2 | Shared clinical registry + shared medicine-row editor + Walk-in rewrite | `src/shared/clinical.ts`, `src/renderer/components/medicine-entry.tsx`, `QuickDocuments.tsx` |
-| 3 | Optional single-line medicine instruction end to end | migration `007`, both forms, `print-documents.tsx`, quick payload |
-| 4 | Clinic-logo watermark end to end | `src/shared/watermark.ts`, `watermark-layer.tsx`, Settings → Customize Documents, print window |
-| 5 | Label/hint sweep + label-policy regression test | `tests/unit/form-label-policy.test.ts` (3 tests), every renderer control labelled or named; exceptions documented |
-| 6 | New automated coverage | `clinical-options`, `watermark`, `prescription-instruction-print`, `medicine-instruction-settings`, extended `quick-documents` |
-| 7 | Full local gate green | typecheck + lint clean; **48 files / 521 tests passing** (`npm test`); `npm run build` clean |
-| 8 | Version + docs | `package.json`/`package-lock.json` → 4.1.3; `docs/RELEASE_NOTES_4.1.3.md`; `docs/KNOWN_LIMITATIONS.md` |
+| 1 | Pre-merge gate on `0161f72` | 48 files / 521 tests, typecheck + lint + build clean; PR #32 CI fully green (verify, Windows E2E, NSIS + installed smoke test) |
+| 2 | Merge of `origin/main` resolved deliberately | tree = `origin/main` + 3 unique files; no `Broken Tooth` re-add (verified it never existed: `git grep` on `1c901a3` and the raw option list) |
+| 3 | Audit fixes applied | §4 — watermark layering, settings normalization, unlabelled control, dead CSS |
+| 4 | Test depth restored inside main's files | `document-watermark` 4 → 17 tests, `clinical-options` 2 → 5, `quick-documents` +4, `prescription-medicine-instruction` 2 → 11 |
+| 5 | Local gate re-run on the merged tree | typecheck 0 errors; lint clean; `npm test` **47 files / 514 tests** (main's 47-file suite plus the restored coverage); `npm run build` clean |
+| 6 | Docs for the merged release | `docs/KNOWN_LIMITATIONS.md`, `docs/PRINTING.md` (watermark section), `docs/RELEASE_NOTES_4.2.1.md`, this log |
+| 7 | Version bump | `package.json` + `package-lock.json` → `4.2.1` |
+| 8 | CI + release | push, PR #32 re-verified, merge to `main`, tag `v4.2.1`, GitHub release from the notes file |
 
-## 6. Audit notes (Mandatory 7) — what was checked and what was found
+## 6. Next action
 
-| Area | Check | Outcome |
-| --- | --- | --- |
-| Stored records | `prescriptions` read/write path, DTO, print mapping | Passed — the new column is nullable and additive; legacy rows read `NULL` |
-| Calculation order | `shared/billing-math.ts`, invoice line maths, walk-in invoice maths | Passed — untouched; only labels/hints changed |
-| Settings | read/write validation for `documentStyles`, `watermark`, prescription labels | Hardened — labels are now validated on write **and** completed with defaults on read; watermark is clamped on both paths |
-| Input sanitising | every new value entering the DB or a document | Passed — `optString(..., max)` / `str(..., max)` / `reqString(..., max)` on every new field |
-| Accessibility | every renderer control | Fixed — the three unassociated `<label>`s on the patient picker, plus accessible names for toolbar filters; policy test added |
-| Data loss | template application over a half-typed prescription | Fixed — applying a saved medicine template now asks before replacing typed rows (both modules) |
-| Removal safety | deleting a medicine row that contains data | Fixed — confirmation before discarding a non-empty row |
-| Watermark safety | disabled default, corrupt settings, missing logo, excluded documents | Passed — unit tests cover each case |
-| Remaining items | documented, not silently dropped | `docs/KNOWN_LIMITATIONS.md` |
-
-## 7. Next action
-
-Commit the verified tree, open the PR, merge to `main`, then tag `v4.1.3` on the merge commit so the
-Windows CI job produces `DentivaPro-Setup-4.1.3.exe`, its SHA-256 file and the GitHub release.
+Commit the merged tree with the audit fixes and the added coverage, push the branch, let Windows CI
+re-verify (typecheck/lint/unit/integration, Playwright E2E, NSIS installer + installed artifact), then
+merge PR #32 to `main`, tag `v4.2.1` on the merge commit and publish the GitHub release from
+`docs/RELEASE_NOTES_4.2.1.md`.

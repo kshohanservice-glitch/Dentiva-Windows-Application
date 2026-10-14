@@ -437,6 +437,10 @@ test('walk-in / quick documents print a real document without registering a pati
   await expect(printWin.locator('.print-doc .prescription-patient-strip')).toContainText('E2E Walk-in Customer');
   // The walk-in path prints the same template as a stored prescription.
   await expect(printWin.locator('.print-doc .prescription-header')).toBeVisible();
+  // The document body sits in its own raised layer, and the clinic-logo
+  // watermark is off until a clinic enables it (fresh install = default).
+  await expect(printWin.locator('.print-doc > .print-doc-content')).toBeAttached();
+  await expect(printWin.locator('.print-doc .print-logo-watermark')).toHaveCount(0);
   await Promise.all([
     printWin.waitForEvent('close'),
     printWin.getByRole('button', { name: 'Back', exact: true }).click(),

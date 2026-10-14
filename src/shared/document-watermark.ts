@@ -51,21 +51,32 @@ function clamp(value: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, value));
 }
 
+/**
+ * Read a bounded numeric setting. Only a real, finite number counts: `null`,
+ * `''`, `false`, arrays and numeric strings are *missing* values, not zeros, so
+ * a hand-edited or half-migrated settings row falls back to the documented
+ * default instead of silently becoming the smallest watermark (0 would clamp up
+ * to the minimum).
+ */
+function numericSetting(value: unknown): number | null {
+  return typeof value === 'number' && Number.isFinite(value) ? value : null;
+}
+
 /** Normalize old, missing, or hand-edited settings JSON without throwing. */
 export function normalizeDocumentWatermark(value: unknown): DocumentWatermarkSettings {
   const raw = value && typeof value === 'object' && !Array.isArray(value)
     ? value as Record<string, unknown>
     : {};
-  const size = Number(raw.sizePercent);
-  const opacity = Number(raw.opacity);
+  const size = numericSetting(raw.sizePercent);
+  const opacity = numericSetting(raw.opacity);
   return {
     enabled: raw.enabled === true,
-    sizePercent: Number.isFinite(size)
-      ? clamp(size, MIN_SIZE_PERCENT, MAX_SIZE_PERCENT)
-      : DEFAULT_DOCUMENT_WATERMARK.sizePercent,
-    opacity: Number.isFinite(opacity)
-      ? clamp(opacity, MIN_OPACITY, MAX_OPACITY)
-      : DEFAULT_DOCUMENT_WATERMARK.opacity,
+    sizePercent: size === null
+      ? DEFAULT_DOCUMENT_WATERMARK.sizePercent
+      : clamp(size, MIN_SIZE_PERCENT, MAX_SIZE_PERCENT),
+    opacity: opacity === null
+      ? DEFAULT_DOCUMENT_WATERMARK.opacity
+      : clamp(opacity, MIN_OPACITY, MAX_OPACITY),
   };
 }
 

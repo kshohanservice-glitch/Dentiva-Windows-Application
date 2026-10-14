@@ -36,6 +36,9 @@ export function CustomizeDocumentsPanel(props: {
 }) {
   const toast = useToast();
   const watermark = normalizeDocumentWatermark(props.watermark ?? DEFAULT_DOCUMENT_WATERMARK);
+  const watermarkIsDefault = !watermark.enabled
+    && watermark.sizePercent === DEFAULT_DOCUMENT_WATERMARK.sizePercent
+    && watermark.opacity === DEFAULT_DOCUMENT_WATERMARK.opacity;
   const setWatermark = (patch: Partial<DocumentWatermarkSettings>): void => {
     props.onWatermarkChange?.({ ...watermark, ...patch });
   };
@@ -203,6 +206,22 @@ export function CustomizeDocumentsPanel(props: {
               </div>
             )}
           </Field>
+        </div>
+        <div className="row between mt-3">
+          <span className="xsmall muted">
+            Saved with the rest of this page; the preview above updates as you change it.
+          </span>
+          <Button
+            size="sm"
+            variant="ghost"
+            disabled={watermarkIsDefault}
+            onClick={() => {
+              props.onWatermarkChange?.({ ...DEFAULT_DOCUMENT_WATERMARK });
+              toast.success('Watermark reset', 'The clinic-logo watermark is off again with default size and opacity.');
+            }}
+          >
+            Reset watermark
+          </Button>
         </div>
       </Card>
 
