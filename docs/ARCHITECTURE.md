@@ -78,7 +78,8 @@ automated CI (including on non-Windows runners for the majority of the logic).
 │  IPC router → session + RBAC guard → Service layer         │
 │     (patients, visits, chart, prescriptions, appts, queue, │
 │      billing, inventory, accounting, staff, users, backup, │
-│      settings, audit, search, notifications, reports)      │
+│      settings, audit, search, notifications, reports,      │
+│      quick documents — walk-in, transient, never persisted)│
 │        → Repositories (SQL) → SQLite (WAL)                 │
 │  Cross-cutting: logger (rotating, redacting), audit,       │
 │  activation state (DPAPI/safeStorage), auto-lock timer,    │
@@ -118,6 +119,15 @@ DentivaPro/
    of names/prices at creation time.
 5. **No dead UI** — every control reachable in the renderer maps to a working handler;
    unreachable features are removed, not stubbed.
+6. **One rendering path per artefact** — every printable document is produced by
+   `src/renderer/documents/print-documents.tsx` and every amount by
+   `src/shared/billing-math.ts`; screens that must show the same document (print window,
+   Settings → Customize Documents preview, Walk-in / Quick Documents) call the same code
+   instead of re-implementing it. Default layouts are pinned by
+   `tests/unit/document-layout.test.ts` against a frozen copy of the pre-4.1.2 renderers.
+7. **Transient means transient** — Walk-in / Quick Documents validates a payload in the main
+   process, keeps it in memory for the life of the print window and writes no patient,
+   financial or clinical row. Only an audit entry records that a document was prepared.
 
 ## 7. Versioning
 

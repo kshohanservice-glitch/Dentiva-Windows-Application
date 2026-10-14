@@ -5,6 +5,7 @@ import { audit, requirePermission, tx } from '../core/context';
 import { formatInvoiceNumber, nextInvoiceNumber, parseInvoiceNumber } from '../core/sequences';
 import { nowISO, todayISO, dateRangeFor } from '../../shared/currency';
 import { optString, pageParams, reqDate, reqInt, reqString, oneOf } from '../core/validate';
+import { computeInvoiceStatus, computeInvoiceTotals } from '../../shared/billing-math';
 
 interface InvoiceRow {
   id: number; number: string; patient_id: number; patient_name: string; patient_code: string;
@@ -27,12 +28,12 @@ export function paidNetFor(db: Ctx['db'], invoiceId: number): number {
   return Number(row.net);
 }
 
+/**
+ * Status helper kept for the existing call sites; the rule itself lives in
+ * shared/billing-math so the walk-in path cannot drift from the stored one.
+ */
 function computeStatus(total: number, paidNet: number, voidedAt: string | null): InvoiceDTO['status'] {
-  if (voidedAt) return 'voided';
-  if (total === 0) return 'paid';
-  if (paidNet >= total) return 'paid';
-  if (paidNet > 0) return 'partial';
-  return 'unpaid';
+  return computeInvoiceStatus(total, paidNet, !!voidedAt);
 }
 
 function hydrate(ctx: Ctx, row: InvoiceRow): InvoiceDTO {
@@ -95,25 +96,26 @@ export function createInvoice(ctx: Ctx, raw: unknown): InvoiceDTO {
   if (items.length === 0) throw validation('Add at least one line item.');
   if (items.length > 500) throw validation('Too many line items.');
 
-  const clean = items.map((it, i) => {
-    const qty = reqInt(it.qty ?? 1, `Item #${i + 1} quantity`, { min: 1, max: 100000 });
-    const unit = reqInt(it.unitPricePaisa, `Item #${i + 1} unit price`, { min: 0, max: 100_000_000_00 });
-    const disc = reqInt(it.discountPaisa ?? 0, `Item #${i + 1} discount`, { min: 0, max: 100_000_000_00 });
-    const lineTotal = qty * unit;
-    if (disc > lineTotal) throw validation(`Item #${i + 1} discount exceeds the line total.`);
-    return {
-      description: reqString(it.description, `Item #${i + 1} description`, { max: 300 }),
-      treatmentId: it.treatmentId ?? null,
-      qty, unitPricePaisa: unit, discountPaisa: disc,
-      totalPaisa: lineTotal - disc,
-    };
-  });
-
-  const subtotal = clean.reduce((s, it) => s + it.qty * it.unitPricePaisa, 0);
-  const lineDiscounts = clean.reduce((s, it) => s + it.discountPaisa, 0);
   const invoiceDiscount = reqInt(input?.discountPaisa ?? 0, 'Invoice discount', { min: 0, max: 100_000_000_00 });
-  const total = subtotal - lineDiscounts - invoiceDiscount;
-  if (total < 0) throw validation('Discounts exceed the invoice subtotal.');
+  // Line and invoice arithmetic lives in shared/billing-math so the walk-in
+  // quick-invoice path produces identical numbers for identical input.
+  const totals = computeInvoiceTotals(
+    items.map((it, i) => {
+      const qty = reqInt(it.qty ?? 1, `Item #${i + 1} quantity`, { min: 1, max: 100000 });
+      const unit = reqInt(it.unitPricePaisa, `Item #${i + 1} unit price`, { min: 0, max: 100_000_000_00 });
+      const disc = reqInt(it.discountPaisa ?? 0, `Item #${i + 1} discount`, { min: 0, max: 100_000_000_00 });
+      if (disc > qty * unit) throw validation(`Item #${i + 1} discount exceeds the line total.`);
+      return {
+        description: reqString(it.description, `Item #${i + 1} description`, { max: 300 }),
+        qty, unitPricePaisa: unit, discountPaisa: disc,
+      };
+    }),
+    invoiceDiscount,
+  );
+  const clean = totals.lines.map((line, i) => ({ ...line, treatmentId: items[i].treatmentId ?? null }));
+  const subtotal = totals.subtotalPaisa;
+  const total = totals.totalPaisa;
+  if (subtotal - totals.lineDiscountPaisa - invoiceDiscount < 0) throw validation('Discounts exceed the invoice subtotal.');
 
   const id = tx(ctx.db, () => {
     const settingRow = ctx.db.prepare("SELECT value_json FROM settings WHERE key = 'invoice'").get() as { value_json: string } | undefined;

@@ -6,8 +6,11 @@ import { Badge, Button, Card, Kbd, Modal, Spinner, Tabs, useToast } from '../com
 import { Field, Input, Select, Textarea } from '../components/forms';
 import { ClinicLogo } from '../components/clinic-brand';
 import { MessageTemplatesPanel } from '../components/message-templates';
+import { CustomizeDocumentsPanel } from '../components/customize-documents';
+import type { DocumentStyleMap } from '../../shared/document-styles';
 
-type SetTab = 'clinic' | 'security' | 'appearance' | 'notifications' | 'billing' | 'prescription' | 'templates' | 'print' | 'data' | 'shortcuts';
+type SetTab = 'clinic' | 'security' | 'appearance' | 'notifications' | 'billing' | 'prescription' | 'templates'
+  | 'print' | 'documents' | 'data' | 'shortcuts';
 
 export function SettingsPage() {
   const { settings, refreshSettings, refresh, user, logout } = useApp();
@@ -72,6 +75,7 @@ export function SettingsPage() {
     { key: 'prescription', label: 'Prescription' },
     { key: 'templates', label: 'Message Templates' },
     { key: 'print', label: 'Printing' },
+    { key: 'documents', label: 'Customize Documents' },
     { key: 'data', label: 'Data' },
     { key: 'shortcuts', label: 'Shortcuts' },
   ];
@@ -259,6 +263,15 @@ export function SettingsPage() {
         {tab === 'templates' && <MessageTemplatesPanel />}
 
         {tab === 'print' && <PrintTab form={form} set={set} />}
+
+        {tab === 'documents' && (
+          <CustomizeDocumentsPanel
+            value={(form.documentStyles ?? {}) as DocumentStyleMap}
+            onChange={(next) => set(['documentStyles'], next)}
+            clinic={form.clinic}
+            settings={form}
+          />
+        )}
 
         {tab === 'data' && <DataTab />}
 

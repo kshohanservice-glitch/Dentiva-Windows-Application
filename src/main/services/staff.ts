@@ -121,6 +121,12 @@ export function deleteDentist(ctx: Ctx, id: number): { ok: boolean } {
   return { ok: true };
 }
 
+/** Single dentist by id (read-only helper used by the quick-document path). */
+export function getDentist(ctx: Ctx, id: number): DentistDTO | null {
+  const row = ctx.db.prepare('SELECT * FROM dentists WHERE id = ? AND deleted_at IS NULL').get(id) as any;
+  return row ? dentistDTO(row) : null;
+}
+
 export function listDentists(ctx: Ctx, includeInactive = false): DentistDTO[] {
   requirePermission(ctx, 'patients.view');
   const rows = ctx.db

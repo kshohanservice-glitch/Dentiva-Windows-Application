@@ -27,6 +27,47 @@ Consequently the preview is genuinely WYSIWYG, and `****` cannot leak into a pri
 
 Screen masking itself is untouched: no global setting is mutated, no authorisation check is weakened, and the per-amount/global reveal controls in the normal UI behave exactly as before.
 
+## Document customization (Settings → Customize Documents)
+
+Printable documents can be adjusted per element without changing the base stylesheet. The original
+design is the source of truth: a document prints exactly as before until a clinic stores an
+override, and resetting an element/section/document restores the original.
+
+* Registry: `src/shared/document-styles.ts` declares, for each of the seven document types, the
+  stable element ids (`<document>.<section>.<element>`), which properties each element accepts, its
+  bounds and whether it may be hidden.
+* Markers: a renderer node that may be customized carries `{...docEl('invoice.body.title')}`, which
+  adds the attribute `data-doc-el` — no element, no class, no inline style.
+* Generated CSS: `documentStyleCss()` emits `.print-doc [data-doc-el="…"] { … }` rules (plus a
+  ` th`/` td` descendant for cell groups) **only** for stored overrides, each declaration carrying
+  its own `!important`. With nothing customized it returns an empty string, and the print page then
+  renders no `<style>` element at all.
+* Storage: the `documentStyles` key in the existing settings table, validated on save and on read by
+  `normalizeDocumentStyles()` (unknown documents/elements/properties dropped, numbers clamped,
+  colours must be hex, non-optional content cannot be hidden, never throws). No migration.
+* Preview: `src/renderer/components/customize-documents.tsx` renders a real document (see
+  `src/renderer/documents/document-preview.tsx` and `documents/samples.ts`) inside a `.print-doc`
+  frame, so the preview and the printed page come from the same builders.
+* Geometry is untouched by customization: page size, margins, scale and copies remain owned by
+  `profilePageCss()` and the selected print profile.
+
+## Walk-in / Quick Documents
+
+`src/renderer/pages/QuickDocuments.tsx` (sidebar: **Walk-in / Quick Docs**) produces a prescription,
+invoice, receipt, examination report or appointment card for a customer who is not registered.
+
+* The form validates with `validateQuickDocumentInput()` (`src/shared/quick-documents.ts`) before
+  anything is sent, and the main process validates the same payload again in
+  `src/main/services/quick-documents.ts`; the renderer is never trusted.
+* Both the create and the print permission of the document kind are required in the service layer.
+* The validated payload is held in memory (two hours, at most 24 documents) and is read back by the
+  print window through `quick-documents/payload`; it is rendered by the same builders as a stored
+  document, so the template, header, footer, signature block and page geometry are identical.
+* No patient/invoice/payment/visit/appointment row is written at any point; only an audit entry
+  (`document.quick.prepare`) recording the kind and reference.
+* There is no WhatsApp surface in this workflow (enforced by a source-level test); WhatsApp on the
+  patient screens is unchanged.
+
 ## Clinic branding in printed documents
 
 Printed headers show the configured clinic name and logo (see `src/renderer/components/clinic-brand.tsx`), falling back to the product identity and a generic clinic name when nothing is configured. The clinic logo is stored under `<dataDir>/branding/` and is included in `.dpv` backups, so a restored backup keeps printing the clinic's own letterhead.

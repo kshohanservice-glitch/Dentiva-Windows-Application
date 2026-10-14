@@ -17,6 +17,7 @@ import type {
 } from './types';
 import type { PermissionKey } from './permissions';
 import type { ClinicalTemplate, ClinicalTemplateKind, ClinicalTemplateBody } from './clinical-templates';
+import type { QuickDocumentInput, QuickDocumentKind, QuickDocumentPayload } from './quick-documents';
 
 /** Appointment edit payload. Moving the date or time requires `confirmReschedule: true`. */
 export interface AppointmentUpdatePayload {
@@ -228,6 +229,10 @@ export interface DentivaApi {
     scale?: number;
   }): Promise<{ ok: boolean; path?: string; cancelled?: boolean; error?: string }>;
 
+  /* walk-in / quick documents (transient — no patient record is created) */
+  'quick-documents/prepare'(input: QuickDocumentInput): Promise<{ token: string; reference: string }>;
+  'quick-documents/payload'(token: string): Promise<QuickDocumentDTO>;
+
   /* referrals */
   'referrals/list'(patientId: number): Promise<ReferralRecord[]>;
   'referrals/save'(input: ReferralInput): Promise<ReferralRecord>;
@@ -300,7 +305,9 @@ export interface ReferralInput {
 }
 
 export type PrintDocKind = 'invoice' | 'receipt' | 'prescription' | 'prescription-duplicate'
-  | 'visit-summary' | 'appointment-card' | 'stock-labels' | 'report';
+  | 'visit-summary' | 'appointment-card' | 'stock-labels' | 'report'
+  /* walk-in / quick document held transiently by the main process */
+  | 'quick';
 
 export interface PrintDocRequest {
   type: PrintDocKind;
@@ -315,6 +322,19 @@ export interface PrinterInfoDTO {
 }
 
 export type PublicSettings = { clinic: SettingsDTO['clinic']; prescription: { labels: SettingsDTO['prescription']['labels'] } };
+
+/**
+ * A walk-in / quick document held transiently by the main process while its
+ * print window is open. It is never written to the database and never carries a
+ * patient id, so a quick document cannot create or alter a patient record.
+ */
+export interface QuickDocumentDTO {
+  kind: QuickDocumentKind;
+  payload: QuickDocumentPayload;
+  /** Dentist record resolved for the selected dentist, or null for a free-text name. */
+  dentist: DentistDTO | null;
+  createdAt: string;
+}
 
 export interface SetupInput {
   clinic: { clinicName: string; address?: string | null; phone?: string | null; email?: string | null; logoPath?: string | null };
@@ -467,6 +487,9 @@ export const IPC = {
 
   referralsList: 'referrals/list',
   referralsSave: 'referrals/save',
+
+  quickDocumentsPrepare: 'quick-documents/prepare',
+  quickDocumentsPayload: 'quick-documents/payload',
 
   whatsappDocuments: 'whatsapp/documents',
   whatsappTemplatesList: 'whatsapp/templates/list',

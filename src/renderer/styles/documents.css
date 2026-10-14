@@ -1,0 +1,81 @@
+/**
+ * Screen-only styles for the two document features:
+ *   - Walk-in / Quick Documents (pages/QuickDocuments.tsx)
+ *   - Settings → Customize Documents (components/customize-documents.tsx)
+ *
+ * Nothing here affects printed output: printable styling lives in print.css and
+ * in the generated per-element stylesheet (shared/document-styles.ts). These
+ * rules only lay out the forms and the on-screen document frames, which is why
+ * they are kept in a separate file from the print stylesheet.
+ */
+
+/* ------------------------------------------------------------- callouts */
+
+.callout {
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  background: var(--surface-2);
+  padding: 10px 12px;
+  font-size: var(--fs-sm);
+  margin-bottom: var(--sp-4);
+}
+.callout-info { border-color: #bcd8f6; background: #eef6ff; color: #12395f; }
+.callout-warning { border-color: #f0d9a8; background: #fff8e6; color: #6b4a06; }
+.callout strong { display: block; margin-bottom: 2px; }
+
+/* --------------------------------------------------- walk-in / quick docs */
+
+.quick-grid {
+  display: grid;
+  grid-template-columns: minmax(340px, 1fr) minmax(380px, 1.05fr);
+  gap: var(--sp-4);
+  align-items: start;
+}
+
+.line-editor {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(116px, 1fr)) 30px;
+  gap: 6px;
+  align-items: center;
+  padding: 6px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  background: var(--surface-2);
+}
+
+/* ------------------------------------------------ customize documents tab */
+
+.customize-grid {
+  display: grid;
+  grid-template-columns: minmax(230px, 300px) minmax(320px, 1fr);
+  gap: var(--sp-4);
+  align-items: start;
+}
+
+.customize-elements .list-row.active { background: var(--surface-2); border-radius: var(--r-sm); box-shadow: inset 2px 0 0 var(--brand-700); }
+.customize-elements .list { max-height: 420px; overflow: auto; }
+
+.style-controls {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(206px, 1fr));
+  gap: 10px 14px;
+}
+.style-control { margin: 0; }
+.style-control > label { display: block; margin-bottom: 4px; font-size: var(--fs-sm); color: var(--muted); }
+.style-color { width: 46px; height: 34px; padding: 2px; cursor: pointer; }
+
+/* Screen frame around a real printable document (same .print-doc as printing). */
+.doc-preview-frame {
+  overflow: auto;
+  max-height: 640px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  background: var(--surface-2);
+  padding: var(--sp-3);
+}
+.doc-preview { margin: 0 auto; transform-origin: top left; }
+
+@media (max-width: 1180px) {
+  .quick-grid,
+  .customize-grid { grid-template-columns: 1fr; }
+}

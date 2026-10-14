@@ -411,6 +411,44 @@ test('invoice print window uses standard profiles and closes with Back', async (
   await detail.getByRole('button', { name: 'Close' }).click();
 });
 
+test('walk-in / quick documents print a real document without registering a patient', async () => {
+  await page.getByRole('link', { name: 'Walk-in / Quick Docs' }).click();
+  await expect(page.getByRole('heading', { name: 'Walk-in / Quick Documents', level: 1 })).toBeVisible();
+
+  // Prescription is the default document type for this workflow.
+  await page.getByLabel('Customer name').fill('E2E Walk-in Customer');
+  await page.getByLabel('Dentist name (typed)').fill('Dr. E2E Dentist');
+  await page.locator('.line-editor input').first().fill('Amoxicillin');
+  await page.locator('.line-editor input').nth(1).fill('500mg');
+
+  // The preview is the real document renderer, so it must show the same content
+  // the print window will show.
+  const preview = page.locator('.doc-preview-frame .print-doc');
+  await expect(preview.locator('.prescription-medication')).toContainText('Amoxicillin');
+  await expect(preview).toContainText('E2E Walk-in Customer');
+
+  const [printWin] = await Promise.all([
+    app.waitForEvent('window', { timeout: 60_000 }),
+    page.getByRole('button', { name: 'Preview & print' }).click(),
+  ]);
+  await printWin.waitForLoadState('domcontentloaded');
+  expect(printWin.url()).toContain('#print/quick/');
+  await expect(printWin.locator('.print-doc')).toContainText('Amoxicillin', { timeout: 60_000 });
+  await expect(printWin.locator('.print-doc .prescription-patient-strip')).toContainText('E2E Walk-in Customer');
+  // The walk-in path prints the same template as a stored prescription.
+  await expect(printWin.locator('.print-doc .prescription-header')).toBeVisible();
+  await Promise.all([
+    printWin.waitForEvent('close'),
+    printWin.getByRole('button', { name: 'Back', exact: true }).click(),
+  ]);
+
+  // Nothing was written to the patient table by the walk-in workflow.
+  await page.getByRole('link', { name: 'Patients', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'Patients', level: 1 })).toBeVisible();
+  await page.getByPlaceholder('Search name, phone, patient ID, tag…').fill('E2E Walk-in Customer');
+  await expect(page.getByRole('cell', { name: 'E2E Walk-in Customer' })).toHaveCount(0);
+});
+
 test('runs reports from the UI — the full catalogue contract (ISS-020 guard)', async () => {
   await page.getByRole('link', { name: 'Reports' }).click();
   await expect(page.getByRole('heading', { name: 'Reports', level: 1 })).toBeVisible();
@@ -526,7 +564,7 @@ test('completes a patient visit from the profile and supports patient deletion',
 test('adapts cleanly across 1280×720 and 1920×1080 viewports without horizontal overflow', async () => {
   for (const size of [{ width: 1280, height: 720 }, { width: 1920, height: 1080 }]) {
     await page.setViewportSize(size);
-    for (const nav of ['Dashboard', 'Patients', 'Appointments', 'Invoice', 'Inventory', 'Settings']) {
+    for (const nav of ['Dashboard', 'Patients', 'Appointments', 'Walk-in / Quick Docs', 'Invoice', 'Inventory', 'Settings']) {
       await page.getByRole('link', { name: nav, exact: true }).click();
       const overflow = await page.evaluate(() => {
         const doc = document.documentElement;

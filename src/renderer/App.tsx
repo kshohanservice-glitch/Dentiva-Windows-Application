@@ -11,6 +11,7 @@ import { PatientsPage, PatientProfilePage } from './pages/Patients';
 import { AppointmentsPage } from './pages/Appointments';
 import { TreatmentsPage } from './pages/Treatments';
 import { PrescriptionsPage } from './pages/Prescriptions';
+import { QuickDocumentsPage } from './pages/QuickDocuments';
 import { InvoicesPage, PaymentsPage } from './pages/Invoices';
 import { InventoryPage } from './pages/Inventory';
 import { AccountingPage } from './pages/Accounting';
@@ -69,6 +70,10 @@ function Root() {
           <Route path="patients" element={<Guarded permission="patients.view"><PatientsPage /></Guarded>} />
           <Route path="patients/:id" element={<Guarded permission="patients.view"><PatientProfilePage /></Guarded>} />
           <Route path="appointments" element={<Guarded permission="appointments.view"><AppointmentsPage /></Guarded>} />
+          {/* Walk-in / Quick Documents — printable documents for one-time
+              customers. Guarded in the page itself (it offers only the
+              document types the current role may create). */}
+          <Route path="quick-documents" element={<Guarded><QuickDocumentsPage /></Guarded>} />
           {/* Queue was retired in 3.1: old links land on Appointments instead of a dead screen. */}
           <Route path="queue" element={<Navigate to="/appointments" replace />} />
           <Route path="treatments" element={<Guarded permission="treatments.view"><TreatmentsPage /></Guarded>} />
