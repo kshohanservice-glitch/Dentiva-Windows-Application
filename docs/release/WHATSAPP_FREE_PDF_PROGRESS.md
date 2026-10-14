@@ -51,16 +51,29 @@ completion for steps that have not actually run.
 
 ## Test results (actual, Linux sandbox 2026-10-14)
 
+> Post-release follow-up: the WhatsApp open failure reported against 4.1.0 is
+> audited, root-caused and fixed on the session branch (unreleased). See
+> `docs/release/WHATSAPP_OPEN_FAILURE_AUDIT.md`. The numbers below marked
+> *(after the opening fix)* are the current branch state.
+
 | Command | Result |
 | --- | --- |
-| `npx vitest run tests/unit/whatsapp.test.ts tests/integration/whatsapp.test.ts` | 45 passed (30 unit + 15 integration) |
-| `npm test` (full suite) | **35 files / 355 tests passed** (v4.0.0 baseline: 308) |
+| `npx vitest run tests/unit/whatsapp.test.ts tests/integration/whatsapp.test.ts` | 45 passed (30 unit + 15 integration) — *(after the opening fix: 46 passed, 31 unit)* |
+| `npx vitest run tests/integration/whatsapp-open-ipc.test.ts` *(after the opening fix)* | 9 passed (new: OS hand-off, OS refusal, unsafe URLs, longest link, clipboard recovery) |
+| `npm test` (full suite) | **35 files / 355 tests passed** (v4.0.0 baseline: 308) — *(after the opening fix: 37 files / 365 tests passed)* |
 | `npm run typecheck` (renderer + node) | pass |
 | `npm run lint` | pass, 0 errors |
 | `npm run build` | pass |
 | `npm audit --omit=dev --audit-level=moderate` | 0 vulnerabilities |
 
 ## Known problems / blockers
+
+- The 4.1.0 WhatsApp opening failure reported by a clinic is not reproducible
+  from this sandbox (no Windows). The audit in
+  `docs/release/WHATSAPP_OPEN_FAILURE_AUDIT.md` proves the failure path in code
+  and lists the Windows checks that are still pending. The fix is unreleased and
+  needs a new installer (for example a 4.1.1 patch) before clinics can receive
+  it; nothing was built, uploaded or published without authorisation.
 
 - The Linux sandbox cannot download an Electron binary, so local Electron E2E and a local Windows installer build are impossible; Windows CI is the installer gate (same limitation as v4.0.0).
 

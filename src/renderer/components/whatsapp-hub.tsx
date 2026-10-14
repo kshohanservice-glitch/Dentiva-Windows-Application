@@ -39,6 +39,7 @@ export function WhatsAppHub(props: { patient: PatientDetailDTO; onPatientChanged
   const [shareDocs, setShareDocs] = useState<PatientDocumentDTO[] | null>(null);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [openingChat, setOpeningChat] = useState(false);
+  const [copyingLink, setCopyingLink] = useState(false);
 
   const docs = useAsync(() => api['whatsapp/documents'](patient.id), [patient.id]);
   const history = useAsync(() => api['whatsapp/history'](patient.id), [patient.id]);
@@ -76,6 +77,21 @@ export function WhatsAppHub(props: { patient: PatientDetailDTO; onPatientChanged
     }
   };
 
+  // Recovery path: the same prepared link, placed on the clipboard so it can
+  // be pasted into a browser or WhatsApp when Windows cannot open it.
+  const copyPlainChatLink = async () => {
+    setCopyingLink(true);
+    try {
+      const prepared = await api['whatsapp/prepare']({ patientId: patient.id, category: 'custom', dryRun: true });
+      await api['whatsapp/copy-link'](prepared.url);
+      toast.push({ kind: 'info', title: 'Link copied', message: 'Paste it into your browser or WhatsApp to continue.' });
+    } catch (err) {
+      toast.fromError(err, 'Could not copy the WhatsApp link');
+    } finally {
+      setCopyingLink(false);
+    }
+  };
+
   return (
     <div className="col gap-4">
       <Card
@@ -94,10 +110,12 @@ export function WhatsAppHub(props: { patient: PatientDetailDTO; onPatientChanged
           <p className="xsmall muted" style={{ margin: 0 }}>
             Messages are prepared here and opened in WhatsApp with the official Click to Chat link. Nothing is sent
             automatically — you review the message, attach any PDF by hand, and press Send in WhatsApp. Opening a chat
-            is not proof of delivery.
+            is not proof of delivery. WhatsApp Desktop is not required: the link opens in the default browser, which
+            shows WhatsApp Web. If Windows cannot open it, use Copy link and paste it into the browser yourself.
           </p>
           <div className="row gap-2 wrap">
             <Button variant="primary" loading={openingChat} onClick={() => void openPlainChat()}>Open WhatsApp Chat</Button>
+            <Button variant="ghost" loading={copyingLink} onClick={() => void copyPlainChatLink()}>Copy link</Button>
             <Button variant="secondary" onClick={() => setComposer({ category: 'appointment_reminder' })}>Send Reminder</Button>
             <Button variant="secondary" onClick={() => setComposer({ category: 'follow_up_reminder' })}>Send Follow-up Reminder</Button>
             <Button variant="secondary" onClick={() => setComposer({ category: 'custom' })}>Send Custom Message</Button>
@@ -429,20 +447,23 @@ function MessageComposerModal(props: ComposerProps) {
     else void generate();
   };
 
+  const preparePayload = (overrides: { dryRun: boolean; messageOverride?: boolean }) => ({
+    patientId: patient.id,
+    templateId: templateId ? Number(templateId) : null,
+    category,
+    appointmentId: appointmentId ? Number(appointmentId) : null,
+    previousAppointmentId: previousAppointmentId ? Number(previousAppointmentId) : null,
+    visitId: visitId ? Number(visitId) : null,
+    documents: (props.documents ?? []).map((d) => ({ kind: d.kind, documentId: d.documentId })),
+    customBody: customBody || null,
+    messageOverride: overrides.messageOverride && edited ? message : null,
+    dryRun: overrides.dryRun,
+  });
+
   const openWhatsApp = async () => {
     setBusy(true);
     try {
-      const result = await api['whatsapp/prepare']({
-        patientId: patient.id,
-        templateId: templateId ? Number(templateId) : null,
-        category,
-        appointmentId: appointmentId ? Number(appointmentId) : null,
-        previousAppointmentId: previousAppointmentId ? Number(previousAppointmentId) : null,
-        visitId: visitId ? Number(visitId) : null,
-        documents: (props.documents ?? []).map((d) => ({ kind: d.kind, documentId: d.documentId })),
-        customBody: customBody || null,
-        messageOverride: edited ? message : null,
-      });
+      const result = await api['whatsapp/prepare'](preparePayload({ dryRun: false, messageOverride: true }));
       setWarnings(result.warnings);
       setLastLogId(result.logId);
       await api['whatsapp/open'](result.url);
@@ -450,6 +471,21 @@ function MessageComposerModal(props: ComposerProps) {
       props.onDone();
     } catch (err) {
       toast.fromError(err, 'Could not open WhatsApp');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  // Recovery path: copy the same prepared link so it can be pasted into a
+  // browser or WhatsApp when Windows cannot open it.
+  const copyWhatsAppLink = async () => {
+    setBusy(true);
+    try {
+      const result = await api['whatsapp/prepare'](preparePayload({ dryRun: true, messageOverride: true }));
+      await api['whatsapp/copy-link'](result.url);
+      toast.push({ kind: 'info', title: 'Link copied', message: 'Paste it into your browser or WhatsApp to continue.' });
+    } catch (err) {
+      toast.fromError(err, 'Could not copy the WhatsApp link');
     } finally {
       setBusy(false);
     }
@@ -486,6 +522,7 @@ function MessageComposerModal(props: ComposerProps) {
       width="wide"
       footer={<>
         <Button variant="secondary" onClick={props.onClose}>Cancel</Button>
+        <Button variant="ghost" loading={busy} onClick={() => void copyWhatsAppLink()}>Copy link</Button>
         {lastLogId ? (
           <>
             <span className="small muted">After sending in WhatsApp, record the outcome:</span>
@@ -683,14 +720,41 @@ function ShareDocumentsModal(props: {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const openWhatsApp = async () => {
+  /** The one link both actions use; never built when the number is unusable. */
+  const chatUrl = (): string | null => {
+    const digits = (patient.whatsappNumber ?? '').replace(/\D/g, '');
+    if (!digits) {
+      toast.error('Could not open WhatsApp', 'Add a WhatsApp number for this patient first, then try again.');
+      return null;
+    }
     try {
-      const digits = (patient.whatsappNumber ?? '').replace(/\D/g, '');
-      const url = buildWhatsAppUrl(digits, intro);
+      return buildWhatsAppUrl(digits, intro);
+    } catch (err) {
+      toast.fromError(err, 'Could not open WhatsApp');
+      return null;
+    }
+  };
+
+  const openWhatsApp = async () => {
+    const url = chatUrl();
+    if (!url) return;
+    try {
       await api['whatsapp/open'](url);
       toast.push({ kind: 'info', title: 'WhatsApp opened', message: 'Attach the PDF files manually in WhatsApp, then press Send. Dentiva Pro does not attach files automatically.' });
     } catch (err) {
       toast.fromError(err, 'Could not open WhatsApp');
+    }
+  };
+
+  // Recovery path when Windows cannot open the link.
+  const copyWhatsAppLink = async () => {
+    const url = chatUrl();
+    if (!url) return;
+    try {
+      await api['whatsapp/copy-link'](url);
+      toast.push({ kind: 'info', title: 'Link copied', message: 'Paste it into your browser or WhatsApp to continue.' });
+    } catch (err) {
+      toast.fromError(err, 'Could not copy the WhatsApp link');
     }
   };
 
@@ -701,6 +765,7 @@ function ShareDocumentsModal(props: {
       width="wide"
       footer={<>
         <Button variant="secondary" onClick={props.onClose}>Close</Button>
+        <Button variant="ghost" disabled={!prepared} onClick={() => void copyWhatsAppLink()}>Copy link</Button>
         <Button variant="primary" disabled={!prepared} onClick={() => void openWhatsApp()}>Open WhatsApp Chat</Button>
       </>}
     >

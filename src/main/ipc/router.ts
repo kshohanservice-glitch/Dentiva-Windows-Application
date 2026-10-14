@@ -1,4 +1,4 @@
-import { BrowserWindow, dialog, ipcMain, shell, type OpenDialogOptions, type SaveDialogOptions } from 'electron';
+import { BrowserWindow, clipboard, dialog, ipcMain, shell, type OpenDialogOptions, type SaveDialogOptions } from 'electron';
 import fs from 'node:fs';
 import { IPC } from '../../shared/ipc';
 import type { SessionUser } from '../../shared/types';
@@ -434,7 +434,31 @@ export function registerRouter(deps: RouterDeps): void {
   handle(IPC.whatsappOpen, { auth: true, fn: async (p, ctx) => {
     requirePermission(ctx!, 'patients.view');
     const url = whatsappSvc.assertSafeWhatsAppOpenUrl(p);
-    await shell.openExternal(url);
+    try {
+      await shell.openExternal(url);
+    } catch (err) {
+      // Windows refused the hand-off — typically no default browser (or no
+      // https handler) is registered for web links. The raw system text is
+      // kept in the log for support; the doctor gets an English message with
+      // a recovery step instead of a generic internal error.
+      logger.error('Windows refused to open the prepared WhatsApp link', {
+        detail: err instanceof Error ? err.message : String(err),
+      });
+      throw new AppError(
+        'FILE',
+        'Windows could not open the WhatsApp link in a browser. Check that a default browser is set for web links ' +
+          '(Windows Settings, Apps, Default apps), then try again — or use Copy link and paste the link into WhatsApp.',
+      );
+    }
+    return { ok: true as const };
+  } });
+  // Recovery path when the operating system cannot open the link: the same
+  // strictly validated wa.me URL is placed on the clipboard so the doctor can
+  // paste it into a browser or WhatsApp manually. Nothing else is copied.
+  handle(IPC.whatsappCopyLink, { auth: true, fn: (p, ctx) => {
+    requirePermission(ctx!, 'patients.view');
+    const url = whatsappSvc.assertSafeWhatsAppOpenUrl(p);
+    clipboard.writeText(url);
     return { ok: true as const };
   } });
   handle(IPC.whatsappHistory, { auth: true, fn: (p, ctx) => whatsappSvc.listWhatsAppHistory(ctx!, Number(p)) });

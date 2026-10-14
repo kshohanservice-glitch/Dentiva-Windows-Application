@@ -7,6 +7,8 @@ import {
   greetingForMinutes,
   hasUnresolvedPlaceholders,
   isSafeWhatsAppUrl,
+  MAX_WHATSAPP_LINK_LENGTH,
+  MAX_WHATSAPP_MESSAGE_LENGTH,
   normalizeWhatsAppNumber,
   placeholdersIn,
   renderWhatsAppTemplate,
@@ -183,6 +185,15 @@ describe('Click to Chat URLs', () => {
     expect(() => buildWhatsAppUrl('123', 'hello')).toThrow(/invalid/i);
     expect(() => buildWhatsAppUrl('+8801712345678', 'hello')).toThrow(/invalid/i);
     expect(() => buildWhatsAppUrl('', 'hello')).toThrow(/invalid/i);
+  });
+
+  it('never lets the message limit produce a link the open guard would refuse', () => {
+    // The main process refuses links longer than MAX_WHATSAPP_LINK_LENGTH, so
+    // the longest message the app accepts must still fit inside that ceiling.
+    const longestAllowed = buildWhatsAppUrl('8801712345678', 'ক'.repeat(MAX_WHATSAPP_MESSAGE_LENGTH));
+    expect(longestAllowed.length).toBeLessThanOrEqual(MAX_WHATSAPP_LINK_LENGTH);
+    // Bengali costs nine encoded characters per letter (3 UTF-8 bytes).
+    expect(longestAllowed.length).toBeGreaterThan(MAX_WHATSAPP_MESSAGE_LENGTH * 8);
   });
 
   it('only accepts strict https wa.me URLs for opening', () => {

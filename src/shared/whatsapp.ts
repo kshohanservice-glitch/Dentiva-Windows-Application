@@ -429,6 +429,19 @@ export function hasUnresolvedPlaceholders(text: string): boolean {
 
 /* ------------------------------ wa.me links -------------------------- */
 
+/** Longest message the composer accepts (characters). Enforced in the service. */
+export const MAX_WHATSAPP_MESSAGE_LENGTH = 4000;
+
+/**
+ * Longest Click to Chat link Dentiva Pro can legitimately produce for such a
+ * message. Bengali text costs nine characters per letter once percent-encoded
+ * (3 UTF-8 bytes → `%XX%XX%XX`), plus the `https://wa.me/<digits>?text=`
+ * prefix. The main process refuses to hand anything longer to the operating
+ * system, so a link the app itself prepared can never be rejected on the way
+ * to the browser.
+ */
+export const MAX_WHATSAPP_LINK_LENGTH = 100 + MAX_WHATSAPP_MESSAGE_LENGTH * 9;
+
 /**
  * Build the official Click to Chat URL. Throws an English Error for an
  * invalid destination so callers can surface it; Bengali text, punctuation

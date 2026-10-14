@@ -11,6 +11,8 @@ import {
   DEFAULT_WHATSAPP_TEMPLATES,
   hasUnresolvedPlaceholders,
   isSafeWhatsAppUrl,
+  MAX_WHATSAPP_LINK_LENGTH,
+  MAX_WHATSAPP_MESSAGE_LENGTH,
   normalizeWhatsAppNumber,
   placeholderLabel,
   renderWhatsAppTemplate,
@@ -416,7 +418,7 @@ export function prepareWhatsAppMessage(ctx: Ctx, input: WhatsAppPrepareInput): W
     if (hasUnresolvedPlaceholders(message)) {
       throw validation('The message still contains unresolved placeholders ({{...}}). Replace or remove them before opening WhatsApp.');
     }
-    if (message.length > 4000) throw validation('Message is too long (max 4000 characters).');
+    if (message.length > MAX_WHATSAPP_MESSAGE_LENGTH) throw validation(`Message is too long (max ${MAX_WHATSAPP_MESSAGE_LENGTH} characters).`);
   } else {
     const rendered = renderWhatsAppTemplate(resolved.body, context);
     message = rendered.text;
@@ -589,7 +591,7 @@ export function recordWhatsAppStatus(ctx: Ctx, logId: number, status: string): W
 
 /** The only external URLs this feature may open: official wa.me links. */
 export function assertSafeWhatsAppOpenUrl(value: unknown): string {
-  const url = optString(value, 'WhatsApp link', { max: 8000 });
+  const url = optString(value, 'WhatsApp link', { max: MAX_WHATSAPP_LINK_LENGTH });
   if (!url || !isSafeWhatsAppUrl(url)) {
     throw validation('Refusing to open an unsafe or invalid WhatsApp link.');
   }
