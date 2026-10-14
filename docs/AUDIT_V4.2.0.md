@@ -22,20 +22,29 @@ behavior and were not intentionally changed.
 | Form accessibility | Several reusable and page-level controls needed dependable labels/names. | Added consistent `Field` associations and accessible names across reviewed forms; regression coverage is in `tests/unit/document-forms-a11y.test.ts`. |
 | Offline/data handling | Features must not add cloud dependencies or alter unrelated clinic records. | No runtime dependency or network service was added. Watermark preferences use existing settings storage; the only database change is the additive prescription-item column. |
 
-## Automated verification in this checkout
+## Automated verification
 
 | Check | Result |
 | --- | --- |
-| `npm run typecheck` | Passed after the latest changes. |
-| `npm run lint` | Passed. |
-| `npm run build` | Passed: main/preload and renderer production builds. |
-| `npm test` | 46 files / 482 tests passed. The command logged an Electron binary download `TypeError: fetch failed`; Vitest nevertheless completed with exit code 0. This is not evidence of a successful Electron E2E run. |
-| `npm audit --omit=dev` | 0 production dependency vulnerabilities reported. |
-| Full `npm audit` | 8 moderate development-tree findings; no high or critical findings after locking `http-cache-semantics` 4.3.0 and `source-map-js` 1.2.2. The `electron-builder` audit recommendation to downgrade below the project's declared range was not applied. |
-| `git diff --check` | Passed on the current checkout. |
-| Electron E2E / Windows package / installed-app smoke | Not run locally. The Electron binary is absent and could not be downloaded in this sandbox; this is Linux x86_64 without Wine or NSIS/makensis. Windows CI remains the release gate. |
-| Physical printer / clinic device | Not tested. Requires a Windows clinic device and printer. |
+| Local `npm run typecheck` / `npm run lint` / `npm run build` | Passed. |
+| Local `npm test` | 46 files / 482 tests passed. The command logged an Electron binary download `TypeError: fetch failed`; Vitest completed with exit code 0. This is not evidence of a successful local Electron E2E run. |
+| Production dependency security audit | `npm audit --omit=dev` reported 0 production vulnerabilities; the tagged CI production audit passed. |
+| Full development dependency audit | 8 moderate findings; no high or critical findings after locking `http-cache-semantics` 4.3.0 and `source-map-js` 1.2.2. The `electron-builder` recommendation to downgrade below the project's declared range was not applied. |
+| PR CI | [Run 38589247140](https://github.com/kshohanservice-glitch/Dentiva-Windows-Application/actions/runs/38589247140) passed the Windows release checks after stale accessible-field selectors were corrected. |
+| Tagged CI / installer | [Run 38590568540](https://github.com/kshohanservice-glitch/Dentiva-Windows-Application/actions/runs/38590568540) passed all three jobs: verification/build, Windows Electron E2E, and NSIS packaging plus installed-app smoke. CI verified the Argon2 runtime binding, silent installation, checksum generation, and release publication. |
+| Electron E2E / Windows package / installed-app smoke | Not run locally; all three were exercised successfully on the Windows CI runner. The installed-app smoke used a fresh profile, not a clinic's database. |
+| Physical printer / clinic device | Not tested. Requires the target Windows device and printer. |
+| Release artifacts | GitHub reports the 100,055,048-byte installer asset SHA-256 as `6c3a100e3874a8e9c63bf1db529993aaf8cdc615cac6e2eca3fb10831d716d9b`, matching the successful CI checksum step. The asset was not separately downloaded for a second local comparison. |
 
 ## Release state
 
-The previous published release is **4.1.2**. This work targets **4.2.0** because it adds compatible user-facing features. Version 4.2.0 is a candidate until its PR's Windows verification and the tag-gated release pipeline have actually passed. No unobserved CI result, tag, installer, checksum, or release is claimed here; the final outcome belongs in `docs/PROGRESS_V4.2.0.md` and a release report after the pipeline completes.
+Dentiva Pro **4.2.0 is released**. PR [#30](https://github.com/kshohanservice-glitch/Dentiva-Windows-Application/pull/30)
+was merged to `main` on 2026-10-14 at `5af241edab8a3c7c8f66006e5617d9bd8ff93757`. The annotated tag
+[`v4.2.0`](https://github.com/kshohanservice-glitch/Dentiva-Windows-Application/releases/tag/v4.2.0)
+points to that commit. The release was published on 2026-10-14 at 15:40:58 UTC and is marked Latest.
+Its Windows installer and `SHA256SUMS.txt` are attached to the release. The full evidence and
+remaining limitations are in [`PROGRESS_V4.2.0.md`](PROGRESS_V4.2.0.md) and
+[`RELEASE_REPORT_V4.2.0.md`](RELEASE_REPORT_V4.2.0.md).
+
+This file was updated as post-release documentation; the tag and shipped artifacts were not moved
+or rebuilt.
