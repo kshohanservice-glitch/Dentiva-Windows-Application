@@ -113,8 +113,8 @@ permissions enforced in the service layer for both create and print.
 | 8 | Full local gates | 43 files / 472 tests, `npm run typecheck`, `npm run lint`, `npm run build`, `npm audit --omit=dev` → all clean |
 | 8a | Windows CI round 1 (run 38539065629) | `verify` **passed** on `windows-latest`; `Electron E2E` **failed** with `locator.fill: Timeout` in the new walk-in test; `package` skipped. Root cause: the new form ignored the `Field` id, leaving every label unassociated (defect AUD-412-08). Fixed for all 30 controls and locked by `tests/unit/document-forms-a11y.test.ts`. |
 | 9 | Version + notes | `package.json` / `package-lock.json` = 4.1.2; `docs/RELEASE_NOTES_4.1.2.md` |
-| 10 | Commit + push + PR | see §7 (updated with the commit SHA) |
-| 11 | Windows CI (verify / E2E / NSIS + installed smoke test) | see §7 |
+| 10 | Commit + push + PR | `b86a1a3` on `arena/ed773b64-dentiva-windows-application`; PR [#28](https://github.com/kshohanservice-glitch/Dentiva-Windows-Application/pull/28) |
+| 11 | Windows CI (verify / E2E / NSIS + installed smoke test) | **all green** on `windows-latest` for `b86a1a34412e6aa293c172ad14ea53d3e6c0dd70` — run [38540067953](https://github.com/kshohanservice-glitch/Dentiva-Windows-Application/actions/runs/38540067953) (push) and [38540068591](https://github.com/kshohanservice-glitch/Dentiva-Windows-Application/actions/runs/38540068591) (PR). Installer produced: `DentivaPro-Setup-4.1.2.exe`, 100 050 200 bytes, SHA-256 `bf31fcf665a6531ae63e05b61c51eb4c4abd12d00dbe47713e1bc8f9f3310b20`; silent install + installed-application smoke test passed in the same job. |
 | 12 | Tag `v4.1.2` on the verified commit → release published | see §7 |
 
 ## 7. Release status
@@ -126,7 +126,10 @@ asset identifiers as each step completes:
 | Item | Value |
 | --- | --- |
 | Branch | `arena/ed773b64-dentiva-windows-application` |
-| Implementation commit | _recorded on push_ |
-| CI run | _pending_ |
-| Tag `v4.1.2` | _pending_ |
-| Installer asset + SHA-256 | _pending_ |
+| Implementation commit | `b86a1a34412e6aa293c172ad14ea53d3e6c0dd70` (code commit verified by CI; the tag, when placed, points at this commit) |
+| Pull request | [#28](https://github.com/kshohanservice-glitch/Dentiva-Windows-Application/pull/28) → `main` |
+| CI run (branch) | [38540067953](https://github.com/kshohanservice-glitch/Dentiva-Windows-Application/actions/runs/38540067953) — verify ✅, Electron E2E ✅, NSIS + installed smoke test ✅ |
+| CI run (PR) | [38540068591](https://github.com/kshohanservice-glitch/Dentiva-Windows-Application/actions/runs/38540068591) — verify ✅, Electron E2E ✅, NSIS + installed smoke test ✅ |
+| Installer artefact (CI) | `DentivaPro-Setup-4.1.2.exe` · 100 050 200 bytes · SHA-256 `bf31fcf665a6531ae63e05b61c51eb4c4abd12d00dbe47713e1bc8f9f3310b20` |
+| Tag `v4.1.2` | _created after the merge to `main`, pointing at `b86a1a3`_ |
+| Published release | _updated by the tag pipeline; link recorded in `docs/RELEASE_REPORT_V4.1.2.md`_ |
