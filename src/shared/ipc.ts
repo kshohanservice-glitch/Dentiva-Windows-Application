@@ -273,6 +273,8 @@ export interface PatientItemPayload {
   strength?: string | null; dosage?: string | null; frequency?: string | null;
   morning?: boolean; afternoon?: boolean; night?: boolean; timing?: 'before' | 'after' | 'na';
   duration?: string | null; qty?: string | null; instruction?: string | null;
+  /** Optional one-line print instruction; existing clients may omit it. */
+  medicineInstruction?: string | null;
   instructionBn?: string | null; note?: string | null;
 }
 

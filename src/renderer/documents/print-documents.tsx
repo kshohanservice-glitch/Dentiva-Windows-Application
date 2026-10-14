@@ -272,12 +272,18 @@ export function prescriptionDoc(data: any): React.ReactNode {
                     {it.strength && <span className="medication-strength" {...docEl('prescription.body.medicationStrength')}> {it.strength}</span>}
                   </div>
                   <div className="medication-instructions" {...docEl('prescription.body.medicationInstructions')}>
-                    {it.dosage && <span>{it.dosage}</span>}
-                    {it.frequency && <span>{it.frequency}</span>}
-                    {it.route && <span>{it.route}</span>}
-                    {it.duration && <span>{it.duration}</span>}
-                    {it.qty && <span>Qty: {it.qty}</span>}
-                    {it.instruction && <span>{it.instruction}</span>}
+                    {it.medicineInstruction?.trim() ? (
+                      <span className="medication-single-instruction">{it.medicineInstruction}</span>
+                    ) : (
+                      <>
+                        {it.dosage && <span>{it.dosage}</span>}
+                        {it.frequency && <span>{it.frequency}</span>}
+                        {it.route && <span>{it.route}</span>}
+                        {it.duration && <span>{it.duration}</span>}
+                        {it.qty && <span>Qty: {it.qty}</span>}
+                        {it.instruction && <span>{it.instruction}</span>}
+                      </>
+                    )}
                     {it.generic && <span className="muted">{it.generic}</span>}
                   </div>
                 </div>
@@ -466,7 +472,8 @@ export function rxToDoc(rx: any) {
     items: (rx.items ?? []).map((it: any, i: number) => ({
       seq: i + 1, medicineName: it.medicineName, generic: it.generic, strength: it.strength,
       form: it.form, dosage: it.dosage, frequency: it.frequency, duration: it.duration,
-      qty: it.qty, instruction: it.instruction, route: null as string | null,
+      qty: it.qty, instruction: it.instruction, medicineInstruction: it.medicineInstruction ?? null,
+      route: null as string | null,
     })),
   };
 }

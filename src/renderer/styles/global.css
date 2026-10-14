@@ -1250,7 +1250,11 @@ tr.row-muted td { opacity: 0.55; }
 
 /* Invoice builder */
 .invoice-line { display: grid; grid-template-columns: 1fr 70px 110px 90px 40px; gap: var(--sp-2); align-items: end; }
-.invoice-line .field label { display: none; }
+.invoice-line {
+  grid-template-columns: minmax(180px, 1.8fr) minmax(80px, 0.65fr) minmax(115px, 1fr) minmax(145px, 1.2fr) 36px;
+}
+.invoice-line .field { min-width: 0; }
+
 .preset-chips { display: flex; flex-wrap: wrap; gap: 6px; }
 .preset-chip {
   font-size: var(--fs-xs); border: 1px solid var(--line); background: var(--surface-2);
@@ -1262,6 +1266,64 @@ tr.row-muted td { opacity: 0.55; }
 .rx-item { border: 1px solid var(--line); border-radius: var(--r-md); padding: var(--sp-3); background: var(--surface-1); }
 .rx-item + .rx-item { margin-top: var(--sp-2); }
 .rx-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: var(--sp-2); }
+
+/* Shared, responsive prescription and quick-document editors. */
+.medicine-entry-editor { min-width: 0; }
+.medicine-entry-card,
+.quick-line-card {
+  min-width: 0;
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  padding: var(--sp-3);
+  background: var(--surface-1);
+}
+.medicine-entry-heading,
+.quick-line-card-heading { align-items: center; }
+.medicine-entry-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--sp-3);
+}
+.medicine-entry-grid > .field,
+.quick-line-grid > .field { min-width: 0; }
+.medicine-entry-full-instruction { grid-column: 1 / -1; }
+.medicine-entry-conflict { margin-top: var(--sp-3); }
+.quick-line-grid {
+  display: grid;
+  grid-template-columns: minmax(180px, 1.8fr) minmax(80px, 0.65fr) minmax(115px, 1fr) minmax(120px, 1fr) minmax(145px, 1.2fr);
+  gap: var(--sp-3);
+  align-items: end;
+}
+.quick-procedure-grid {
+  grid-template-columns: minmax(115px, 0.75fr) minmax(170px, 1.5fr) minmax(80px, 0.65fr) minmax(120px, 1fr);
+}
+.quick-line-total-value { display: flex; align-items: center; min-height: 36px; }
+.quick-invoice-summary {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: var(--sp-2) var(--sp-4);
+  padding: var(--sp-3);
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  background: var(--surface-2);
+}
+.quick-invoice-summary > span { display: flex; justify-content: space-between; gap: var(--sp-2); }
+
+@media (max-width: 980px) {
+  .medicine-entry-grid,
+  .quick-line-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .quick-line-description { grid-column: 1 / -1; }
+  .invoice-line { grid-template-columns: minmax(145px, 1.5fr) minmax(72px, 0.65fr) minmax(105px, 1fr) minmax(130px, 1.2fr) 34px; }
+}
+@media (max-width: 680px) {
+  .medicine-entry-grid,
+  .quick-line-grid { grid-template-columns: minmax(0, 1fr); }
+  .medicine-entry-full-instruction,
+  .quick-line-description { grid-column: auto; }
+  .invoice-line { grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; }
+  .invoice-line .field:first-child { grid-column: 1 / -1; }
+  .invoice-line > .btn { justify-self: end; }
+}
 
 /* Status pills in lists */
 .status-pill { font-size: 11px; font-weight: 750; text-transform: capitalize; }
@@ -1372,3 +1434,9 @@ kbd {
   border: 1px solid var(--line); border-radius: var(--r-sm); background: var(--surface-1); color: var(--ink-2, inherit); cursor: pointer;
 }
 .money-global.on { border-color: var(--brand-700); color: var(--brand-700); }
+
+/* Reusable template controls and configurable document watermark sliders. */
+.clinical-template-name-row { align-items: flex-end; }
+.clinical-template-name { flex: 1 1 240px; min-width: 0; }
+.watermark-slider-row { align-items: center; }
+.watermark-slider { flex: 1 1 auto; width: 100%; min-width: 100px; accent-color: var(--brand-600); }

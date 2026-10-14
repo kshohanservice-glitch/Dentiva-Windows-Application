@@ -3,7 +3,7 @@ import type { Paged, PrescriptionDTO, PrescriptionItemDTO } from '../../shared/t
 import { notFound, validation } from '../errors';
 import { audit, requirePermission, tx } from '../core/context';
 import { nextPrescriptionNumber } from '../core/sequences';
-import { optString, pageParams, reqDate, reqInt, reqString, oneOf } from '../core/validate';
+import { optString, optVerbatimString, pageParams, reqDate, reqInt, reqString, oneOf } from '../core/validate';
 import { nowISO, todayISO } from '../../shared/currency';
 
 interface ItemRow {
@@ -11,7 +11,7 @@ interface ItemRow {
   strength: string | null; dosage: string | null; frequency: string | null;
   morning: number; afternoon: number; night: number; timing: string;
   duration: string | null; qty: string | null; instruction: string | null;
-  instruction_bn: string | null; note: string | null;
+  instruction_bn: string | null; note: string | null; medicine_instruction: string | null;
 }
 
 interface RxRow {
@@ -28,6 +28,7 @@ function toItemDTO(r: ItemRow): PrescriptionItemDTO {
     morning: !!r.morning, afternoon: !!r.afternoon, night: !!r.night,
     timing: r.timing as PrescriptionItemDTO['timing'], duration: r.duration, qty: r.qty,
     instruction: r.instruction, instructionBn: r.instruction_bn, note: r.note,
+    medicineInstruction: r.medicine_instruction,
   };
 }
 
@@ -127,6 +128,7 @@ export function createPrescription(ctx: Ctx, raw: unknown): PrescriptionDTO {
     duration: optString(it.duration, 'Duration', { max: 60 }),
     qty: optString(it.qty, 'Quantity', { max: 40 }),
     instruction: optString(it.instruction, 'Instruction', { max: 500 }),
+    medicineInstruction: optVerbatimString(it.medicineInstruction, 'One-line medicine instruction', { max: 500 }),
     instructionBn: optString(it.instructionBn, 'Bengali instruction', { max: 500 }),
     note: optString(it.note, 'Note', { max: 500 }),
   }));
@@ -154,13 +156,13 @@ export function createPrescription(ctx: Ctx, raw: unknown): PrescriptionDTO {
     const rxId = Number(info.lastInsertRowid);
     const insItem = ctx.db.prepare(
       `INSERT INTO prescription_items (prescription_id, seq, medicine_name, generic, form, strength, dosage,
-         frequency, morning, afternoon, night, timing, duration, qty, instruction, instruction_bn, note)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+         frequency, morning, afternoon, night, timing, duration, qty, instruction, medicine_instruction, instruction_bn, note)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     );
     for (const it of cleanItems) {
       insItem.run(rxId, it.seq, it.medicineName, it.generic, it.form, it.strength, it.dosage,
         it.frequency, it.morning, it.afternoon, it.night, it.timing, it.duration, it.qty,
-        it.instruction, it.instructionBn, it.note);
+        it.instruction, it.medicineInstruction, it.instructionBn, it.note);
     }
     if (input.saveAsTemplate) {
       const tName = reqString(input.saveAsTemplate, 'Template name', { max: 120 });

@@ -210,7 +210,7 @@ export function TreatmentsPage() {
         }
       >
         <div style={{ minWidth: 260, flex: '1 1 260px' }}>
-          <Input value={query} onChange={setQuery} placeholder="Search name, code or category…" />
+          <Input value={query} onChange={setQuery} placeholder="Search name, code or category…" ariaLabel="Search treatments" />
         </div>
       </TableToolbar>
 

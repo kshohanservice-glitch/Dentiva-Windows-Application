@@ -1,5 +1,6 @@
 import type { PermissionKey } from './permissions';
 import type { DocumentStyleMap } from './document-styles';
+import type { DocumentWatermarkSettings } from './document-watermark';
 import type { GreetingRange, WhatsAppTemplateCategory } from './whatsapp';
 
 /* ----------------------------- Session ----------------------------- */
@@ -107,6 +108,8 @@ export interface PrescriptionItemDTO {
   frequency: string | null; morning: boolean; afternoon: boolean; night: boolean;
   timing: 'before' | 'after' | 'na'; duration: string | null; qty: string | null;
   instruction: string | null; instructionBn: string | null; note: string | null;
+  /** Optional one-line print instruction; absent on records/templates from older versions. */
+  medicineInstruction?: string | null;
 }
 
 export interface PrescriptionDTO {
@@ -333,6 +336,8 @@ export interface SettingsDTO {
    * original document design”; see `src/shared/document-styles.ts`.
    */
   documentStyles: DocumentStyleMap;
+  /** Disabled-by-default clinic-logo watermark preferences (JSON settings key). */
+  documentWatermark: DocumentWatermarkSettings;
 }
 
 /* ------------------------------- Reports ---------------------------- */

@@ -20,6 +20,17 @@ export function optString(value: unknown, field: string, opts: { max?: number } 
   return v;
 }
 
+/** Optional text whose exact non-blank content must be preserved (e.g. a one-line instruction). */
+export function optVerbatimString(value: unknown, field: string, opts: { max?: number } = {}): string | null {
+  if (value === null || value === undefined || value === '') return null;
+  if (typeof value !== 'string') throw validation(`${field} must be text.`);
+  if (value.trim() === '') return null;
+  if (opts.max !== undefined && value.length > opts.max) {
+    throw validation(`${field} is too long (max ${opts.max} characters).`);
+  }
+  return value;
+}
+
 export function reqInt(value: unknown, field: string, opts: { min?: number; max?: number } = {}): number {
   const n = typeof value === 'number' ? value : Number(value);
   if (!Number.isInteger(n)) throw validation(`${field} must be a whole number.`);

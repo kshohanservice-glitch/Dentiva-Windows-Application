@@ -55,8 +55,9 @@ export function SettingsPage() {
       // WhatsApp greeting settings are managed by the Message Templates tab;
       // never overwrite them with this form's snapshot.
       const { whatsapp: _whatsapp, ...rest } = form;
-      await api['settings/save'](rest);
+      const saved = await api['settings/save'](rest);
       await refreshSettings();
+      setForm(JSON.parse(JSON.stringify(saved)));
       setDirty(false);
       toast.success('Settings saved');
     } catch (err) {
@@ -100,16 +101,16 @@ export function SettingsPage() {
           <Card title="Clinic information">
             <div className="form-grid">
               <Field label="Clinic name" className="span-2">
-                {() => <Input value={form.clinic.clinicName} onChange={(v) => set(['clinic', 'clinicName'], v)} />}
+                {(id) => <Input id={id} value={form.clinic.clinicName} onChange={(v) => set(['clinic', 'clinicName'], v)} />}
               </Field>
-              <Field label="Bengali name">{() => <Input value={form.clinic.clinicNameBn ?? ''} onChange={(v) => set(['clinic', 'clinicNameBn'], v)} />}</Field>
-              <Field label="Phone">{() => <Input value={form.clinic.phone ?? ''} onChange={(v) => set(['clinic', 'phone'], v)} />}</Field>
-              <Field label="Email">{() => <Input value={form.clinic.email ?? ''} onChange={(v) => set(['clinic', 'email'], v)} />}</Field>
-              <Field label="Website">{() => <Input value={form.clinic.website ?? ''} onChange={(v) => set(['clinic', 'website'], v)} />}</Field>
-              <Field label="Address" className="span-2">{() => <Textarea rows={2} value={form.clinic.address ?? ''} onChange={(v) => set(['clinic', 'address'], v)} />}</Field>
-              <Field label="Operating hours">{() => <Input value={form.clinic.operatingHours ?? ''} onChange={(v) => set(['clinic', 'operatingHours'], v)} placeholder="10:00 – 20:00" />}</Field>
-              <Field label="Visiting days">{() => <Input value={form.clinic.visitingDays ?? ''} onChange={(v) => set(['clinic', 'visitingDays'], v)} placeholder="Sat – Thu" />}</Field>
-              <Field label="Logo" hint="Shown on the sign-in screen, the app header and printed documents">
+              <Field label="Bengali name">{(id) => <Input id={id} value={form.clinic.clinicNameBn ?? ''} onChange={(v) => set(['clinic', 'clinicNameBn'], v)} />}</Field>
+              <Field label="Phone">{(id) => <Input id={id} value={form.clinic.phone ?? ''} onChange={(v) => set(['clinic', 'phone'], v)} />}</Field>
+              <Field label="Email">{(id) => <Input id={id} value={form.clinic.email ?? ''} onChange={(v) => set(['clinic', 'email'], v)} />}</Field>
+              <Field label="Website">{(id) => <Input id={id} value={form.clinic.website ?? ''} onChange={(v) => set(['clinic', 'website'], v)} />}</Field>
+              <Field label="Address" className="span-2">{(id) => <Textarea id={id} rows={2} value={form.clinic.address ?? ''} onChange={(v) => set(['clinic', 'address'], v)} />}</Field>
+              <Field label="Operating hours">{(id) => <Input id={id} value={form.clinic.operatingHours ?? ''} onChange={(v) => set(['clinic', 'operatingHours'], v)} placeholder="10:00 – 20:00" />}</Field>
+              <Field label="Visiting days">{(id) => <Input id={id} value={form.clinic.visitingDays ?? ''} onChange={(v) => set(['clinic', 'visitingDays'], v)} placeholder="Sat – Thu" />}</Field>
+              <Field label="Logo" labelFor={false} hint="Shown on the sign-in screen, the app header and printed documents">
                 {() => (
                   <div className="row gap-3">
                     <ClinicLogo clinic={settings?.clinic} size={44} rounded={10} />
@@ -128,7 +129,10 @@ export function SettingsPage() {
                         }}
                       >Upload logo…</Button>
                       {form.clinic.logoPath && (
-                        <Button variant="ghost" onClick={() => set(['clinic', 'logoPath'], null)}>Remove</Button>
+                        <Button variant="ghost" onClick={() => {
+                          set(['clinic', 'logoPath'], null);
+                          set(['clinic', 'logoDataUrl'], null);
+                        }}>Remove</Button>
                       )}
                     </div>
                   </div>
@@ -159,7 +163,7 @@ export function SettingsPage() {
                     ]} />
                 )}
               </Field>
-              <Field label="Animations">
+              <Field label="Animations" labelFor={false}>
                 {() => (
                   <label className="checkbox">
                     <input type="checkbox" checked={form.appearance.animations} onChange={(e) => set(['appearance', 'animations'], e.target.checked)} />
@@ -167,7 +171,7 @@ export function SettingsPage() {
                   </label>
                 )}
               </Field>
-              <Field label="Sidebar">
+              <Field label="Sidebar" labelFor={false}>
                 {() => (
                   <label className="checkbox">
                     <input type="checkbox" checked={form.appearance.sidebarCollapsed} onChange={(e) => set(['appearance', 'sidebarCollapsed'], e.target.checked)} />
@@ -239,7 +243,7 @@ export function SettingsPage() {
             <div className="form-grid">
               <Field label="Visiting hours line">{(id) => <Input id={id} value={form.prescription.visitingHours ?? ''} onChange={(v) => set(['prescription', 'visitingHours'], v)} />}</Field>
               <Field label="Footer message">{(id) => <Input id={id} value={form.prescription.footerMessage ?? ''} onChange={(v) => set(['prescription', 'footerMessage'], v)} />}</Field>
-              <Field label="Signature area reserved" >
+              <Field label="Signature area reserved" labelFor={false}>
                 {() => (
                   <label className="checkbox">
                     <input type="checkbox" checked={form.prescription.signatureReserved} onChange={(e) => set(['prescription', 'signatureReserved'], e.target.checked)} />
@@ -270,6 +274,8 @@ export function SettingsPage() {
             onChange={(next) => set(['documentStyles'], next)}
             clinic={form.clinic}
             settings={form}
+            watermark={form.documentWatermark}
+            onWatermarkChange={(next) => set(['documentWatermark'], next)}
           />
         )}
 

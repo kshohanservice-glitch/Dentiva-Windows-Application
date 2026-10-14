@@ -1,7 +1,7 @@
 import { useId, useRef, useState } from 'react';
 import { api, useAsync } from '../api';
 import { Button, ConfirmDialog, useToast } from './primitives';
-import { Input, Select } from './forms';
+import { Field, Input, Select } from './forms';
 import { hasTemplateDraftContent, type ClinicalTemplateBody, type ClinicalTemplateKind } from '../../shared/clinical-templates';
 
 /** Reusable authoring control. Applying a template only fills the draft: it never saves a patient record. */
@@ -68,8 +68,10 @@ export function ClinicalTemplatePicker(props: {
         }}>Apply to draft</Button>
         <Button size="sm" variant="ghost" disabled={!item || pending} onClick={() => setConfirm('delete')}>Delete</Button>
       </div>
-      <div className="row gap-2 wrap mt-2">
-        <Input value={name} onChange={setName} placeholder="New template name" />
+      <div className="row gap-2 wrap mt-2 clinical-template-name-row">
+        <Field label="Template name" className="clinical-template-name">
+          {(fieldId) => <Input id={fieldId} value={name} onChange={setName} placeholder="e.g. Routine follow-up" />}
+        </Field>
         <Button size="sm" loading={pending} onClick={() => {
           if (!name.trim()) { toast.warning('Enter a template name'); return; }
           if (data?.some((t) => t.name.toLowerCase() === name.trim().toLowerCase())) setConfirm('replace');
