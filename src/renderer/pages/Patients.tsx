@@ -1261,7 +1261,12 @@ export function VisitFormModal(props: { patientId: number; onClose: () => void; 
               return (
                 <div className="list-row" key={sel.treatmentId}>
                   <span className="flex-1">{t?.name ?? `Treatment #${sel.treatmentId}`}</span>
-                  <Input value={String(sel.qty)} onChange={(v) => set('treatments', values.treatments.map((x) => x.treatmentId === sel.treatmentId ? { ...x, qty: Math.max(1, Number(v) || 1) } : x))} type="number" />
+                  <Input
+                    value={String(sel.qty)}
+                    onChange={(v) => set('treatments', values.treatments.map((x) => x.treatmentId === sel.treatmentId ? { ...x, qty: Math.max(1, Number(v) || 1) } : x))}
+                    type="number"
+                    ariaLabel={`Quantity of ${t?.name ?? `treatment #${sel.treatmentId}`}`}
+                  />
                   <span className="num small"><Money paisa={sel.qty * sel.unitPricePaisa} /></span>
                   <Button size="sm" variant="ghost" onClick={() => set('treatments', values.treatments.filter((x) => x.treatmentId !== sel.treatmentId))}>✕</Button>
                 </div>

@@ -353,7 +353,8 @@ export function PrintPage() {
               documentType={state?.kind}
               pageSize={{ widthMm: pageW, heightMm: pageH }}
             />
-            {state?.doc}
+            {/* Content layer: paints above the logo watermark (see print.css). */}
+            <div className="print-doc-content">{state?.doc}</div>
           </div>
         )}
       </div>

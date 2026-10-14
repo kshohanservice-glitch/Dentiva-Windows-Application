@@ -95,6 +95,8 @@
 }
 
 .print-doc {
+  /* Positioning context for the page-sized watermark box (see below). */
+  position: relative;
   width: 210mm;
   min-height: 297mm;
   background: #fff;
@@ -323,15 +325,28 @@
   text-align: center;
 }
 
+/* Clinic-logo watermark layer.
+   `z-index: -1` would paint this below the white page backgrounds of
+   `.print-stage` / `.print-doc` (and of the print root), which makes the mark
+   invisible on screen and on paper. Instead the mark paints at `z-index: 0` —
+   above every ancestor background — and the document content is lifted one
+   layer above it (`.print-doc-content`, below) so patient text always stays on
+   top of the logo. */
 .print-logo-watermark {
   position: absolute;
   inset: 0;
-  z-index: -1;
+  z-index: 0;
   display: flex;
   align-items: center;
   justify-content: center;
   overflow: hidden;
   pointer-events: none;
+}
+
+/* Document content, kept above the watermark mark but below dialogs. */
+.print-doc-content {
+  position: relative;
+  z-index: 1;
 }
 
 .print-logo-watermark img {
@@ -346,8 +361,9 @@
 
 @media print {
   /* A fixed mark repeats on each physical page and stays page-centered if a
-     document flows past one sheet. Preview mode uses the page-sized absolute box. */
-  .print-logo-watermark { position: fixed; inset: 0; }
+     document flows past one sheet. Preview mode uses the page-sized absolute box
+     inside `.print-doc`. Both stay behind `.print-doc-content`. */
+  .print-logo-watermark { position: fixed; inset: 0; z-index: 0; }
 }
 
 .print-watermark {
