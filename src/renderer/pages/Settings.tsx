@@ -5,8 +5,9 @@ import { useApp } from '../state/app-context';
 import { Badge, Button, Card, Kbd, Modal, Spinner, Tabs, useToast } from '../components/primitives';
 import { Field, Input, Select, Textarea } from '../components/forms';
 import { ClinicLogo } from '../components/clinic-brand';
+import { MessageTemplatesPanel } from '../components/message-templates';
 
-type SetTab = 'clinic' | 'security' | 'appearance' | 'notifications' | 'billing' | 'prescription' | 'print' | 'data' | 'shortcuts';
+type SetTab = 'clinic' | 'security' | 'appearance' | 'notifications' | 'billing' | 'prescription' | 'templates' | 'print' | 'data' | 'shortcuts';
 
 export function SettingsPage() {
   const { settings, refreshSettings, refresh, user, logout } = useApp();
@@ -48,7 +49,10 @@ export function SettingsPage() {
   const save = async () => {
     setSaving(true);
     try {
-      await api['settings/save'](form);
+      // WhatsApp greeting settings are managed by the Message Templates tab;
+      // never overwrite them with this form's snapshot.
+      const { whatsapp: _whatsapp, ...rest } = form;
+      await api['settings/save'](rest);
       await refreshSettings();
       setDirty(false);
       toast.success('Settings saved');
@@ -66,6 +70,7 @@ export function SettingsPage() {
     { key: 'notifications', label: 'Notifications' },
     { key: 'billing', label: 'Billing' },
     { key: 'prescription', label: 'Prescription' },
+    { key: 'templates', label: 'Message Templates' },
     { key: 'print', label: 'Printing' },
     { key: 'data', label: 'Data' },
     { key: 'shortcuts', label: 'Shortcuts' },
@@ -250,6 +255,8 @@ export function SettingsPage() {
             </div>
           </Card>
         )}
+
+        {tab === 'templates' && <MessageTemplatesPanel />}
 
         {tab === 'print' && <PrintTab form={form} set={set} />}
 

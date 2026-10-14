@@ -1,4 +1,5 @@
 import type { PermissionKey } from './permissions';
+import type { GreetingRange, WhatsAppTemplateCategory } from './whatsapp';
 
 /* ----------------------------- Session ----------------------------- */
 
@@ -26,10 +27,17 @@ export interface AuditEntry {
 
 /* ----------------------------- Patients ---------------------------- */
 
+export type WhatsAppConsent = 'unknown' | 'granted' | 'declined';
+
 export interface PatientDTO {
   id: number; code: string; name: string; bengaliName: string | null;
   dob: string | null; ageYears: number | null; ageText: string | null;
   gender: string; bloodGroup: string | null; phone: string | null; phone2: string | null;
+  /** Digits-only international WhatsApp number (e.g. 8801712345678), or null when not recorded. */
+  whatsappNumber: string | null;
+  whatsappSameAsPhone: boolean;
+  whatsappConsent: WhatsAppConsent;
+  whatsappConsentAt: string | null;
   emergencyContact: string | null; emergencyPhone: string | null;
   address: string | null; city: string | null;
   chiefComplaint: string | null; referredBy: string | null; preferredDentistId: number | null;
@@ -314,6 +322,7 @@ export interface SettingsDTO {
   backup: { autoFrequencyDays: 7 | 15 | 30 | 0; destination: string | null; retention: number };
   appearance: { theme: 'light' | 'dark' | 'system'; density: 'comfortable' | 'compact'; animations: boolean; sidebarCollapsed: boolean };
   notifications: { appointments: boolean; lowStock: boolean; dues: boolean; backup: boolean };
+  whatsapp: { timezone: string | null; greetingRanges: GreetingRange[] };
   paymentMethods: string[];
   expenseCategories: string[];
   printProfiles: PrintProfile[];
@@ -337,6 +346,90 @@ export interface SearchHit {
   id: number; title: string; subtitle: string; meta?: string;
   /** Integer paisa for money hits; the renderer masks it (never formatted server-side). */
   amountPaisa?: number;
+}
+
+/* ------------------------------ WhatsApp ---------------------------- */
+
+export interface WhatsAppTemplateDTO {
+  id: number; key: string; name: string; category: WhatsAppTemplateCategory;
+  body: string; isDefault: boolean; enabled: boolean;
+  createdAt: string; updatedAt: string;
+}
+
+export interface WhatsAppTemplateSaveInput {
+  id?: number; name: string; category: WhatsAppTemplateCategory; body: string; enabled?: boolean;
+}
+
+export type PatientDocumentKind = 'prescription' | 'invoice' | 'receipt' | 'visit-summary' | 'appointment-card';
+
+export interface PatientDocumentDTO {
+  /** Stable selection key: "<kind>:<document id>". */
+  key: string;
+  kind: PatientDocumentKind;
+  documentId: number;
+  /** English document type label for the UI. */
+  typeLabel: string;
+  reference: string | null;
+  date: string;
+  relatedLabel: string | null;
+  amountPaisa: number | null;
+  status: string | null;
+  suggestedFileName: string;
+}
+
+export interface WhatsAppPrepareInput {
+  patientId: number;
+  templateId?: number | null;
+  category?: WhatsAppTemplateCategory | null;
+  appointmentId?: number | null;
+  /** Previous appointment for a rescheduling message. */
+  previousAppointmentId?: number | null;
+  visitId?: number | null;
+  documents?: { kind: PatientDocumentKind; documentId: number }[];
+  /** Value for the custom-message body placeholder. */
+  customBody?: string | null;
+  /** Doctor-edited final text; when set it is used verbatim (still validated). */
+  messageOverride?: string | null;
+  /** Preview only: render and validate without writing a history entry. */
+  dryRun?: boolean;
+}
+
+export interface WhatsAppPrepareResult {
+  logId: number | null;
+  url: string;
+  message: string;
+  greeting: string | null;
+  destination: string;
+  destinationDisplay: string;
+  patientName: string;
+  warnings: string[];
+}
+
+export interface WhatsAppDocumentSelection {
+  kind: PatientDocumentKind;
+  documentId: number;
+}
+
+export interface WhatsAppDocumentPrepareResult {
+  patientId: number;
+  patientName: string;
+  destinationDisplay: string;
+  documents: PatientDocumentDTO[];
+  introMessage: string;
+  greeting: string | null;
+  /** Organized folder (app temp area) holding the share manifest; PDFs are saved here by the doctor via Print → Save PDF. */
+  shareFolder: string;
+  warnings: string[];
+  logId: number | null;
+}
+
+export type WhatsAppMessageStatus = 'prepared' | 'sent' | 'not_sent' | 'unknown';
+
+export interface WhatsAppMessageLogDTO {
+  id: number; patientId: number; templateKey: string | null; category: string | null;
+  destinationNumber: string | null; messagePreview: string | null;
+  documents: WhatsAppDocumentSelection[];
+  status: WhatsAppMessageStatus; createdAt: string; updatedAt: string;
 }
 
 /* ------------------------------ Activation -------------------------- */

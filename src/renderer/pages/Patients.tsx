@@ -17,6 +17,8 @@ import { formatDate, isoDate, localDateTime } from '../format';
 import type { DuplicateCandidate, PatientDTO, PatientFilters, PatientDetailDTO, PrescriptionDTO, TreatmentDTO, VisitDTO } from '../../shared/types';
 import type { PatientInputPayload, ReferralRecord, ReferralInput } from '../../shared/ipc';
 import { hasInvoiceDraftChanges } from '../../shared/unsaved';
+import { WhatsAppHub } from '../components/whatsapp-hub';
+import { normalizeWhatsAppNumber } from '../../shared/whatsapp';
 
 /* ================================ List ================================= */
 
@@ -24,7 +26,8 @@ type PatientFormValues = Omit<PatientInputPayload, 'dob' | 'ageYears'> & { dob: 
 
 const EMPTY_FORM: PatientFormValues = {
   name: '', bengaliName: '', dob: '', ageYears: '', gender: '', bloodGroup: '',
-  phone: '', phone2: '', emergencyContact: '', emergencyPhone: '',
+  phone: '', phone2: '', whatsappNumber: '', whatsappSameAsPhone: false, whatsappConsent: 'unknown',
+  emergencyContact: '', emergencyPhone: '',
   address: '', city: '', chiefComplaint: '', referredBy: '', preferredDentistId: null,
   status: 'active', tags: [], histories: {}, forceCreate: false,
 };
@@ -42,6 +45,7 @@ function PatientFormModal(props: { open: boolean; initial?: (PatientDTO & Partia
   };
   const [dupes, setDupes] = useState<DuplicateCandidate[]>([]);
   const [forceAck, setForceAck] = useState(false);
+  const [whatsappCheck, setWhatsappCheck] = useState<string | null>(null);
   const { data: dentists } = useAsync(() => api['dentists/list'](true), []);
   const toast = useToast();
 
@@ -55,6 +59,9 @@ function PatientFormModal(props: { open: boolean; initial?: (PatientDTO & Partia
             dob: props.initial.dob ?? '', ageYears: props.initial.ageYears != null ? String(props.initial.ageYears) : '',
             gender: props.initial.gender, bloodGroup: props.initial.bloodGroup ?? '',
             phone: props.initial.phone ?? '', phone2: props.initial.phone2 ?? '',
+            whatsappNumber: props.initial.whatsappNumber ? `+${props.initial.whatsappNumber}` : '',
+            whatsappSameAsPhone: props.initial.whatsappSameAsPhone ?? false,
+            whatsappConsent: props.initial.whatsappConsent ?? 'unknown',
             emergencyContact: props.initial.emergencyContact ?? '', emergencyPhone: props.initial.emergencyPhone ?? '',
             address: props.initial.address ?? '', city: props.initial.city ?? '',
             chiefComplaint: props.initial.chiefComplaint ?? '', referredBy: props.initial.referredBy ?? '',
@@ -99,6 +106,12 @@ function PatientFormModal(props: { open: boolean; initial?: (PatientDTO & Partia
         : '',
       ageYears: v.ageYears && (Number(v.ageYears) < 0 || Number(v.ageYears) > 120) ? 'Age must be 0–120.' : '',
       dob: v.dob && new Date(v.dob).getTime() > Date.now() ? 'Date of birth cannot be in the future.' : '',
+      whatsappNumber: (() => {
+        const candidate = v.whatsappSameAsPhone ? (v.phone ?? '') : (v.whatsappNumber ?? '');
+        if (!candidate.trim()) return '';
+        const result = normalizeWhatsAppNumber(candidate);
+        return result.ok ? '' : result.error;
+      })(),
     }));
     if (!ok) return;
     const payload: PatientInputPayload = {
@@ -194,11 +207,74 @@ function PatientFormModal(props: { open: boolean; initial?: (PatientDTO & Partia
             />
           )}
         </Field>
-        <Field label="Mobile number" hint="01XXXXXXXXX">
-          {(id) => <Input id={id} value={values.phone ?? ''} onChange={(v) => set('phone', v)} placeholder="01XXXXXXXXX" />}
+        <Field label="Phone Number" hint="01XXXXXXXXX">
+          {(id) => (
+            <Input
+              id={id}
+              value={values.phone ?? ''}
+              onChange={(v) => {
+                set('phone', v);
+                if (values.whatsappSameAsPhone) set('whatsappNumber', v);
+              }}
+              placeholder="01XXXXXXXXX"
+            />
+          )}
         </Field>
         <Field label="Alternate phone">
           {(id) => <Input id={id} value={values.phone2 ?? ''} onChange={(v) => set('phone2', v)} />}
+        </Field>
+        <Field label="WhatsApp Number" hint="Optional. Bangladesh or international format." error={errors.whatsappNumber}>
+          {(id) => (
+            <Input
+              id={id}
+              value={values.whatsappSameAsPhone ? (values.phone ?? '') : (values.whatsappNumber ?? '')}
+              onChange={(v) => { set('whatsappNumber', v); setWhatsappCheck(null); }}
+              placeholder="+880 1XXX-XXXXXX"
+              disabled={!!values.whatsappSameAsPhone}
+              invalid={!!errors.whatsappNumber}
+            />
+          )}
+        </Field>
+        <Field label="WhatsApp options">
+          {() => (
+            <div className="col gap-2">
+              <label className="checkbox">
+                <input
+                  type="checkbox"
+                  checked={!!values.whatsappSameAsPhone}
+                  onChange={(e) => {
+                    set('whatsappSameAsPhone', e.target.checked);
+                    if (e.target.checked) set('whatsappNumber', values.phone ?? '');
+                    setWhatsappCheck(null);
+                  }}
+                />
+                <span>Same as Phone Number</span>
+              </label>
+              <div className="row gap-2" style={{ alignItems: 'center' }}>
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => {
+                    const candidate = values.whatsappSameAsPhone ? (values.phone ?? '') : (values.whatsappNumber ?? '');
+                    const result = normalizeWhatsAppNumber(candidate);
+                    setWhatsappCheck(result.ok ? `Valid WhatsApp number: ${result.display}` : result.error);
+                  }}
+                >
+                  Validate Number
+                </Button>
+                {whatsappCheck && <span className="xsmall">{whatsappCheck}</span>}
+              </div>
+              <Select
+                value={values.whatsappConsent ?? 'unknown'}
+                onChange={(v) => set('whatsappConsent', v as PatientFormValues['whatsappConsent'])}
+                options={[
+                  { value: 'unknown', label: 'Consent not recorded' },
+                  { value: 'granted', label: 'WhatsApp consent granted' },
+                  { value: 'declined', label: 'WhatsApp consent declined' },
+                ]}
+              />
+            </div>
+          )}
         </Field>
         <Field label="City / area">
           {(id) => <Input id={id} value={values.city ?? ''} onChange={(v) => set('city', v)} placeholder="e.g. Dhanmondi, Dhaka" />}
@@ -433,7 +509,7 @@ export function PatientsPage() {
 
 /* ============================== Profile ================================ */
 
-type ProfileTab = 'overview' | 'visits' | 'chart' | 'rx' | 'invoices' | 'referrals' | 'files' | 'history';
+type ProfileTab = 'overview' | 'visits' | 'chart' | 'rx' | 'invoices' | 'whatsapp' | 'referrals' | 'files' | 'history';
 
 export function PatientProfilePage() {
   const { id } = useParams();
@@ -463,6 +539,7 @@ export function PatientProfilePage() {
     { key: 'chart' as const, label: 'Dental chart' },
     { key: 'rx' as const, label: 'Prescriptions' },
     { key: 'invoices' as const, label: 'Invoices' },
+    { key: 'whatsapp' as const, label: 'WhatsApp & Documents' },
     ...(can('clinical.view') ? [{ key: 'referrals' as const, label: 'Referrals' }] : []),
     { key: 'files' as const, label: 'Attachments' },
     { key: 'history' as const, label: 'History' },
@@ -533,6 +610,7 @@ export function PatientProfilePage() {
           </Card>
         )}
         {tab === 'referrals' && <ReferralsTab patientId={patient.id} canManage={can('clinical.referral.manage')} onCreate={() => setReferralOpen(true)} />}
+        {tab === 'whatsapp' && <WhatsAppHub patient={patient} onPatientChanged={() => { reload(); setRefreshTick((n) => n + 1); }} />}
         {tab === 'files' && <AttachmentsTab entityType="patient" entityId={patient.id} />}
         {tab === 'history' && <TimelineTab patientId={patient.id} refreshKey={refreshTick} />}
       </div>
@@ -682,6 +760,7 @@ function OverviewTab(props: { patient: PatientDetailDTO; onGoto: (t: ProfileTab)
       <Card title="Contact & registration">
         <div className="kv-list">
           <div className="kv"><span className="k">Phone</span><span className="v mono">{p.phone || '—'}</span></div>
+          <div className="kv"><span className="k">WhatsApp Number</span><span className="v mono">{p.whatsappNumber ? `+${p.whatsappNumber}` : '—'}</span></div>
           <div className="kv"><span className="k">Alternate</span><span className="v mono">{p.phone2 || '—'}</span></div>
           <div className="kv"><span className="k">Address</span><span className="v">{p.address || '—'}</span></div>
           <div className="kv"><span className="k">Emergency</span><span className="v">{p.emergencyContact ? `${p.emergencyContact} (${p.emergencyPhone ?? ''})` : '—'}</span></div>

@@ -8,6 +8,7 @@ import { ensureDir, safeResolve } from '../paths';
 import { nowISO, todayISO } from '../../shared/currency';
 import { peekNextInvoiceNumber, parseInvoiceNumber } from '../core/sequences';
 import { reqString } from '../core/validate';
+import { DEFAULT_GREETING_RANGES, isValidTimeOfDay, type GreetingRange } from '../../shared/whatsapp';
 
 function readSetting<T>(ctx: Ctx, key: string, fallback: T): T {
   const row = ctx.db.prepare('SELECT value_json FROM settings WHERE key = ?').get(key) as { value_json: string } | undefined;
@@ -59,6 +60,13 @@ export function getSettings(ctx: Ctx): SettingsDTO {
   const notifications = readSetting(ctx, 'notifications', { appointments: true, lowStock: true, dues: true, backup: true });
   const paymentMethods = readSetting(ctx, 'paymentMethods', ['cash', 'bank', 'card', 'bkash', 'nagad', 'rocket', 'upay', 'other']);
   const printProfiles = readSetting<PrintProfile[]>(ctx, 'printProfiles', []).filter((p) => String(p.paperSize).toLowerCase() !== 'thermal');
+  const whatsappRaw = readSetting<Partial<SettingsDTO['whatsapp']>>(ctx, 'whatsapp', {});
+  const whatsapp: SettingsDTO['whatsapp'] = {
+    timezone: typeof whatsappRaw.timezone === 'string' && whatsappRaw.timezone.trim() ? whatsappRaw.timezone.trim() : null,
+    greetingRanges: Array.isArray(whatsappRaw.greetingRanges) && whatsappRaw.greetingRanges.length > 0
+      ? whatsappRaw.greetingRanges
+      : DEFAULT_GREETING_RANGES,
+  };
   return {
     clinic: { ...clinic, currency: 'BDT' as const, logoDataUrl },
     prescription,
@@ -67,6 +75,7 @@ export function getSettings(ctx: Ctx): SettingsDTO {
     backup,
     appearance,
     notifications,
+    whatsapp,
     paymentMethods,
     expenseCategories: ctx.db.prepare("SELECT name FROM account_categories WHERE kind = 'expense' ORDER BY name").all<{ name: string }>().map((r) => r.name),
     printProfiles,
@@ -168,6 +177,31 @@ export function saveSettings(ctx: Ctx, patch: Partial<SettingsDTO>): SettingsDTO
         dues: patch.notifications.dues ?? current.dues ?? true,
         backup: patch.notifications.backup ?? current.backup ?? true,
       });
+    }
+
+    if (patch.whatsapp) {
+      const timezone = patch.whatsapp.timezone != null && String(patch.whatsapp.timezone).trim()
+        ? String(patch.whatsapp.timezone).trim()
+        : null;
+      if (timezone) {
+        try {
+          new Intl.DateTimeFormat('en-GB', { timeZone: timezone });
+        } catch {
+          throw validation('Clinic time zone is not recognized. Use an IANA name such as Asia/Dhaka, or leave it empty to use this computer\'s time zone.');
+        }
+      }
+      const rangesIn = Array.isArray(patch.whatsapp.greetingRanges) ? patch.whatsapp.greetingRanges : [];
+      if (rangesIn.length < 1 || rangesIn.length > 8) {
+        throw validation('Configure between 1 and 8 greeting time ranges.');
+      }
+      const greetingRanges: GreetingRange[] = rangesIn.map((r, i) => {
+        if (!r || !isValidTimeOfDay(String(r.start ?? '')) || !isValidTimeOfDay(String(r.end ?? ''))) {
+          throw validation(`Greeting range ${i + 1} must use HH:MM start and end times.`);
+        }
+        const greeting = reqString(r.greeting, `Greeting range ${i + 1} greeting`, { max: 60 });
+        return { start: String(r.start), end: String(r.end), greeting };
+      });
+      writeSetting(ctx, 'whatsapp', { timezone, greetingRanges });
     }
 
     if (patch.paymentMethods) {
@@ -306,7 +340,7 @@ export async function resetBusiness(ctx: Ctx, input: { typedConfirm: string; pas
     'queue_entries', 'appointments', 'prescription_items', 'prescriptions',
     'visit_treatments', 'tooth_conditions', 'visits', 'referrals',
     'invoice_items', 'payments', 'invoices', 'inventory_txns', 'inventory_batches', 'inventory_items', 'suppliers',
-    'expenses', 'incomes', 'attachments', 'patient_tags', 'tags', 'patient_histories', 'patients',
+    'expenses', 'incomes', 'attachments', 'whatsapp_message_log', 'patient_tags', 'tags', 'patient_histories', 'patients',
     'notifications', 'medicine_templates', 'clinical_templates',
   ];
   const APPEND_ONLY_TRIGGERS = [

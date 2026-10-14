@@ -5,8 +5,10 @@ import { conflict, notFound, validation } from '../errors';
 import { audit, hasPermission, requirePermission, tx } from '../core/context';
 import { nextPatientCode } from '../core/sequences';
 import {
-  escapeLike, optDate, optPhone, optString, oneOf, pageParams, reqDate, reqInt, reqString,
+  escapeLike, optDate, optPhone, optString, optWhatsAppNumber, oneOf, pageParams, reqDate, reqInt, reqString,
 } from '../core/validate';
+import { normalizeWhatsAppNumber } from '../../shared/whatsapp';
+import type { WhatsAppConsent } from '../../shared/types';
 import { dateRangeFor, todayISO } from '../../shared/currency';
 import { BLOOD_GROUPS, GENDERS } from '../../shared/clinical';
 
@@ -17,6 +19,8 @@ interface PatientRow {
   emergency_phone: string | null; address: string | null; city: string | null;
   chief_complaint: string | null; referred_by: string | null;
   preferred_dentist_id: number | null; status: string; registration_date: string;
+  whatsapp_number: string | null; whatsapp_same_as_phone: number;
+  whatsapp_consent: string; whatsapp_consent_at: string | null;
   created_at: string; updated_at: string;
   last_visit_at: string | null; visit_count: number;
 }
@@ -31,6 +35,8 @@ export interface PatientInput {
   emergencyContact?: string | null; emergencyPhone?: string | null;
   address?: string | null; city?: string | null;
   chiefComplaint?: string | null; referredBy?: string | null; preferredDentistId?: number | null;
+  whatsappNumber?: string | null; whatsappSameAsPhone?: boolean;
+  whatsappConsent?: WhatsAppConsent;
   status?: string; registrationDate?: string | null; tags?: string[];
   histories?: Partial<Record<HistoryKind, string | null>>;
   forceCreate?: boolean;
@@ -44,6 +50,10 @@ function toDTO(row: PatientRow, tags: string[]): PatientDTO {
     emergencyContact: row.emergency_contact, emergencyPhone: row.emergency_phone,
     address: row.address, city: row.city, chiefComplaint: row.chief_complaint,
     referredBy: row.referred_by, preferredDentistId: row.preferred_dentist_id,
+    whatsappNumber: row.whatsapp_number ?? null,
+    whatsappSameAsPhone: !!row.whatsapp_same_as_phone,
+    whatsappConsent: (['granted', 'declined'].includes(row.whatsapp_consent) ? row.whatsapp_consent : 'unknown') as WhatsAppConsent,
+    whatsappConsentAt: row.whatsapp_consent_at ?? null,
     status: row.status as PatientDTO['status'], tags,
     registrationDate: row.registration_date, createdAt: row.created_at, updatedAt: row.updated_at,
     lastVisitAt: row.last_visit_at, visitCount: row.visit_count,
@@ -77,8 +87,8 @@ export function listPatients(ctx: Ctx, filters: PatientFilters): Paged<PatientDT
   if (filters.dentistId) { where.push('p.preferred_dentist_id = ?'); params.push(filters.dentistId); }
   if (filters.query && filters.query.trim()) {
     const q = `%${escapeLike(filters.query.trim().toLowerCase())}%`;
-    where.push("(LOWER(p.name) LIKE ? ESCAPE '\\' OR LOWER(COALESCE(p.bengali_name,'')) LIKE ? ESCAPE '\\' OR LOWER(p.code) LIKE ? ESCAPE '\\' OR COALESCE(p.phone,'') LIKE ? ESCAPE '\\' OR COALESCE(p.phone2,'') LIKE ? ESCAPE '\\')");
-    params.push(q, q, q, q, q);
+    where.push("(LOWER(p.name) LIKE ? ESCAPE '\\' OR LOWER(COALESCE(p.bengali_name,'')) LIKE ? ESCAPE '\\' OR LOWER(p.code) LIKE ? ESCAPE '\\' OR COALESCE(p.phone,'') LIKE ? ESCAPE '\\' OR COALESCE(p.phone2,'') LIKE ? ESCAPE '\\' OR COALESCE(p.whatsapp_number,'') LIKE ? ESCAPE '\\')");
+    params.push(q, q, q, q, q, q);
   }
 
   const sortMap: Record<string, string> = {
@@ -186,6 +196,19 @@ export function createPatient(ctx: Ctx, raw: unknown): PatientDTO {
   const phone2 = optPhone(input?.phone2, 'Alternate phone');
   if (!phone && !phone2) throw validation('At least one phone number is required for a patient.');
 
+  // WhatsApp number is optional and separate from the clinic phone. When the
+  // doctor ticks "Same as Phone Number" and gave no distinct value, derive it
+  // from the phone without ever rewriting the phone itself.
+  const sameAsPhone = !!input?.whatsappSameAsPhone;
+  let whatsappNumber = optWhatsAppNumber(input?.whatsappNumber);
+  if (!whatsappNumber && sameAsPhone && phone) {
+    const derived = normalizeWhatsAppNumber(phone);
+    if (derived.ok) whatsappNumber = derived.international;
+  }
+  const whatsappConsent = input?.whatsappConsent
+    ? oneOf(input.whatsappConsent, ['unknown', 'granted', 'declined'] as const, 'WhatsApp consent')
+    : 'unknown';
+
   const manualCode = input?.code ? reqString(input.code, 'Patient code', { max: 40 }) : null;
 
   const candidates = findDuplicates(ctx.db, { ...input, name });
@@ -207,8 +230,9 @@ export function createPatient(ctx: Ctx, raw: unknown): PatientDTO {
       .prepare(
         `INSERT INTO patients (code, name, bengali_name, dob, age_years, gender, blood_group, phone, phone2,
            emergency_contact, emergency_phone, address, city, chief_complaint, referred_by,
-           preferred_dentist_id, status, registration_date, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+           preferred_dentist_id, status, registration_date, whatsapp_number, whatsapp_same_as_phone,
+           whatsapp_consent, whatsapp_consent_at, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       )
       .run(
         code, name, optString(input.bengaliName, 'Bengali name', { max: 160 }), dob, ageYears, gender, blood,
@@ -221,7 +245,10 @@ export function createPatient(ctx: Ctx, raw: unknown): PatientDTO {
         optString(input.referredBy, 'Referred by', { max: 200 }),
         input.preferredDentistId != null ? reqInt(input.preferredDentistId, 'Preferred dentist') : null,
         oneOf(input.status ?? 'active', ['active', 'archived', 'blocked'] as const, 'Status'),
-        registrationDate, now, now,
+        registrationDate,
+        whatsappNumber, sameAsPhone ? 1 : 0,
+        whatsappConsent, whatsappConsent !== 'unknown' ? now : null,
+        now, now,
       );
     const patientId = Number(info.lastInsertRowid);
 
@@ -274,12 +301,35 @@ export function updatePatient(ctx: Ctx, id: number, raw: unknown): PatientDTO {
   const phone2 = input?.phone2 !== undefined ? optPhone(input.phone2, 'Alternate phone') : existing.phone2;
   if (!phone && !phone2) throw validation('At least one phone number is required for a patient.');
 
+  // An independently entered WhatsApp number is never overwritten silently:
+  // it only changes when the field is supplied, or when the doctor explicitly
+  // ticks "Same as Phone Number".
+  const sameAsPhone = input?.whatsappSameAsPhone !== undefined ? !!input.whatsappSameAsPhone : !!existing.whatsapp_same_as_phone;
+  let whatsappNumber = existing.whatsapp_number;
+  if (input?.whatsappNumber !== undefined) whatsappNumber = optWhatsAppNumber(input.whatsappNumber);
+  if (sameAsPhone && input?.whatsappSameAsPhone === true && phone) {
+    const derived = normalizeWhatsAppNumber(phone);
+    if (derived.ok) whatsappNumber = derived.international;
+  } else if (sameAsPhone && input?.phone !== undefined && input?.whatsappNumber === undefined && existing.whatsapp_same_as_phone && phone) {
+    // Phone edited while "same as phone" was already on: keep them in step.
+    const derived = normalizeWhatsAppNumber(phone);
+    if (derived.ok) whatsappNumber = derived.international;
+  }
+  const whatsappConsent = input?.whatsappConsent !== undefined
+    ? oneOf(input.whatsappConsent, ['unknown', 'granted', 'declined'] as const, 'WhatsApp consent')
+    : (existing.whatsapp_consent as WhatsAppConsent);
+  const whatsappConsentAt = whatsappConsent !== existing.whatsapp_consent
+    ? new Date().toISOString()
+    : existing.whatsapp_consent_at;
+
   tx(ctx.db, () => {
     ctx.db
       .prepare(
         `UPDATE patients SET name = ?, bengali_name = ?, dob = ?, age_years = ?, gender = ?, blood_group = ?,
            phone = ?, phone2 = ?, emergency_contact = ?, emergency_phone = ?, address = ?, city = ?,
-           chief_complaint = ?, referred_by = ?, preferred_dentist_id = ?, status = ?, updated_at = ?
+           chief_complaint = ?, referred_by = ?, preferred_dentist_id = ?, status = ?,
+           whatsapp_number = ?, whatsapp_same_as_phone = ?, whatsapp_consent = ?, whatsapp_consent_at = ?,
+           updated_at = ?
          WHERE id = ?`,
       )
       .run(
@@ -297,6 +347,7 @@ export function updatePatient(ctx: Ctx, id: number, raw: unknown): PatientDTO {
           ? input.preferredDentistId != null ? reqInt(input.preferredDentistId, 'Preferred dentist') : null
           : existing.preferred_dentist_id,
         oneOf(input.status ?? existing.status, ['active', 'archived', 'blocked'] as const, 'Status'),
+        whatsappNumber, sameAsPhone ? 1 : 0, whatsappConsent, whatsappConsentAt,
         new Date().toISOString(),
         id,
       );
