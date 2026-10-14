@@ -97,7 +97,7 @@ function PaymentModal(props: { invoice: InvoiceDTO; onClose: () => void; onPaid:
             />
           )}
         </Field>
-        <Field label="Quick amount">
+        <Field label="Quick amount" labelFor={false}>
           {() => (
             <div className="row gap-2">
               <Button size="sm" variant="secondary" onClick={() => set('amountPaisa', due)}>Full balance</Button>
@@ -422,9 +422,10 @@ export function InvoicesPage() {
 
       <TableToolbar>
         <div style={{ minWidth: 240, flex: '1 1 240px' }}>
-          <Input value={query} onChange={setQuery} placeholder="Search invoice number or patient…" />
+          <Input value={query} onChange={setQuery} placeholder="Search invoice number or patient…" ariaLabel="Search invoices" />
         </div>
         <Select
+          ariaLabel="Filter invoices by date"
           value={range}
           onChange={(v) => { setRange(v); setPage(1); }}
           options={[
@@ -433,6 +434,7 @@ export function InvoicesPage() {
           ]}
         />
         <Select
+          ariaLabel="Filter invoices by payment status"
           value={status}
           onChange={(v) => { setStatus(v); setPage(1); }}
           placeholder="Any status"
@@ -534,6 +536,7 @@ export function PaymentsPage() {
 
       <TableToolbar>
         <Select
+          ariaLabel="Filter payments by date"
           value={range}
           onChange={(v) => { setRange(v); setPage(1); }}
           options={[
@@ -542,6 +545,7 @@ export function PaymentsPage() {
           ]}
         />
         <Select
+          ariaLabel="Filter payments by method"
           value={method}
           onChange={(v) => { setMethod(v); setPage(1); }}
           placeholder="Any method"

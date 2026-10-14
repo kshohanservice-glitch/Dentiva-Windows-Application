@@ -314,7 +314,7 @@ export function MessageTemplatesPanel() {
                   />
                 )}
               </Field>
-              <Field label="Preview">
+              <Field label="Preview" labelFor={false}>
                 {() => <Button variant="secondary" onClick={() => void preview()}>Preview message</Button>}
               </Field>
             </div>

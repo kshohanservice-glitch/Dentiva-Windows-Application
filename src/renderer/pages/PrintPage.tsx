@@ -8,6 +8,10 @@ import type { PrintProfile } from '../../shared/types';
 import type { DocumentStyleMap } from '../../shared/document-styles';
 import { normalizeDocumentStyles } from '../../shared/document-styles';
 import {
+  DEFAULT_DOCUMENT_WATERMARK, normalizeDocumentWatermark,
+} from '../../shared/document-watermark';
+import { ClinicLogoWatermark } from '../documents/document-preview';
+import {
   ageFromDob, appointmentCardDoc, emptyDoc, invToDoc, invoiceDoc, prescriptionDoc,
   receiptDoc, reportDoc, rxToDoc, stockLabelDoc, visitSummaryDoc, visitToDoc,
 } from '../documents/print-documents';
@@ -59,6 +63,7 @@ export function PrintPage() {
   // Stored document customizations (Settings → Customize Documents). Empty for
   // an untouched installation, in which case no stylesheet is emitted at all.
   const [docStyles, setDocStyles] = useState<DocumentStyleMap>({});
+  const [documentWatermark, setDocumentWatermark] = useState(DEFAULT_DOCUMENT_WATERMARK);
   const toast = useToast();
   const { locked, user } = useApp();
   const canOutput = !loading && !error && !locked && !!user;
@@ -96,7 +101,10 @@ export function PrintPage() {
           return byDoc?.id ?? loadedProfiles[0].id;
         });
       }
-      setDocStyles(normalizeDocumentStyles((s as { documentStyles?: unknown }).documentStyles));
+      if (!cancelled) {
+        setDocStyles(normalizeDocumentStyles((s as { documentStyles?: unknown }).documentStyles));
+        setDocumentWatermark(normalizeDocumentWatermark((s as { documentWatermark?: unknown }).documentWatermark));
+      }
       return s;
     };
     const clinicOf = async (): Promise<any> => (await settingsOf()).clinic;
@@ -217,7 +225,12 @@ export function PrintPage() {
           const fullSettings = await settingsOf();
           const input: QuickDocumentInput = { kind: stored.kind as QuickDocumentKind, payload: stored.payload as any };
           const ctx = { clinic: fullSettings.clinic, settings: fullSettings, dentist: stored.dentist ?? null };
-          return { kind: `quick-${stored.kind}`, title: quickDocumentTitle(input), doc: quickDocumentNode(input, ctx), data: input };
+          return {
+            kind: `quick-${stored.kind}`,
+            title: quickDocumentTitle(input),
+            doc: quickDocumentNode(input, ctx),
+            data: { input, clinic: fullSettings.clinic, settings: fullSettings },
+          };
         }
         default:
           return { kind, title: 'Unknown document', doc: emptyDoc('Unknown document'), data: {} };
@@ -334,6 +347,12 @@ export function PrintPage() {
         {(locked || !user) && !loading && <div className="card card-pad">Unlock the app to view or print this document.</div>}
         {!loading && error == null && !locked && !!user && (
           <div className="print-doc" style={docStyle}>
+            <ClinicLogoWatermark
+              clinic={state?.data?.clinic}
+              settings={documentWatermark}
+              documentType={state?.kind}
+              pageSize={{ widthMm: pageW, heightMm: pageH }}
+            />
             {state?.doc}
           </div>
         )}

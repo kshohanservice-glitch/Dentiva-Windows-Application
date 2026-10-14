@@ -89,6 +89,26 @@ describe('validateQuickDocumentInput', () => {
     expect((result.input!.payload as any).items).toHaveLength(2);
   });
 
+  it('preserves manual C/C and O/E text and the optional one-line medicine instruction', () => {
+    const instruction = '  Follow the dentist\'s handwritten instruction exactly.  ';
+    const result = validateQuickDocumentInput({
+      kind: 'prescription',
+      payload: {
+        reference: 'QP-20261014-090507', date: '2026-10-14', customer,
+        dentistName: 'Dr. Ayesha Rahman',
+        cC: 'Patient-specific complaint not in the common list',
+        oE: 'Clinician-entered finding',
+        items: [{ medicineName: 'Example medicine', medicineInstruction: instruction }],
+      },
+    });
+    expect(result.errors).toEqual([]);
+    expect(result.input?.kind).toBe('prescription');
+    if (!result.input || !('items' in result.input.payload)) throw new Error('Expected a prescription payload.');
+    expect(result.input.payload.cC).toBe('Patient-specific complaint not in the common list');
+    expect(result.input.payload.oE).toBe('Clinician-entered finding');
+    expect(result.input.payload.items[0].medicineInstruction).toBe(instruction);
+  });
+
   it('requires at least one medicine or invoice line', () => {
     const rx = validateQuickDocumentInput({
       kind: 'prescription',

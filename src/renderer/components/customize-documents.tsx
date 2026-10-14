@@ -6,9 +6,13 @@ import {
   type CustomizableDocumentType, type DocumentElementStyle, type DocumentSection, type DocumentStyleMap,
   type DocumentStylePropKey,
 } from '../../shared/document-styles';
+import type { DocumentWatermarkSettings } from '../../shared/document-watermark';
+import {
+  DEFAULT_DOCUMENT_WATERMARK, normalizeDocumentWatermark, pageSizeForDocument, supportsLogoWatermark,
+} from '../../shared/document-watermark';
 import type { ClinicSettings, SettingsDTO } from '../../shared/types';
 import { Badge, Button, Card, Tabs, useToast } from './primitives';
-import { Select } from './forms';
+import { Field, Select } from './forms';
 import { DocumentPreview, sampleDocumentNode } from '../documents/document-preview';
 
 /**
@@ -27,11 +31,19 @@ export function CustomizeDocumentsPanel(props: {
   onChange: (next: DocumentStyleMap) => void;
   clinic?: ClinicSettings | null;
   settings?: SettingsDTO | null;
+  watermark?: DocumentWatermarkSettings | null;
+  onWatermarkChange?: (next: DocumentWatermarkSettings) => void;
 }) {
   const toast = useToast();
+  const watermark = normalizeDocumentWatermark(props.watermark ?? DEFAULT_DOCUMENT_WATERMARK);
+  const setWatermark = (patch: Partial<DocumentWatermarkSettings>): void => {
+    props.onWatermarkChange?.({ ...watermark, ...patch });
+  };
   const [docType, setDocType] = useState<CustomizableDocumentType>('prescription');
   const [section, setSection] = useState<DocumentSection>('header');
   const [elementId, setElementId] = useState<string>('');
+  const pageSize = pageSizeForDocument(props.settings?.printProfiles, docType);
+  const watermarkSupported = supportsLogoWatermark(docType);
 
   const typeDef = documentTypeDef(docType);
   const sectionElements = useMemo(
@@ -89,6 +101,7 @@ export function CustomizeDocumentsPanel(props: {
         </p>
         <div className="form-grid">
           <Select
+            ariaLabel="Document to customize"
             value={docType}
             onChange={(v) => { setDocType(v as CustomizableDocumentType); setSection('header'); }}
             options={DOCUMENT_TYPE_DEFS.map((d) => ({ value: d.type, label: d.label }))}
@@ -119,6 +132,77 @@ export function CustomizeDocumentsPanel(props: {
           >
             Reset every document
           </Button>
+        </div>
+      </Card>
+
+      <Card
+        title="Clinic logo watermark"
+        actions={<Badge tone={watermark.enabled ? 'info' : 'neutral'}>{watermark.enabled ? 'Enabled' : 'Disabled'}</Badge>}
+      >
+        <p className="small muted" style={{ marginTop: 0 }}>
+          Use the clinic logo saved in Settings → Clinic. The mark is centered in page coordinates, keeps the logo's
+          original aspect ratio, and applies to prescriptions, invoices, visit summaries, appointment cards and reports.
+          Receipts and stock labels are intentionally left unchanged.
+        </p>
+        {!props.clinic?.logoDataUrl && (
+          <div className="callout callout-info small" role="note">
+            Upload and save a clinic logo in Settings → Clinic to see it here and on printed documents.
+          </div>
+        )}
+        {!watermarkSupported && (
+          <div className="callout callout-warning small" role="note">
+            The selected document type does not use the clinic-logo watermark.
+          </div>
+        )}
+        <div className="form-grid mt-3">
+          <Field label="Watermark" labelFor={false} className="span-2">
+            {() => (
+              <label className="checkbox">
+                <input
+                  type="checkbox"
+                  checked={watermark.enabled}
+                  onChange={(event) => setWatermark({ enabled: event.target.checked })}
+                />
+                <span>Enable the clinic-logo watermark (off by default)</span>
+              </label>
+            )}
+          </Field>
+          <Field label={`Logo size (${watermark.sizePercent}%)`} hint="Maximum logo dimension as a share of the page's shorter edge.">
+            {(id) => (
+              <div className="row gap-2 watermark-slider-row">
+                <input
+                  id={id}
+                  className="watermark-slider"
+                  type="range"
+                  min={15}
+                  max={70}
+                  step={1}
+                  value={watermark.sizePercent}
+                  aria-valuetext={`${watermark.sizePercent} percent of the page's shorter edge`}
+                  onChange={(event) => setWatermark({ sizePercent: Number(event.target.value) })}
+                />
+                <span className="xsmall muted num">{watermark.sizePercent}%</span>
+              </div>
+            )}
+          </Field>
+          <Field label={`Opacity (${Math.round(watermark.opacity * 100)}%)`} hint="Keep the logo subtle so printed text stays legible.">
+            {(id) => (
+              <div className="row gap-2 watermark-slider-row">
+                <input
+                  id={id}
+                  className="watermark-slider"
+                  type="range"
+                  min={4}
+                  max={30}
+                  step={1}
+                  value={Math.round(watermark.opacity * 100)}
+                  aria-valuetext={`${Math.round(watermark.opacity * 100)} percent opacity`}
+                  onChange={(event) => setWatermark({ opacity: Number(event.target.value) / 100 })}
+                />
+                <span className="xsmall muted num">{Math.round(watermark.opacity * 100)}%</span>
+              </div>
+            )}
+          </Field>
         </div>
       </Card>
 
@@ -184,7 +268,16 @@ export function CustomizeDocumentsPanel(props: {
       </div>
 
       <Card title="Preview" actions={<span className="xsmall muted">Real document renderer · sample content</span>}>
-        <DocumentPreview styles={props.value} zoom={0.72}>{preview}</DocumentPreview>
+        <DocumentPreview
+          styles={props.value}
+          watermark={watermark}
+          clinic={props.clinic}
+          documentType={docType}
+          pageSize={pageSize}
+          zoom={0.72}
+        >
+          {preview}
+        </DocumentPreview>
       </Card>
     </div>
   );

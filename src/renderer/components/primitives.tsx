@@ -8,9 +8,9 @@ export function Button(props: {
   variant?: BtnVariant; size?: 'sm' | 'md' | 'lg'; loading?: boolean; block?: boolean;
   icon?: React.ReactNode; children?: React.ReactNode;
   onClick?: (e: React.MouseEvent<HTMLButtonElement>) => void;
-  type?: 'button' | 'submit'; disabled?: boolean; title?: string; id?: string; autoFocus?: boolean;
+  type?: 'button' | 'submit'; disabled?: boolean; title?: string; id?: string; autoFocus?: boolean; ariaLabel?: string;
 }) {
-  const { variant = 'default', size = 'md', loading, block, icon, children, onClick, type = 'button', disabled, title, id, autoFocus } = props;
+  const { variant = 'default', size = 'md', loading, block, icon, children, onClick, type = 'button', disabled, title, id, autoFocus, ariaLabel } = props;
   const cls = [
     'btn',
     variant !== 'default' ? `btn-${variant}` : '',
@@ -19,7 +19,7 @@ export function Button(props: {
     !children ? 'btn-icon' : '',
   ].filter(Boolean).join(' ');
   return (
-    <button id={id} className={cls} type={type} disabled={disabled || loading} onClick={onClick} title={title} autoFocus={autoFocus}>
+    <button id={id} className={cls} type={type} disabled={disabled || loading} onClick={onClick} title={title} autoFocus={autoFocus} aria-label={ariaLabel}>
       {loading ? <span className="spinner" style={{ width: 14, height: 14, borderColor: 'rgba(255,255,255,0.4)', borderTopColor: '#fff' }} /> : icon}
       {children}
     </button>

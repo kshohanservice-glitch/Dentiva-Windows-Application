@@ -192,7 +192,7 @@ test('clinician templates fill visit and invoice drafts without creating records
   const visit = page.locator('.modal[role="dialog"]', { hasText: 'Record visit' });
   await visit.getByLabel('Treatment plan', { exact: true }).fill('Review options at next visit');
   const plan = visit.locator('.form-section', { hasText: 'Treatment plan templates' });
-  await plan.getByPlaceholder('New template name').fill('E2E reusable plan');
+  await plan.getByLabel('Template name', { exact: true }).fill('E2E reusable plan');
   await plan.getByRole('button', { name: 'Save current draft' }).click();
   await expect(plan.getByRole('option', { name: 'E2E reusable plan' })).toBeAttached();
   await visit.getByLabel('Treatment plan', { exact: true }).fill('');
@@ -206,7 +206,7 @@ test('clinician templates fill visit and invoice drafts without creating records
   const rx = page.locator('.modal[role="dialog"]', { hasText: 'New prescription' });
   await rx.getByLabel('Advice', { exact: true }).fill('Routine post-op advice');
   const instructions = rx.locator('.form-section', { hasText: 'Prescription instructions templates' });
-  await instructions.getByPlaceholder('New template name').fill('E2E reusable advice');
+  await instructions.getByLabel('Template name', { exact: true }).fill('E2E reusable advice');
   await instructions.getByRole('button', { name: 'Save current draft' }).click();
   await expect(instructions.getByRole('option', { name: 'E2E reusable advice' })).toBeAttached();
   await rx.getByLabel('Advice', { exact: true }).fill('');
@@ -222,7 +222,7 @@ test('clinician templates fill visit and invoice drafts without creating records
   await invoice.getByPlaceholder('Treatment or item').fill('Template consultation');
   await invoice.getByLabel('Unit price (৳)').fill('125');
   const items = invoice.locator('.form-section', { hasText: 'Invoice item templates' });
-  await items.getByPlaceholder('New template name').fill('E2E invoice items');
+  await items.getByLabel('Template name', { exact: true }).fill('E2E invoice items');
   await items.getByRole('button', { name: 'Save current draft' }).click();
   await expect(items.getByRole('option', { name: 'E2E invoice items' })).toBeAttached();
   await invoice.getByPlaceholder('Treatment or item').fill('');
@@ -418,8 +418,8 @@ test('walk-in / quick documents print a real document without registering a pati
   // Prescription is the default document type for this workflow.
   await page.getByLabel('Customer name').fill('E2E Walk-in Customer');
   await page.getByLabel('Dentist name (typed)').fill('Dr. E2E Dentist');
-  await page.locator('.line-editor input').first().fill('Amoxicillin');
-  await page.locator('.line-editor input').nth(1).fill('500mg');
+  await page.getByLabel('Medicine name').first().fill('Amoxicillin');
+  await page.getByLabel('Strength').first().fill('500mg');
 
   // The preview is the real document renderer, so it must show the same content
   // the print window will show.

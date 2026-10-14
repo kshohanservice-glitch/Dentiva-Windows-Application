@@ -376,7 +376,7 @@ export function UsersPage() {
           <>
             <TableToolbar>
               <div style={{ minWidth: 260, flex: '1 1 260px' }}>
-                <Input value={query} onChange={setQuery} placeholder="Search users…" />
+                <Input value={query} onChange={setQuery} placeholder="Search users…" ariaLabel="Search users" />
               </div>
             </TableToolbar>
             <Card pad={false}>

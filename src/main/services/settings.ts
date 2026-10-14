@@ -10,6 +10,7 @@ import { peekNextInvoiceNumber, parseInvoiceNumber } from '../core/sequences';
 import { reqString } from '../core/validate';
 import { DEFAULT_GREETING_RANGES, isValidTimeOfDay, type GreetingRange } from '../../shared/whatsapp';
 import { normalizeDocumentStyles } from '../../shared/document-styles';
+import { DEFAULT_DOCUMENT_WATERMARK, normalizeDocumentWatermark } from '../../shared/document-watermark';
 
 function readSetting<T>(ctx: Ctx, key: string, fallback: T): T {
   const row = ctx.db.prepare('SELECT value_json FROM settings WHERE key = ?').get(key) as { value_json: string } | undefined;
@@ -65,6 +66,9 @@ export function getSettings(ctx: Ctx): SettingsDTO {
   // keeps its original design; validation drops anything unrecognized so an old
   // or hand-edited settings row can never break rendering.
   const documentStyles = normalizeDocumentStyles(readSetting(ctx, 'documentStyles', {}));
+  const documentWatermark = normalizeDocumentWatermark(
+    readSetting(ctx, 'documentWatermark', DEFAULT_DOCUMENT_WATERMARK),
+  );
   const whatsappRaw = readSetting<Partial<SettingsDTO['whatsapp']>>(ctx, 'whatsapp', {});
   const whatsapp: SettingsDTO['whatsapp'] = {
     timezone: typeof whatsappRaw.timezone === 'string' && whatsappRaw.timezone.trim() ? whatsappRaw.timezone.trim() : null,
@@ -85,6 +89,7 @@ export function getSettings(ctx: Ctx): SettingsDTO {
     expenseCategories: ctx.db.prepare("SELECT name FROM account_categories WHERE kind = 'expense' ORDER BY name").all<{ name: string }>().map((r) => r.name),
     printProfiles,
     documentStyles,
+    documentWatermark,
   };
 }
 
@@ -221,6 +226,9 @@ export function saveSettings(ctx: Ctx, patch: Partial<SettingsDTO>): SettingsDTO
 
     if (patch.documentStyles) {
       writeSetting(ctx, 'documentStyles', normalizeDocumentStyles(patch.documentStyles));
+    }
+    if (patch.documentWatermark !== undefined) {
+      writeSetting(ctx, 'documentWatermark', normalizeDocumentWatermark(patch.documentWatermark));
     }
 
     if (patch.printProfiles) {

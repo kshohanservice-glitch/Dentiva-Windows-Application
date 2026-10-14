@@ -72,6 +72,20 @@ describe('printable documents: default design is unchanged', () => {
     expect(html).toContain('Specimen');
   });
 
+  it('prints a nonblank one-line medicine instruction instead of duplicate structured directions', () => {
+    const data = DOCUMENT_SAMPLES.prescription() as any;
+    data.rx.items[0] = {
+      ...data.rx.items[0],
+      medicineInstruction: 'Take one capsule after meals for five days.',
+    };
+    const html = render(current, 'prescriptionDoc', data);
+    expect(html).toContain('class="medication-single-instruction">Take one capsule after meals for five days.</span>');
+    expect(html).not.toContain('1 capsule');
+    expect(html).not.toContain('3× daily');
+    expect(html).toContain('Amoxicillin trihydrate');
+    expect(html).toContain('2× daily');
+  });
+
   it('an untouched installation emits no customization stylesheet', () => {
     expect(documentStyleCss({})).toBe('');
     expect(documentStyleCss(undefined)).toBe('');
