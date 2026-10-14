@@ -87,11 +87,13 @@ untouched), and instruction storage/validation (500-character bound, verbatim te
 | 5 | Local gate re-run on the merged tree | typecheck 0 errors; lint clean; `npm test` **47 files / 514 tests** (main's 47-file suite plus the restored coverage); `npm run build` clean |
 | 6 | Docs for the merged release | `docs/KNOWN_LIMITATIONS.md`, `docs/PRINTING.md` (watermark section), `docs/RELEASE_NOTES_4.2.1.md`, this log |
 | 7 | Version bump | `package.json` + `package-lock.json` → `4.2.1` |
-| 8 | CI + release | push, PR #32 re-verified, merge to `main`, tag `v4.2.1`, GitHub release from the notes file |
+| 8 | CI + release | done — branch pushed (`84009c2`), PR #32 re-verified on CI run 38595558756 (verify, Windows E2E, NSIS + installed smoke test all green), merged to `main` as `414a65a`, tag `v4.2.1` pushed, publish run 38596758870 green; release [Dentiva Pro 4.2.1](https://github.com/kshohanservice-glitch/Dentiva-Windows-Application/releases/tag/v4.2.1) with `DentivaPro-Setup-4.2.1.exe` (100 055 290 bytes, sha256 `d03e9523…f490b`) and `SHA256SUMS.txt` |
 
-## 6. Next action
+## 6. Release status — closed
 
-Commit the merged tree with the audit fixes and the added coverage, push the branch, let Windows CI
-re-verify (typecheck/lint/unit/integration, Playwright E2E, NSIS installer + installed artifact), then
-merge PR #32 to `main`, tag `v4.2.1` on the merge commit and publish the GitHub release from
-`docs/RELEASE_NOTES_4.2.1.md`.
+The v4.2.1 release is published: tag `v4.2.1` → `414a65a` on `main` (parents `06831e3` = main's
+v4.2.0 release, `84009c2` = this branch's hardening commit), assets verified. No further action is
+required for this release. If work resumes on this branch, start by reading §4 (audit findings) and
+`docs/KNOWN_LIMITATIONS.md`, and re-derive the current version from `package.json` before tagging —
+the tag must always match it and the branch version must be ahead of the last published one
+(currently 4.2.1).
