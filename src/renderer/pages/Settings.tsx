@@ -49,7 +49,10 @@ export function SettingsPage() {
   const save = async () => {
     setSaving(true);
     try {
-      await api['settings/save'](form);
+      // WhatsApp greeting settings are managed by the Message Templates tab;
+      // never overwrite them with this form's snapshot.
+      const { whatsapp: _whatsapp, ...rest } = form;
+      await api['settings/save'](rest);
       await refreshSettings();
       setDirty(false);
       toast.success('Settings saved');

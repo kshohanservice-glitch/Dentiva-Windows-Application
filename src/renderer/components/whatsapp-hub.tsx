@@ -359,6 +359,7 @@ function MessageComposerModal(props: ComposerProps) {
   const [category, setCategory] = useState<WhatsAppTemplateCategory>(props.category);
   const [templateId, setTemplateId] = useState<string>('');
   const [appointmentId, setAppointmentId] = useState<string>('');
+  const [previousAppointmentId, setPreviousAppointmentId] = useState<string>('');
   const [visitId, setVisitId] = useState<string>('');
   const [customBody, setCustomBody] = useState('');
   const [message, setMessage] = useState('');
@@ -392,7 +393,7 @@ function MessageComposerModal(props: ComposerProps) {
     [templates.data],
   );
 
-  const generate = async (overrides?: { templateId?: string; appointmentId?: string; visitId?: string; category?: WhatsAppTemplateCategory }) => {
+  const generate = async (overrides?: { templateId?: string; appointmentId?: string; previousAppointmentId?: string; visitId?: string; category?: WhatsAppTemplateCategory }) => {
     setBusy(true);
     try {
       const result = await api['whatsapp/prepare']({
@@ -400,6 +401,7 @@ function MessageComposerModal(props: ComposerProps) {
         templateId: (overrides?.templateId ?? templateId) ? Number(overrides?.templateId ?? templateId) : null,
         category: overrides?.category ?? category,
         appointmentId: (overrides?.appointmentId ?? appointmentId) ? Number(overrides?.appointmentId ?? appointmentId) : null,
+        previousAppointmentId: (overrides?.previousAppointmentId ?? previousAppointmentId) ? Number(overrides?.previousAppointmentId ?? previousAppointmentId) : null,
         visitId: (overrides?.visitId ?? visitId) ? Number(overrides?.visitId ?? visitId) : null,
         documents: (props.documents ?? []).map((d) => ({ kind: d.kind, documentId: d.documentId })),
         customBody: customBody || null,
@@ -435,6 +437,7 @@ function MessageComposerModal(props: ComposerProps) {
         templateId: templateId ? Number(templateId) : null,
         category,
         appointmentId: appointmentId ? Number(appointmentId) : null,
+        previousAppointmentId: previousAppointmentId ? Number(previousAppointmentId) : null,
         visitId: visitId ? Number(visitId) : null,
         documents: (props.documents ?? []).map((d) => ({ kind: d.kind, documentId: d.documentId })),
         customBody: customBody || null,
@@ -554,6 +557,25 @@ function MessageComposerModal(props: ComposerProps) {
               />
             )}
           </Field>
+          {category === 'rescheduling' && (
+            <Field label="Previous appointment">
+              {(id) => (
+                <Select
+                  id={id}
+                  value={previousAppointmentId}
+                  onChange={(v) => {
+                    setPreviousAppointmentId(v);
+                    if (!edited) void generate({ previousAppointmentId: v });
+                  }}
+                  placeholder="No previous appointment selected"
+                  options={patientAppointments.map((a) => ({
+                    value: String(a.id),
+                    label: `${formatDate(a.date)} ${a.time} — ${a.type}${a.dentistName ? ` · ${a.dentistName}` : ''}`,
+                  }))}
+                />
+              )}
+            </Field>
+          )}
           {category === 'follow_up_reminder' && (
             <Field label="Follow-up visit">
               {(id) => (
