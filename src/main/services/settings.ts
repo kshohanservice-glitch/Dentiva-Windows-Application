@@ -32,11 +32,34 @@ function writeSetting(ctx: Ctx, key: string, value: unknown): void {
     .run(key, JSON.stringify(value), nowISO(), ctx.session.userId);
 }
 
-function clinicLogoDataUrl(ctx: Ctx, logoPath?: string | null): string | null {
-  if (!logoPath) return null;
+/** Logo files live only in `<dataDir>/branding/` and are always images (V5-006). */
+const LOGO_DIR = 'branding';
+const LOGO_EXTENSIONS = new Set(['.png', '.jpg', '.jpeg', '.webp', '.svg']);
+
+/**
+ * Resolve a stored logo path, or null when it is not a managed logo file.
+ * The value is served through the unauthenticated `settings/get` (login
+ * screen branding), so it must never be able to point at the database or any
+ * other file in the data folder.
+ */
+export function resolveManagedLogoPath(dataDir: string, logoPath: unknown): string | null {
+  if (typeof logoPath !== 'string' || !logoPath.trim()) return null;
   try {
-    const full = safeResolve(ctx.paths.dataDir, logoPath);
-    if (!fs.existsSync(full) || !fs.statSync(full).isFile()) return null;
+    const brandingRoot = path.resolve(dataDir, LOGO_DIR);
+    const full = safeResolve(brandingRoot, path.relative(brandingRoot, path.resolve(dataDir, logoPath)));
+    if (path.dirname(full) !== brandingRoot) return null;
+    if (!LOGO_EXTENSIONS.has(path.extname(full).toLowerCase())) return null;
+    return full;
+  } catch {
+    return null;
+  }
+}
+
+function clinicLogoDataUrl(ctx: Ctx, logoPath?: string | null): string | null {
+  const full = resolveManagedLogoPath(ctx.paths.dataDir, logoPath);
+  if (!full) return null;
+  try {
+    if (!fs.existsSync(full) || !fs.lstatSync(full).isFile()) return null;
     // Defensive ceiling: a logo is at most a few MB (see uploadLogo). Never
     // ship an unbounded blob through IPC.
     if (fs.statSync(full).size > 8 * 1024 * 1024) return null;
@@ -111,7 +134,9 @@ export function saveSettings(ctx: Ctx, patch: Partial<SettingsDTO>): SettingsDTO
         ...current,
         clinicName,
         clinicNameBn: patch.clinic.clinicNameBn !== undefined ? patch.clinic.clinicNameBn : current.clinicNameBn ?? null,
-        logoPath: patch.clinic.logoPath !== undefined ? patch.clinic.logoPath : current.logoPath ?? null,
+        // The logo path is owned by the main process (uploadLogo writes it).
+        // The renderer may only clear it; any other value keeps the stored one.
+        logoPath: patch.clinic.logoPath === null ? null : current.logoPath ?? null,
         address: patch.clinic.address !== undefined ? patch.clinic.address : current.address ?? null,
         phone: patch.clinic.phone !== undefined ? patch.clinic.phone : current.phone ?? null,
         email: patch.clinic.email !== undefined ? patch.clinic.email : current.email ?? null,

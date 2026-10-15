@@ -75,6 +75,8 @@ function UserModal(props: {
   const toast = useToast();
   const { data: roles } = useAsync(() => api['roles/list'](), []);
   const { data: staff } = useAsync(() => api['staff/list'](), []);
+  const { can } = useApp();
+  const canManageRoles = can('roles.manage');
 
   React.useEffect(() => {
     if (!props.open) return;
@@ -87,7 +89,10 @@ function UserModal(props: {
       staffId: props.initial?.staffId != null ? String(props.initial.staffId) : '',
       status: props.initial?.status ?? 'active',
       permissions: props.initial?.permissions ?? [],
-      customPerms: !!(props.initial?.permissions?.length),
+      // On only when the user really has per-user overrides. Defaulting to on
+      // for every user re-submitted the old effective set and kept a demoted
+      // user's former permissions (V5-014).
+      customPerms: !!props.initial?.hasPermissionOverrides,
     });
   }, [props.open, props.initial]);
 
@@ -115,7 +120,9 @@ function UserModal(props: {
         roleId: Number(v.roleId),
         status: v.status as UserDTO['status'],
         staffId: v.staffId ? Number(v.staffId) : null,
-        permissions: v.customPerms ? v.permissions : undefined,
+        // Exact effective set when overriding; null removes every override so
+        // the user has exactly the selected role's permissions.
+        permissions: canManageRoles ? (v.customPerms ? v.permissions : null) : undefined,
       });
       toast.success(props.initial ? 'User updated' : 'User created', v.username);
       props.onSaved();
@@ -151,7 +158,17 @@ function UserModal(props: {
         </Field>
         <Field label="Role" required error={errors.roleId}>
           {(id) => (
-            <Select id={id} value={v.roleId} onChange={(x) => set('roleId', x)} placeholder="Select role…" invalid={!!errors.roleId}
+            <Select
+              id={id}
+              value={v.roleId}
+              onChange={(x) => {
+                // Start an override from the new role's permissions, never from
+                // the previous role's — otherwise a demotion silently keeps them.
+                const next = (roles ?? []).find((r) => String(r.id) === x);
+                setV((p) => ({ ...p, roleId: x, permissions: next ? [...next.permissions] : p.permissions }));
+              }}
+              placeholder="Select role…"
+              invalid={!!errors.roleId}
               options={(roles ?? []).map((r) => ({ value: String(r.id), label: `${r.name}${r.builtin ? ' (built-in)' : ''}` }))} />
           )}
         </Field>
@@ -174,15 +191,44 @@ function UserModal(props: {
       </div>
 
       <div className="form-section mt-4">
-        <label className="checkbox mb-4">
-          <input type="checkbox" checked={v.customPerms} onChange={(e) => set('customPerms', e.target.checked)} />
-          <span>Override role permissions for this user</span>
-        </label>
-        {v.customPerms ? (
-          <PermissionMatrix selected={v.permissions} onChange={(p) => set('permissions', p)} />
+        {canManageRoles ? (
+          <>
+            <label className="checkbox mb-4">
+              <input
+                type="checkbox"
+                checked={v.customPerms}
+                onChange={(e) => {
+                  const on = e.target.checked;
+                  const roleDef = (roles ?? []).find((r) => String(r.id) === v.roleId);
+                  setV((p) => ({
+                    ...p,
+                    customPerms: on,
+                    // Turning the override on starts from the role's permissions.
+                    permissions: on && !p.customPerms && roleDef ? [...roleDef.permissions] : p.permissions,
+                  }));
+                }}
+              />
+              <span>Override role permissions for this user</span>
+            </label>
+            {v.customPerms ? (
+              <>
+                <p className="small muted mb-4">
+                  Ticked permissions are exactly what this user can do. Unticking a permission that the role grants removes
+                  it for this user only.
+                </p>
+                <PermissionMatrix selected={v.permissions} onChange={(p) => set('permissions', p)} />
+              </>
+            ) : (
+              <p className="small muted">
+                This user receives exactly the permissions of the selected role. Role edits by an administrator apply here automatically.
+              </p>
+            )}
+          </>
         ) : (
           <p className="small muted">
-            This user receives exactly the permissions of the selected role. Role edits by an administrator apply here automatically.
+            {props.initial?.hasPermissionOverrides
+              ? 'This user has individual permission changes. Only someone who can manage roles can change them.'
+              : 'This user receives exactly the permissions of the selected role.'}
           </p>
         )}
       </div>

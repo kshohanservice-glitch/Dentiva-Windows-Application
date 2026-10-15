@@ -157,3 +157,34 @@ export function pageParams(page: unknown, pageSize: unknown): { page: number; pa
 export function escapeLike(value: string): string {
   return value.replace(/[\\%_]/g, '\\$&');
 }
+
+/**
+ * Optional link to a visit that must exist, be active and belong to the same
+ * patient (V5-008). Returns the visit id or null. Prevents an invoice,
+ * prescription or chart entry from being attached to another patient's visit.
+ */
+export function optVisitOfPatient(
+  db: { prepare: (sql: string) => { get: (...args: unknown[]) => unknown } },
+  value: unknown,
+  patientId: number,
+): number | null {
+  const visitId = optInt(value, 'Visit', { min: 1 });
+  if (visitId === null) return null;
+  const row = db.prepare('SELECT patient_id FROM visits WHERE id = ? AND deleted_at IS NULL').get(visitId) as { patient_id: number } | undefined;
+  if (!row) throw validation('The linked visit was not found.');
+  if (Number(row.patient_id) !== Number(patientId)) throw validation('The linked visit belongs to a different patient.');
+  return visitId;
+}
+
+/** Optional link to a treatment-catalogue row that must exist (V5-008). */
+export function optTreatmentId(
+  db: { prepare: (sql: string) => { get: (...args: unknown[]) => unknown } },
+  value: unknown,
+  field: string,
+): number | null {
+  const id = optInt(value, field, { min: 1 });
+  if (id === null) return null;
+  if (!db.prepare('SELECT 1 FROM treatments WHERE id = ?').get(id)) throw validation(`${field}: the selected treatment no longer exists.`);
+  return id;
+}
+

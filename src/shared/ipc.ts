@@ -50,7 +50,7 @@ export interface DentivaApi {
   'auth/logout'(): Promise<null>;
   'auth/session'(): Promise<SessionUser | null>;
   'auth/change-password'(payload: { oldPassword: string; newPassword: string }): Promise<{ ok: boolean }>;
-  'auth/unlock'(password: string): Promise<{ ok: boolean; error?: string }>;
+  'auth/unlock'(password: string): Promise<{ ok: true } | { ok: false; error: string; attemptsLeft: number }>;
 
   /* setup wizard */
   'setup/status'(): Promise<{ needsSetup: boolean }>;
@@ -280,7 +280,14 @@ export interface PatientItemPayload {
 
 export interface UserSavePayload {
   id?: number; username: string; displayName: string; password?: string;
-  roleId: number; status?: string; staffId?: number | null; permissions?: PermissionKey[];
+  roleId: number; status?: string; staffId?: number | null;
+  /**
+   * Per-user permission override. An array is the user's exact effective set
+   * (grants and revokes relative to the role are derived from it); `null`
+   * removes every override so the user has exactly the role's permissions;
+   * omitted keeps the stored overrides unchanged.
+   */
+  permissions?: PermissionKey[] | null;
 }
 
 export interface RoleSavePayload {

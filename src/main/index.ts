@@ -15,6 +15,7 @@ import { resolveWindowIcon } from './print';
 import { IPC } from '../shared/ipc';
 import { isDemoBuild } from './build-mode';
 import { seedDemoDatabase, DEMO_PASSWORD, DEMO_USERNAME } from './demo';
+import { isAppEntryUrl } from './navigation';
 
 const APP_VERSION = ((): string => {
   try {
@@ -61,12 +62,15 @@ function createWindow(): void {
   mainWindow.once('ready-to-show', () => mainWindow?.show());
   mainWindow.on('closed', () => { mainWindow = null; });
 
-  void mainWindow.loadFile(path.join(app.getAppPath(), 'dist', 'renderer', 'index.html'));
+  const appHtml = path.join(app.getAppPath(), 'dist', 'renderer', 'index.html');
+  void mainWindow.loadFile(appHtml);
 
   const wc = mainWindow.webContents;
   wc.setWindowOpenHandler(() => ({ action: 'deny' }));
+  // Only the packaged renderer entry may ever be shown: the preload bridge is
+  // attached to the window, so any other page would receive it (V5-004).
   wc.on('will-navigate', (event, url) => {
-    if (!url.startsWith('file://')) event.preventDefault();
+    if (!isAppEntryUrl(url, appHtml)) event.preventDefault();
   });
 }
 
@@ -94,7 +98,11 @@ async function boot(): Promise<void> {
   // --- Database open with integrity guard -------------------------------
   let db: DB;
   try {
-    ({ db } = openDatabase(paths.dbFile));
+    const opened = openDatabase(paths.dbFile);
+    db = opened.db;
+    if (opened.preMigrationCopy) {
+      logger.info('Database upgraded; verified pre-upgrade copy kept', { copy: opened.preMigrationCopy, schemaVersion: opened.schemaVersion });
+    }
   } catch (err: any) {
     logger.error('Database failed to open', { error: err?.message });
     fatal(
@@ -204,16 +212,6 @@ async function boot(): Promise<void> {
 
   createWindow();
 
-  // Crash containment: log, surface a friendly dialog, exit non-zero once.
-  process.on('uncaughtException', (err) => {
-    logger.error('Uncaught exception', { error: err.message, stack: err.stack?.split('\n').slice(0, 3).join(' | ') });
-    dialog.showErrorBox('Dentiva Pro — unexpected error', `An unexpected error occurred:\n${err.message}\n\nYour saved data is unaffected. The application will close.`);
-    app.exit(1);
-  });
-  process.on('unhandledRejection', (reason) => {
-    logger.error('Unhandled rejection', { error: reason instanceof Error ? reason.message : String(reason) });
-  });
-
   // Maintenance: appointment expiry + reminder sync run at startup and every
   // 5 minutes, so they survive restarts and catch up after the PC was asleep.
   // Both are idempotent; reads also re-derive expiry from the local date.
@@ -255,6 +253,18 @@ async function boot(): Promise<void> {
 
 /* --------------------------- app lifecycle --------------------------- */
 
+// Crash containment is registered before anything else runs, so a failure
+// during start-up (database open, demo sign-in, router registration) is
+// logged and surfaced instead of disappearing as a silent rejection (V5-011).
+process.on('uncaughtException', (err) => {
+  logger.error('Uncaught exception', { error: err.message, stack: err.stack?.split('\n').slice(0, 3).join(' | ') });
+  dialog.showErrorBox('Dentiva Pro — unexpected error', `An unexpected error occurred:\n${err.message}\n\nYour saved data is unaffected. The application will close.`);
+  app.exit(1);
+});
+process.on('unhandledRejection', (reason) => {
+  logger.error('Unhandled rejection', { error: reason instanceof Error ? reason.message : String(reason) });
+});
+
 const gotLock = app.requestSingleInstanceLock();
 if (!gotLock) {
   app.quit();
@@ -276,7 +286,10 @@ if (!gotLock) {
       contents.on('will-attach-webview', (event) => event.preventDefault());
       contents.session.setPermissionRequestHandler((_wc, _permission, cb) => cb(false));
     });
-    void boot();
+    boot().catch((err: unknown) => {
+      logger.error('Start-up failed', { error: err instanceof Error ? err.message : String(err) });
+      fatal('Start-up failed', `Dentiva Pro could not start.\n\n${err instanceof Error ? err.message : String(err)}\n\nYour saved data is unaffected.`);
+    });
   });
 
   app.on('window-all-closed', () => {

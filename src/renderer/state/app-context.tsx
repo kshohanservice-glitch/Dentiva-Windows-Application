@@ -6,6 +6,15 @@ import type { PublicSettings } from '../../shared/ipc';
 
 export type BootPhase = 'booting' | 'activation' | 'setup' | 'auth' | 'ready';
 
+export interface UnlockOutcome {
+  ok: boolean;
+  message?: string;
+  /** Wrong passwords still allowed before the session is ended. */
+  attemptsLeft?: number;
+  /** True when the main process ended the session (sign in again). */
+  signedOut?: boolean;
+}
+
 interface AppState {
   phase: BootPhase;
   user: SessionUser | null;
@@ -16,7 +25,7 @@ interface AppState {
   login: (username: string, password: string) => Promise<{ ok: boolean; reason?: string; retryAfterMs?: number }>;
   logout: () => Promise<void>;
   lock: () => void;
-  unlock: (password: string) => Promise<boolean>;
+  unlock: (password: string) => Promise<UnlockOutcome>;
   refresh: () => Promise<void>;
   refreshSettings: () => Promise<void>;
   can: (permission: string) => boolean;
@@ -162,14 +171,21 @@ export function AppProvider(props: { children: React.ReactNode }) {
   }, []);
 
   const unlock = useCallback(
-    async (password: string) => {
-      const res = await api['auth/unlock'](password);
-      if (res.ok) {
-        setLocked(false);
-        void api['system/activity']().catch(() => undefined);
-        return true;
+    async (password: string): Promise<UnlockOutcome> => {
+      try {
+        const res = await api['auth/unlock'](password);
+        if (res.ok) {
+          setLocked(false);
+          void api['system/activity']().catch(() => undefined);
+          return { ok: true };
+        }
+        return { ok: false, message: res.error, attemptsLeft: res.attemptsLeft };
+      } catch (err) {
+        // AUTH: too many wrong passwords or the account was disabled. The main
+        // process has ended the session and broadcast session-expired, which
+        // returns the app to the sign-in screen.
+        return { ok: false, signedOut: true, message: err instanceof Error ? err.message : 'You have been signed out.' };
       }
-      return false;
     },
     [],
   );

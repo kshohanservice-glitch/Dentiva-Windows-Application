@@ -257,7 +257,10 @@ export interface UserDTO {
   id: number; username: string; displayName: string; roleId: number; roleName: string;
   status: 'active' | 'locked' | 'disabled'; staffId: number | null;
   lastLoginAt: string | null; createdAt: string; mustChangePassword: boolean;
+  /** Effective permissions (role ± per-user overrides). */
   permissions?: PermissionKey[];
+  /** True when per-user grant/revoke overrides exist on top of the role. */
+  hasPermissionOverrides?: boolean;
 }
 
 export interface RoleDTO {

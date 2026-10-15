@@ -4,8 +4,9 @@ import { conflict, notFound, validation } from '../errors';
 import { audit, requirePermission, tx } from '../core/context';
 import { formatInvoiceNumber, nextInvoiceNumber, parseInvoiceNumber } from '../core/sequences';
 import { nowISO, todayISO, dateRangeFor } from '../../shared/currency';
-import { optString, pageParams, reqDate, reqInt, reqString, oneOf } from '../core/validate';
+import { optString, optTreatmentId, optVisitOfPatient, pageParams, reqDate, reqInt, reqString, oneOf } from '../core/validate';
 import { computeInvoiceStatus, computeInvoiceTotals } from '../../shared/billing-math';
+import { instantRange } from '../core/dates';
 
 interface InvoiceRow {
   id: number; number: string; patient_id: number; patient_name: string; patient_code: string;
@@ -112,7 +113,8 @@ export function createInvoice(ctx: Ctx, raw: unknown): InvoiceDTO {
     }),
     invoiceDiscount,
   );
-  const clean = totals.lines.map((line, i) => ({ ...line, treatmentId: items[i].treatmentId ?? null }));
+  const clean = totals.lines.map((line, i) => ({ ...line, treatmentId: optTreatmentId(ctx.db, items[i].treatmentId, `Item #${i + 1}`) }));
+  const visitId = optVisitOfPatient(ctx.db, input?.visitId, patientId);
   const subtotal = totals.subtotalPaisa;
   const total = totals.totalPaisa;
   if (subtotal - totals.lineDiscountPaisa - invoiceDiscount < 0) throw validation('Discounts exceed the invoice subtotal.');
@@ -142,7 +144,7 @@ export function createInvoice(ctx: Ctx, raw: unknown): InvoiceDTO {
          VALUES (?, ?, ?, ?, 'unpaid', ?, ?, ?, ?, ?, ?)`,
       )
       .run(
-        number, patientId, input.visitId ?? null, date,
+        number, patientId, visitId, date,
         subtotal, subtotal - total, total,
         optString(input.note, 'Note', { max: 2000 }),
         ctx.session.userId, nowISO(),
@@ -155,8 +157,8 @@ export function createInvoice(ctx: Ctx, raw: unknown): InvoiceDTO {
     for (const it of clean) {
       insItem.run(invoiceId, it.description, it.treatmentId, it.qty, it.unitPricePaisa, it.discountPaisa, it.totalPaisa);
     }
-    if (input.visitId) {
-      ctx.db.prepare('UPDATE visits SET invoice_id = ? WHERE id = ? AND invoice_id IS NULL').run(invoiceId, input.visitId);
+    if (visitId) {
+      ctx.db.prepare('UPDATE visits SET invoice_id = ? WHERE id = ? AND invoice_id IS NULL').run(invoiceId, visitId);
     }
     const nextNumber = formatInvoiceNumber(year, Number(number.slice(9)) + 1);
     const currentSettingRow = ctx.db.prepare("SELECT value_json FROM settings WHERE key = 'invoice'").get() as { value_json: string } | undefined;
@@ -256,8 +258,9 @@ export function listPayments(ctx: Ctx, filter: { patientId?: number; invoiceId?:
   if (filter.method) { where.push('pay.method = ?'); params.push(filter.method); }
   if (filter.range && filter.range !== 'all') {
     const { from, to } = dateRangeFor(filter.range as any);
-    if (from) { where.push('pay.paid_at >= ?'); params.push(`${from}T00:00:00.000Z`); }
-    if (to) { where.push('pay.paid_at <= ?'); params.push(`${to}T23:59:59.999Z`); }
+    // paid_at is a UTC instant; the filter is local calendar days (V5-012).
+    const range = instantRange('pay.paid_at', from, to);
+    where.push(...range.conds); params.push(...range.args);
   }
   const whereSql = where.length ? `WHERE ${where.join(' AND ')}` : '';
   const total = Number(ctx.db.prepare(`SELECT COUNT(*) c FROM payments pay ${whereSql}`).get(...params as any[])!['c']);

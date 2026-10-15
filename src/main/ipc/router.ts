@@ -2,7 +2,7 @@ import { BrowserWindow, clipboard, dialog, ipcMain, shell, type OpenDialogOption
 import fs from 'node:fs';
 import { IPC } from '../../shared/ipc';
 import type { SessionUser } from '../../shared/types';
-import { AppError, toWireError } from '../errors';
+import { AppError, toWireError, validation } from '../errors';
 import { logger } from '../logger';
 import type { Ctx } from '../core/context';
 import { audit, requirePermission } from '../core/context';
@@ -35,6 +35,7 @@ import { closePrintWindow, executePrint, listPrinters, openPrintWindow, saveAsPd
 import { toCsv } from '../../shared/csv';
 import type { AppPaths } from '../paths';
 import { getDb } from '../app';
+import { isDemoAllowed, isPrintableKind, printWindowPermissions } from './access-policy';
 
 export interface RouterDeps {
   paths: () => AppPaths;
@@ -102,29 +103,10 @@ async function pickFile(title: string, filters: Electron.FileFilter[]): Promise<
 }
 
 export function registerRouter(deps: RouterDeps): void {
-    const demoBlocked: Set<string> = new Set([
-    IPC.activationVerify, IPC.authLogout, IPC.authChangePassword, IPC.authUnlock, IPC.setupComplete, IPC.systemLock,
-    IPC.patientsCreate, IPC.patientsUpdate, IPC.patientsArchive, IPC.patientsDelete,
-    IPC.visitsCreate, IPC.visitsUpdate, IPC.visitsDelete, IPC.chartSet,
-    IPC.treatmentsSave, IPC.treatmentsSetActive, IPC.treatmentsDelete,
-    IPC.prescriptionsCreate, IPC.prescriptionsDelete, IPC.prescriptionsSaveTemplate, IPC.prescriptionsDeleteTemplate,
-    IPC.clinicalTemplatesSave, IPC.clinicalTemplatesDelete,
-    IPC.appointmentsCreate, IPC.appointmentsUpdate, IPC.appointmentsCancel, IPC.appointmentsDelete, IPC.appointmentsNoShow,
-    IPC.invoicesCreate, IPC.invoicesVoid, IPC.invoicesDelete, IPC.paymentsCreate, IPC.paymentsDelete,
-    IPC.inventorySaveItem, IPC.inventoryDeleteItem, IPC.inventoryDeleteBatch, IPC.inventoryStock, IPC.inventorySaveSupplier, IPC.inventoryDeleteSupplier,
-    IPC.accountingAddExpense, IPC.accountingDeleteExpense, IPC.accountingAddIncome, IPC.accountingDeleteIncome, IPC.accountingSaveCategory,
-    IPC.staffSave, IPC.staffDelete, IPC.dentistsSave, IPC.dentistsDelete,
-    IPC.usersSave, IPC.usersResetPassword, IPC.usersDelete, IPC.rolesSave, IPC.rolesRemove,
-    IPC.attachmentsAdd, IPC.attachmentsRename, IPC.attachmentsRemove,
-    IPC.backupRun, IPC.backupRestore, IPC.backupSetAuto,
-    IPC.settingsSave, IPC.settingsUploadLogo, IPC.settingsResetBusiness, IPC.referralsDelete,
-    IPC.quickDocumentsPrepare,
-    IPC.notificationsMarkRead, IPC.referralsSave,
-  ]);
   const handle = (channel: string, opts: { auth: boolean; fn: (payload: any, ctx: Ctx | null) => any | Promise<any> }) => {
     ipcMain.handle(channel, async (_event, payload): Promise<Result<any>> => {
       try {
-        if (deps.demo && demoBlocked.has(channel)) {
+        if (deps.demo && !isDemoAllowed(channel)) {
           throw new AppError('PERMISSION', 'Demo mode is read-only. This demo cannot be modified.');
         }
         let ctx: Ctx | null = null;
@@ -359,12 +341,8 @@ export function registerRouter(deps: RouterDeps): void {
     // One-click backup: use the caller's destination, else the configured
     // auto-backup destination, else the app's backups folder. Never blocks on
     // a native folder dialog — destination changes happen in Backup settings.
-    let destination = String(p ?? '');
-    if (!destination) {
-      const configured = deps.backup.readBackupSetting().destination;
-      destination = configured && configured.trim() ? configured : deps.paths().backupsDir;
-    }
-    return deps.backup.runBackup(ctx!, destination, 'manual');
+    // `backup.create` is enforced in the service (V5-013).
+    return deps.backup.runManualBackup(ctx!, p == null ? null : String(p));
   } });
   handle(IPC.backupList, { auth: true, fn: (_p, ctx) => deps.backup.listBackups(ctx!) });
   handle(IPC.backupRestore, { auth: true, fn: async (p, ctx) => {
@@ -426,14 +404,23 @@ export function registerRouter(deps: RouterDeps): void {
     audit(ctx!, { action: 'export.report', entityType: 'report', entityId: String(p?.name), summary: `Exported report "${p?.name}" (${rows.length} rows)` });
     return { path: target, rows: rows.length };
   } });
-  handle(IPC.reportsPrint, { auth: true, fn: (p) => {
-    openPrintWindow({ type: p?.type ?? 'report', id: Number(p?.id ?? 0), reportName: p?.reportName, profileId: p?.profileId, params: p?.params });
+  // Opening a print window requires the read permission of the document it
+  // shows (V5-010); the window's own data calls are permission-gated as well.
+  const openGuardedPrintWindow = (p: any, ctx: Ctx) => {
+    const type = p?.type ?? 'report';
+    if (!isPrintableKind(type)) throw validation('Unknown document type.');
+    for (const permission of printWindowPermissions(type, p?.reportName)) requirePermission(ctx, permission);
+    const id = Number(p?.id ?? 0);
+    openPrintWindow({
+      type, id: Number.isSafeInteger(id) && id >= 0 ? id : 0,
+      reportName: typeof p?.reportName === 'string' ? p.reportName : undefined,
+      profileId: typeof p?.profileId === 'string' ? p.profileId : undefined,
+      params: p?.params && typeof p.params === 'object' ? p.params : undefined,
+    });
     return { ok: true };
-  } });
-  handle(IPC.reportsSavePdf, { auth: true, fn: (p) => {
-    openPrintWindow({ type: p?.type ?? 'report', id: Number(p?.id ?? 0), reportName: p?.reportName, profileId: p?.profileId, params: p?.params });
-    return { ok: true };
-  } });
+  };
+  handle(IPC.reportsPrint, { auth: true, fn: (p, ctx) => openGuardedPrintWindow(p, ctx!) });
+  handle(IPC.reportsSavePdf, { auth: true, fn: (p, ctx) => openGuardedPrintWindow(p, ctx!) });
   /* ---------------------- walk-in / quick documents ---------------------- */
   // The payload is validated in the service, held in memory only, and rendered
   // by the same print window as every other document. No patient record is
@@ -527,10 +514,9 @@ export function registerRouter(deps: RouterDeps): void {
   handle(IPC.referralsList, { auth: true, fn: (p, ctx) => referralsSvc.listReferrals(ctx!, Number(p)) });
   handle(IPC.referralsSave, { auth: true, fn: (p, ctx) => referralsSvc.saveReferral(ctx!, p) });
 
-  handle(IPC.authUnlock, { auth: false, fn: async (p) => {
-    const ok = await deps.session.unlock(String(p ?? ''));
-    return ok ? { ok: true } : { ok: false, error: 'Incorrect password.' };
-  } });
+  // Lock-screen re-authentication. Wrong passwords count towards the sign-in
+  // lockout policy; the limit ends the session with an AUTH error (V5-001).
+  handle(IPC.authUnlock, { auth: false, fn: async (p) => deps.session.unlock(String(p ?? '')) });
 
   /* -------------------------- change password ----------------------------- */
   handle(IPC.authChangePassword, { auth: true, fn: async (p, ctx) => {

@@ -190,22 +190,49 @@ export function createBackupService(deps: BackupDeps) {
     }
   }
 
+  /**
+   * Retention for automatic backups only (V5-017). Candidates are the rows
+   * recorded as `kind = 'auto'` for this destination — never a file chosen by
+   * name — so manual and pre-restore backups that share the folder and the
+   * `DentivaPro_Backup_*.dpv` naming are never deleted by an automatic run.
+   */
   function pruneRetention(destination: string, kind: string): void {
     if (kind !== 'auto') return;
     try {
-      const retention = readBackupSetting().retention;
+      const retention = Math.max(1, Number(readBackupSetting().retention) || 10);
       const db = holder.get();
-      const files = fs.readdirSync(destination)
-        .filter((f) => f.startsWith('DentivaPro_Backup_') && f.endsWith('.dpv'))
-        .sort()
-        .reverse();
-      for (const f of files.slice(retention)) {
-        const full = path.join(destination, f);
-        fs.rmSync(full, { force: true });
-        // Keep the backup list truthful: drop rows for pruned files.
-        db.prepare("DELETE FROM backups WHERE filename = ? AND kind = 'auto' AND status = 'ok'").run(f);
+      const root = path.resolve(destination);
+      const rows = db
+        .prepare("SELECT id, path FROM backups WHERE kind = 'auto' AND status = 'ok' ORDER BY created_at DESC, id DESC")
+        .all() as { id: number; path: string }[];
+      const inDestination = rows.filter((r) => path.dirname(path.resolve(String(r.path))) === root);
+      for (const r of inDestination.slice(retention)) {
+        const full = path.resolve(String(r.path));
+        if (path.basename(full).startsWith('DentivaPro_Backup_') && full.endsWith('.dpv')) {
+          fs.rmSync(full, { force: true });
+        }
+        // Keep the backup list truthful: drop the row of the pruned file.
+        db.prepare('DELETE FROM backups WHERE id = ?').run(r.id);
       }
     } catch { /* best effort */ }
+  }
+
+  /**
+   * Operator-initiated backup from the IPC layer. Requires `backup.create`
+   * (V5-013): the export contains the complete clinic database (patients,
+   * finances, salaries, password hashes) and every attachment. Without a
+   * destination it uses the configured automatic-backup folder, else the app's
+   * backups folder.
+   */
+  async function runManualBackup(ctx: Ctx, destination?: string | null): Promise<BackupRecordDTO> {
+    requirePermission(ctx, 'backup.create');
+    let target = typeof destination === 'string' ? destination.trim() : '';
+    if (!target) {
+      const configured = readBackupSetting().destination;
+      target = configured && String(configured).trim() ? String(configured) : paths.backupsDir;
+    }
+    if (!path.isAbsolute(target)) throw validation('Backup destination must be a full folder path.');
+    return runBackup(ctx, target, 'manual');
   }
 
   function readBackupSetting(): { autoFrequencyDays: number; destination: string | null; retention: number } {
@@ -449,7 +476,9 @@ export function createBackupService(deps: BackupDeps) {
 
   /** Verify an extracted database BEFORE it can replace live data. */
   function verifyStagedDatabase(stagedDb: string, currentSchema: number, stagedAttachments: string): void {
-    const { db, schemaVersion } = openDatabase(stagedDb); // applies pending migrations to the staged copy only
+    // Applies pending migrations to the staged copy only; the staged file is
+    // itself a disposable copy, so no pre-migration safety copy is written.
+    const { db, schemaVersion } = openDatabase(stagedDb, { preMigrationCopy: false });
     try {
       if (schemaVersion > currentSchema) {
         throw new AppError('RESTORE', 'This backup requires a newer version of Dentiva Pro.');
@@ -510,7 +539,7 @@ export function createBackupService(deps: BackupDeps) {
     }
   }
 
-  return { runBackup, listBackups, restoreBackup, autoBackupIfDue, readBackupSetting };
+  return { runBackup, runManualBackup, listBackups, restoreBackup, autoBackupIfDue, readBackupSetting };
 }
 
 export type BackupService = ReturnType<typeof createBackupService>;

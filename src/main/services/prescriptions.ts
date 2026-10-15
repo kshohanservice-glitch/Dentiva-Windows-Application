@@ -3,7 +3,7 @@ import type { Paged, PrescriptionDTO, PrescriptionItemDTO } from '../../shared/t
 import { notFound, validation } from '../errors';
 import { audit, requirePermission, tx } from '../core/context';
 import { nextPrescriptionNumber } from '../core/sequences';
-import { optString, optVerbatimString, pageParams, reqDate, reqInt, reqString, oneOf } from '../core/validate';
+import { optString, optVerbatimString, optVisitOfPatient, pageParams, reqDate, reqInt, reqString, oneOf } from '../core/validate';
 import { nowISO, todayISO } from '../../shared/currency';
 
 interface ItemRow {
@@ -102,20 +102,13 @@ export interface PrescriptionInput {
   saveAsTemplate?: string | null;
 }
 
-export function createPrescription(ctx: Ctx, raw: unknown): PrescriptionDTO {
-  requirePermission(ctx, 'clinical.prescription.create');
-  const input = raw as PrescriptionInput;
-  const patientId = Number(input?.patientId);
-  const patient = ctx.db.prepare('SELECT id, code FROM patients WHERE id = ? AND deleted_at IS NULL').get(patientId) as { id: number; code: string } | undefined;
-  if (!patient) throw validation('Select a valid patient.');
-  const dentistId = reqInt(input?.dentistId, 'Prescribing dentist', { min: 1 });
-  const dentist = ctx.db.prepare('SELECT id FROM dentists WHERE id = ? AND active = 1').get(dentistId);
-  if (!dentist) throw validation('Select a valid dentist.');
-
-  const items = Array.isArray(input?.items) ? input.items : [];
-  if (items.length === 0) throw validation('Add at least one medicine.');
-  if (items.length > 60) throw validation('A prescription may contain at most 60 medicines.');
-  const cleanItems = items.map((it, i) => ({
+/**
+ * Validate and normalise prescription medicine rows. Shared by prescription
+ * creation and the medicine-template save path (V5-009), so a template can
+ * never store a shape that a prescription would reject.
+ */
+function cleanMedicineItems(items: Partial<PrescriptionItemDTO>[]) {
+  return items.map((it, i) => ({
     seq: i + 1,
     medicineName: reqString(it.medicineName, `Medicine #${i + 1} name`, { max: 200 }),
     generic: optString(it.generic, 'Generic', { max: 200 }),
@@ -132,6 +125,24 @@ export function createPrescription(ctx: Ctx, raw: unknown): PrescriptionDTO {
     instructionBn: optString(it.instructionBn, 'Bengali instruction', { max: 500 }),
     note: optString(it.note, 'Note', { max: 500 }),
   }));
+}
+
+export function createPrescription(ctx: Ctx, raw: unknown): PrescriptionDTO {
+  requirePermission(ctx, 'clinical.prescription.create');
+  const input = raw as PrescriptionInput;
+  const patientId = Number(input?.patientId);
+  const patient = ctx.db.prepare('SELECT id, code FROM patients WHERE id = ? AND deleted_at IS NULL').get(patientId) as { id: number; code: string } | undefined;
+  if (!patient) throw validation('Select a valid patient.');
+  const dentistId = reqInt(input?.dentistId, 'Prescribing dentist', { min: 1 });
+  const dentist = ctx.db.prepare('SELECT id FROM dentists WHERE id = ? AND active = 1').get(dentistId);
+  if (!dentist) throw validation('Select a valid dentist.');
+
+  const visitId = optVisitOfPatient(ctx.db, input?.visitId, patientId);
+
+  const items = Array.isArray(input?.items) ? input.items : [];
+  if (items.length === 0) throw validation('Add at least one medicine.');
+  if (items.length > 60) throw validation('A prescription may contain at most 60 medicines.');
+  const cleanItems = cleanMedicineItems(items);
 
   const date = input.date ? reqDate(input.date, 'Prescription date') : todayISO();
   const id = tx(ctx.db, () => {
@@ -143,7 +154,7 @@ export function createPrescription(ctx: Ctx, raw: unknown): PrescriptionDTO {
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       )
       .run(
-        number, patientId, input.visitId ?? null, dentistId, date,
+        number, patientId, visitId, dentistId, date,
         optString(input.cC, 'C/C', { max: 20000 }),
         optString(input.oE, 'O/E', { max: 20000 }),
         optString(input.rE, 'R/E', { max: 20000 }),
@@ -188,7 +199,7 @@ export function listTemplates(ctx: Ctx): { id: number; name: string; items: any[
 export function deleteTemplate(ctx: Ctx, id: number): { ok: boolean } {
   requirePermission(ctx, 'data.delete');
   const row = ctx.db.prepare('SELECT id, name FROM medicine_templates WHERE id = ?').get(id) as any;
-  if (!row) throw new Error('Medicine template not found.');
+  if (!row) throw notFound('Medicine template not found.');
   ctx.db.prepare('DELETE FROM medicine_templates WHERE id = ?').run(id);
   audit(ctx, { action: 'prescription.template_delete', entityType: 'medicine_template', entityId: id, summary: `Deleted medicine template "${row.name}"` });
   return { ok: true };
@@ -198,12 +209,14 @@ export function saveTemplate(ctx: Ctx, name: string, items: any[]): { id: number
   requirePermission(ctx, 'clinical.prescription.create');
   const tName = reqString(name, 'Template name', { max: 120 });
   if (!Array.isArray(items) || items.length === 0) throw validation('Template needs at least one medicine.');
+  if (items.length > 60) throw validation('A template may contain at most 60 medicines.');
+  const cleanItems = cleanMedicineItems(items);
   const info = ctx.db
     .prepare(
       `INSERT INTO medicine_templates (name, items_json, created_by, created_at)
        VALUES (?, ?, ?, ?) ON CONFLICT(name) DO UPDATE SET items_json = excluded.items_json RETURNING id`,
     )
-    .get(tName, JSON.stringify(items), ctx.session.userId, nowISO()) as { id: number };
+    .get(tName, JSON.stringify(cleanItems), ctx.session.userId, nowISO()) as { id: number };
   audit(ctx, { action: 'prescription.template_save', entityType: 'medicine_template', entityId: info.id, summary: `Saved medicine template "${tName}"` });
   return { id: info.id };
 }

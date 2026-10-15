@@ -4,7 +4,7 @@ import { notFound, validation } from '../errors';
 import { audit, requirePermission, tx } from '../core/context';
 import { CONDITION_KEYS, conditionLabel } from '../../shared/clinical';
 import { nowISO } from '../../shared/currency';
-import { oneOf, optString } from '../core/validate';
+import { oneOf, optString, optVisitOfPatient } from '../core/validate';
 
 const SEVERITIES = ['mild', 'moderate', 'severe'] as const;
 
@@ -68,6 +68,7 @@ export function setChart(ctx: Ctx, patientId: number, input: ChartInput): ChartS
   const changes = Array.isArray(input?.changes) ? input.changes : [];
   if (changes.length === 0) throw validation('No chart changes supplied.');
   if (changes.length > 400) throw validation('Too many chart changes in one operation.');
+  const visitId = optVisitOfPatient(ctx.db, input?.visitId, patientId);
 
   const validTeeth = new Set(
     ctx.db.prepare('SELECT code FROM teeth').all<{ code: string }>().map((t) => t.code),
@@ -91,7 +92,7 @@ export function setChart(ctx: Ctx, patientId: number, input: ChartInput): ChartS
             `INSERT INTO tooth_conditions (patient_id, tooth, condition, severity, visit_id, note, recorded_at, recorded_by, superseded_at)
              VALUES (?, ?, ?, ?, ?, ?, ?, ?, NULL)`,
           )
-          .run(patientId, ch.tooth, ch.condition, severity, input.visitId ?? null, note, at, ctx.session.userId);
+          .run(patientId, ch.tooth, ch.condition, severity, visitId, note, at, ctx.session.userId);
         sets++;
       } else {
         const info = ctx.db
@@ -103,7 +104,7 @@ export function setChart(ctx: Ctx, patientId: number, input: ChartInput): ChartS
     audit(ctx, {
       action: 'chart.update', entityType: 'patient', entityId: patientId,
       summary: `Dental chart updated for ${patient.code}: ${sets} set, ${cleared(clears)}`,
-      after: { sets, clears, visitId: input.visitId ?? null },
+      after: { sets, clears, visitId },
     });
   });
   return getChart(ctx, patientId);

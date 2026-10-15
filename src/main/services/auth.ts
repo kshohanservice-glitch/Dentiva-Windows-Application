@@ -38,15 +38,24 @@ export function loadPermissions(db: DB, userId: number, roleId: number): Permiss
   return [...set] as PermissionKey[];
 }
 
+/**
+ * Load the live session profile for a user. Called on sign-in and again on
+ * every protected IPC call (SessionManager.require), so an account that an
+ * administrator disables, locks or deletes stops working on its next action
+ * instead of keeping its session until sign-out (V5-002).
+ */
 export function loadSessionUser(db: DB, userId: number): SessionUser {
   const row = db
     .prepare(
-      `SELECT u.id, u.username, u.display_name, u.role_id, u.staff_id, r.name role_name, r.key role_key
+      `SELECT u.id, u.username, u.display_name, u.role_id, u.staff_id, u.status, r.name role_name, r.key role_key
        FROM users u JOIN roles r ON r.id = u.role_id
        WHERE u.id = ? AND u.deleted_at IS NULL`,
     )
-    .get<{ id: number; username: string; display_name: string; role_id: number; staff_id: number | null; role_name: string; role_key: string }>(userId);
+    .get<{ id: number; username: string; display_name: string; role_id: number; staff_id: number | null; status: string; role_name: string; role_key: string }>(userId);
   if (!row) throw authError('User account not found.');
+  if (row.status !== 'active') {
+    throw authError('This account has been disabled or locked by an administrator. Sign in with another account.');
+  }
   return {
     userId: row.id,
     username: row.username,
@@ -176,7 +185,9 @@ export async function completeSetup(db: DB, paths: AppPaths, input: SetupInputIn
     clinic.address = optString(input.clinic?.address, 'Address', { max: 400 });
     clinic.phone = optString(input.clinic?.phone, 'Phone', { max: 40 });
     clinic.email = optString(input.clinic?.email, 'Email', { max: 160 });
-    if (input.clinic?.logoPath) clinic.logoPath = input.clinic.logoPath;
+    // A logo is added later through Settings → Clinic (uploadLogo), which
+    // validates the image and stores it under branding/. Setup never accepts
+    // a file path from the renderer (V5-006).
     db.prepare('UPDATE settings SET value_json = ?, updated_at = ? WHERE key = ?')
       .run(JSON.stringify(clinic), now, 'clinic');
 

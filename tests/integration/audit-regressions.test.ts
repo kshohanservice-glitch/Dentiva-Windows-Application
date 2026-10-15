@@ -155,10 +155,19 @@ describe('ISS-010 owner account protection', () => {
   });
 
   it('owner can still manage owner accounts', async () => {
+    // v5 (V5-016): an Owner manages *other* Owner accounts. Demoting oneself —
+    // the previous form of this test — could leave the clinic with no Owner,
+    // so it is now refused (see tests/integration/v5-security.test.ts).
     const ctx = ownerCtx(env);
+    const ownerRole = env.db.prepare("SELECT id FROM roles WHERE key = 'owner'").get<{ id: number }>()!;
     const reception = env.db.prepare("SELECT id FROM roles WHERE key = 'receptionist'").get<{ id: number }>()!;
-    const dto = await saveUser(ctx, { id: 1, username: 'owner', displayName: 'Owner Renamed', roleId: reception.id, status: 'active' });
-    expect(dto.displayName).toBe('Owner Renamed');
+    const second = await saveUser(ctx, { username: 'coowner', displayName: 'Co-owner', roleId: ownerRole.id, password: 'abc12345' });
+    const renamed = await saveUser(ctx, { id: second.id, username: 'coowner', displayName: 'Co-owner Renamed', roleId: ownerRole.id, status: 'active' });
+    expect(renamed.displayName).toBe('Co-owner Renamed');
+    const demoted = await saveUser(ctx, { id: second.id, username: 'coowner', displayName: 'Co-owner Renamed', roleId: reception.id, status: 'active', permissions: null });
+    expect(demoted.roleId).toBe(reception.id);
+    const self = await saveUser(ctx, { id: 1, username: 'owner', displayName: 'Owner Renamed', roleId: ownerRole.id, status: 'active' });
+    expect(self.displayName).toBe('Owner Renamed');
   });
 });
 
@@ -174,12 +183,12 @@ describe('ISS-011 failed unlock is audited', () => {
     const res = await mgr.signIn('owner', 'goodPass123');
     expect(res.ok).toBe(true);
     mgr.lock();
-    expect(await mgr.unlock('wrongPass999')).toBe(false);
+    expect(await mgr.unlock('wrongPass999')).toMatchObject({ ok: false, error: 'Incorrect password.', attemptsLeft: 4 });
     const row = env.db
       .prepare("SELECT COUNT(*) c FROM audit_log WHERE action = 'auth.unlock' AND result = 'denied'")
       .get<{ c: number }>()!;
     expect(Number(row.c)).toBe(1);
-    expect(await mgr.unlock('goodPass123')).toBe(true);
+    expect(await mgr.unlock('goodPass123')).toEqual({ ok: true });
   });
 });
 

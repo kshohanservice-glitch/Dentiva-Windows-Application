@@ -277,13 +277,20 @@ export function LockOverlay() {
     if (!password) return;
     setPending(true);
     setError(null);
-    const ok = await unlock(password);
+    const res = await unlock(password);
     setPending(false);
-    if (ok) {
+    if (res.ok) {
       setPassword('');
       toast.success('Unlocked');
+    } else if (res.signedOut) {
+      setPassword('');
+      toast.error('Signed out', res.message);
     } else {
-      setError('Incorrect password.');
+      setError(
+        typeof res.attemptsLeft === 'number'
+          ? `Incorrect password. ${res.attemptsLeft} ${res.attemptsLeft === 1 ? 'attempt' : 'attempts'} left before you are signed out.`
+          : 'Incorrect password.',
+      );
     }
   };
 

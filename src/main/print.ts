@@ -2,6 +2,7 @@ import { BrowserWindow, dialog, app, type WebContents } from 'electron';
 import path from 'node:path';
 import fs from 'node:fs';
 import { AppError } from './errors';
+import { isAppEntryUrl } from './navigation';
 import { asA4PageSize } from '../shared/print-page';
 
 export interface PrintDocRef {
@@ -77,7 +78,7 @@ export function openPrintWindow(doc: PrintDocRef): void {
   const wc = printWindow.webContents;
   wc.setWindowOpenHandler(() => ({ action: 'deny' }));
   wc.on('will-navigate', (event, url) => {
-    if (!url.startsWith('file://')) event.preventDefault();
+    if (!isAppEntryUrl(url, appHtml())) event.preventDefault();
   });
   void printWindow.loadFile(appHtml(), { hash: hash.slice(1) });
 }
@@ -184,7 +185,9 @@ export interface PdfOptions {
 export type PdfResult = { ok: true; path: string } | { ok: false; cancelled?: boolean; error: string };
 
 export async function saveAsPdf(opts: PdfOptions): Promise<PdfResult> {
-  const win = BrowserWindow.getFocusedWindow() ?? printWindow;
+  // Always the document window (V5-005): never whichever window has focus,
+  // which could be the main application window with other patient data.
+  const win = printWindow;
   if (!win || win.isDestroyed()) return { ok: false, error: 'Print window is not open.' };
   const save = await dialog.showSaveDialog(win, {
     title: 'Save as PDF',
