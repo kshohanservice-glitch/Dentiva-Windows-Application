@@ -116,7 +116,7 @@ function PaymentModal(props: { invoice: InvoiceDTO; onClose: () => void; onPaid:
             />
           )}
         </Field>
-        <Field label="Reference" hint="TrxID / cheque no. (optional)">
+        <Field label="Reference">
           {(id) => <Input id={id} value={values.reference} onChange={(v) => set('reference', v)} />}
         </Field>
         <Field label="Note" className="span-2">

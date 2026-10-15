@@ -113,6 +113,8 @@
   isolation: isolate;
   -webkit-print-color-adjust: exact;
   print-color-adjust: exact;
+  display: flex;
+  flex-direction: column;
 }
 
 .print-doc * {
@@ -315,14 +317,15 @@
 }
 
 .print-footer {
-  margin-top: 28px;
-  border-top: 1px solid var(--print-line);
+  margin-top: auto;
   padding-top: 8px;
+  border-top: 1px solid var(--print-line);
   font-size: 10.5px;
   color: var(--print-muted);
   display: flex;
   justify-content: space-between;
   text-align: center;
+  flex-shrink: 0;
 }
 
 /* Clinic-logo watermark layer.
@@ -343,10 +346,16 @@
   pointer-events: none;
 }
 
-/* Document content, kept above the watermark mark but below dialogs. */
+/* Document content, kept above the watermark mark but below dialogs.
+   Uses flex column so the prescription body and footer can stretch to fill
+   the available page height without leaving blank space. */
 .print-doc-content {
   position: relative;
   z-index: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  flex: 1 1 auto;
 }
 
 .print-logo-watermark img {
@@ -442,6 +451,7 @@
   align-items: start;
   padding-bottom: 13px;
   border-bottom: 2px solid var(--print-ink);
+  flex-shrink: 0;
 }
 
 .prescription-clinic {
@@ -539,6 +549,7 @@
   border: 1px solid var(--print-ink);
   border-radius: 5px;
   overflow: hidden;
+  flex-shrink: 0;
 }
 
 .prescription-patient-strip > div {
@@ -578,6 +589,7 @@
   color: var(--print-muted);
   font-size: 9.5px;
   text-align: right;
+  flex-shrink: 0;
 }
 
 .prescription-body {
@@ -588,12 +600,15 @@
   border-radius: 6px;
   overflow: hidden;
   min-height: 145mm;
+  flex: 1 1 auto;
 }
 
 .prescription-clinical {
   min-width: 0;
   padding: 11px 12px;
   border-right: 1px solid var(--print-ink);
+  display: flex;
+  flex-direction: column;
 }
 
 .prescription-column-title {
@@ -637,6 +652,7 @@
   padding: 11px 13px 10px;
   display: flex;
   flex-direction: column;
+  min-height: 0;
 }
 
 .rx-heading {
@@ -664,7 +680,7 @@
 }
 
 .medication-list {
-  flex: 0 0 auto;
+  flex: 1 1 auto;
 }
 
 .prescription-medication {
@@ -794,7 +810,7 @@
 
 @media screen {
   .prescription-body {
-    min-height: 145mm;
+    min-height: 140mm;
   }
 }
 
@@ -807,7 +823,7 @@
   }
 
   .prescription-body {
-    min-height: 145mm;
+    min-height: 120mm;
   }
 }
 

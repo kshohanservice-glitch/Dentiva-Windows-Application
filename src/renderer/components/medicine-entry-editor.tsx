@@ -53,7 +53,7 @@ export function MedicineEntryEditor(props: {
                 )}
               </div>
               <div className="medicine-entry-grid">
-                <Field label="Medicine name" required error={props.showNameErrors && !item.medicineName.trim() ? 'Enter a medicine name.' : null}>
+                <Field label="Medicine" required error={props.showNameErrors && !item.medicineName.trim() ? 'Enter a medicine name.' : null}>
                   {(id) => (
                     <Input
                       id={id}
@@ -65,10 +65,10 @@ export function MedicineEntryEditor(props: {
                     />
                   )}
                 </Field>
-                <Field label="Generic name (optional)">
+                <Field label="Generic name">
                   {(id) => <Input id={id} value={item.generic} onChange={(value) => props.onChange(index, { generic: value })} />}
                 </Field>
-                <Field label="Dosage form">
+                <Field label="Form">
                   {(id) => <Input id={id} value={item.form} onChange={(value) => props.onChange(index, { form: value })} placeholder="e.g. Tablet" />}
                 </Field>
                 <Field label="Strength">
@@ -83,16 +83,16 @@ export function MedicineEntryEditor(props: {
                 <Field label="Duration">
                   {(id) => <Input id={id} value={item.duration} onChange={(value) => props.onChange(index, { duration: value })} placeholder="e.g. 5 days" />}
                 </Field>
-                <Field label="Quantity">
-                  {(id) => <Input id={id} value={item.qty} onChange={(value) => props.onChange(index, { qty: value })} placeholder="Optional" />}
+                <Field label="Qty">
+                  {(id) => <Input id={id} value={item.qty} onChange={(value) => props.onChange(index, { qty: value })} />}
                 </Field>
-                <Field label="Administration note" hint="Structured note, for example “after meals”.">
+                <Field label="Admin. note">
                   {(id) => <Input id={id} value={item.instruction} onChange={(value) => props.onChange(index, { instruction: value })} placeholder="e.g. after meals" />}
                 </Field>
                 <Field
-                  label="One-line medicine instruction (optional)"
+                  label="Medicine instruction"
                   className="medicine-entry-full-instruction"
-                  hint="Prints beneath the medicine name and replaces the structured dosage, frequency, duration, quantity and administration note. Those entries remain saved; they are not merged with this line."
+                  hint="Replaces the structured dosage, frequency, duration, quantity and administration note when printed."
                 >
                   {(id) => (
                     <Input
