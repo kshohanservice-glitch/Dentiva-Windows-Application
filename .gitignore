@@ -12,3 +12,6 @@ test-results/
 .vite/
 *.tsbuildinfo
 .dentiva-data/
+
+# Generated responsive-audit screenshots (scripts/layout-audit.mjs --screens)
+layout-audit/

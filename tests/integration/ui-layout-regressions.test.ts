@@ -94,7 +94,9 @@ describe('form grid alignment prevents label wrapping from shifting inputs', () 
 
   it('quick-line-grid uses align-items: start', () => {
     const css = readSource('src/renderer/styles/global.css');
-    expect(css).toMatch(/\.quick-line-grid\s*\{[^}]*align-items:\s*start/s);
+    // The invoice line grid is now written with an explicit :not() so the
+    // procedure grid keeps its own template.
+    expect(css).toMatch(/\.quick-line-grid:not\(\.quick-procedure-grid\)\s*\{[^}]*align-items:\s*start/s);
   });
 
   it('invoice-line uses align-items: start', () => {
@@ -114,29 +116,197 @@ describe('form grid alignment prevents label wrapping from shifting inputs', () 
   });
 });
 
-describe('responsive layout wraps gracefully instead of overflowing', () => {
-  it('invoice-line has a responsive breakpoint that moves to 2 columns', () => {
+/* ------------------------------ CSS helpers ------------------------------ */
+
+/** Body of the first brace-free rule with this exact selector. */
+function ruleBody(css: string, selector: string): string {
+  const escaped = selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const match = css.match(new RegExp(`${escaped}\\s*\\{([^}]*)\\}`));
+  expect(match, `rule not found: ${selector}`).not.toBeNull();
+  return match![1];
+}
+
+/** Every brace-free rule body for a selector, in source order. */
+function ruleBodies(css: string, selector: string): string[] {
+  const escaped = selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  return [...css.matchAll(new RegExp(`${escaped}\\s*\\{([^}]*)\\}`, 'g'))].map((m) => m[1]);
+}
+
+/** Source ranges of every @media block, so window rules can be inspected. */
+function mediaBlocks(css: string): { query: string; body: string }[] {
+  const blocks: { query: string; body: string }[] = [];
+  const marker = /@media[^{]*\{/g;
+  let match: RegExpExecArray | null;
+  while ((match = marker.exec(css)) !== null) {
+    let depth = 1;
+    let i = match.index + match[0].length;
+    const start = i;
+    while (i < css.length && depth > 0) {
+      if (css[i] === '{') depth += 1;
+      else if (css[i] === '}') depth -= 1;
+      i += 1;
+    }
+    blocks.push({ query: match[0].replace(/\{$/, '').trim(), body: css.slice(start, i - 1) });
+    marker.lastIndex = i;
+  }
+  return blocks;
+}
+
+/** Reads `grid-template-areas` from a rule body as rows of area names. */
+function areaRows(body: string): string[][] {
+  const match = body.match(/grid-template-areas\s*:\s*([^;]+);/);
+  expect(match, 'grid-template-areas missing').not.toBeNull();
+  return [...match![1].matchAll(/'([^']+)'/g)].map((row) => row[1].split(/\s+/));
+}
+
+/** Deduplicated area names of a row, preserving left-to-right order. */
+function rowOrder(row: string[]): string[] {
+  return [...new Set(row)];
+}
+
+describe('walk-in invoice lines are laid out from the panel width, not the window', () => {
+  it('puts Item/Qty/Unit price on the first row and Discount/Line total on the second', () => {
     const css = readSource('src/renderer/styles/global.css');
-    // Verify a 980px breakpoint exists with invoice-line 2-column layout.
-    // The CSS may have multiple rules within the media query, so we verify:
-    // 1) A @media (max-width: 980px) block exists
-    // 2) Within that block, .invoice-line gets grid-template-columns: repeat(2, ...)
-    // We extract the 980px media query block and check it contains the invoice-line rule.
-    const mediaMatch = css.match(/@media\s*\(max-width:\s*980px\)\s*\{([\s\S]*?)\n\}/);
-    expect(mediaMatch).not.toBeNull();
-    const mediaBlock = mediaMatch![1];
-    expect(mediaBlock).toContain('.invoice-line');
-    expect(mediaBlock).toMatch(/grid-template-columns:\s*repeat\(2/);
+    const narrow = ruleBody(css, '.quick-line-grid:not(.quick-procedure-grid)');
+    const rows = areaRows(narrow);
+    expect(rows).toHaveLength(2);
+    expect(rowOrder(rows[0])).toEqual(['item', 'qty', 'price']);
+    expect(rowOrder(rows[1])).toEqual(['discount', 'total']);
   });
 
-  it('medicine-entry-grid has a responsive single-column breakpoint', () => {
+  it('keeps a compact single row, but only under a container query that fits it', () => {
     const css = readSource('src/renderer/styles/global.css');
-    // Verify a 680px breakpoint exists with single-column layout.
-    const mediaMatch = css.match(/@media\s*\(max-width:\s*680px\)\s*\{([\s\S]*?)\n\}/);
-    expect(mediaMatch).not.toBeNull();
-    const mediaBlock = mediaMatch![1];
-    expect(mediaBlock).toContain('.medicine-entry-grid');
-    expect(mediaBlock).toMatch(/grid-template-columns:\s*minmax\(0,\s*1fr\)/);
+    // The wide variant is the *second* rule for the selector and must sit inside
+    // a container query: window width alone must never force five fields into a
+    // panel that cannot hold them.
+    const bodies = ruleBodies(css, '.quick-line-grid:not(.quick-procedure-grid)');
+    expect(bodies.length).toBeGreaterThanOrEqual(2);
+    const wide = bodies[bodies.length - 1];
+    expect(areaRows(wide)).toHaveLength(1);
+    expect(rowOrder(areaRows(wide)[0])).toEqual(['item', 'qty', 'price', 'discount', 'total']);
+
+    const wideIndex = css.lastIndexOf('.quick-line-grid:not(.quick-procedure-grid)');
+    const containerIndex = css.lastIndexOf('@container (min-width: 690px)');
+    expect(containerIndex).toBeGreaterThan(-1);
+    expect(containerIndex).toBeLessThan(wideIndex);
+    // The compact row is only allowed when its minimum column widths plus the
+    // gaps genuinely fit the container threshold that triggers it (--sp-3 = 12px).
+    const minimums = [...wide.matchAll(/minmax\((\d+)px/g)].map((m) => Number(m[1]));
+    expect(minimums).toHaveLength(5);
+    const required = minimums.reduce((sum, px) => sum + px, 0) + 12 * 4;
+    expect(required).toBeLessThanOrEqual(690);
+  });
+
+  it('gives every invoice field an explicit grid area', () => {
+    const css = readSource('src/renderer/styles/global.css');
+    for (const [selector, area] of [
+      ['.quick-line-item', 'item'],
+      ['.quick-line-qty', 'qty'],
+      ['.quick-line-unit-price', 'price'],
+      ['.quick-line-discount', 'discount'],
+      ['.quick-line-total', 'total'],
+    ] as const) {
+      expect(ruleBody(css, selector)).toContain(`grid-area: ${area}`);
+    }
+  });
+
+  it('measures the line card instead of the window', () => {
+    const css = readSource('src/renderer/styles/global.css');
+    expect(ruleBody(css, '.medicine-entry-card,\n.quick-line-card')).toContain('container-type: inline-size');
+  });
+
+  it('renders the Remove action above the field grid, never inside it', () => {
+    const src = readSource('src/renderer/pages/QuickDocuments.tsx');
+    const heading = src.indexOf('quick-line-card-heading');
+    const removeButton = src.indexOf('Remove invoice line ${index + 1}');
+    const grid = src.indexOf('className="quick-line-grid"');
+    expect(heading).toBeGreaterThan(-1);
+    expect(removeButton).toBeGreaterThan(heading);
+    expect(grid).toBeGreaterThan(removeButton);
+  });
+
+  it('keeps the invoice fields labelled, required, and state-bound', () => {
+    const src = readSource('src/renderer/pages/QuickDocuments.tsx');
+    for (const label of ['Item or procedure', 'Qty', 'Unit price (৳)', 'Discount (৳)', 'Line total (৳)']) {
+      expect(src).toContain(`label="${label}"`);
+    }
+    expect(src).toContain('onChange={(value) => setRow(index, { discount: value })}');
+    expect(src).toContain('required />}');
+    // The line total stays a read-only, computed value.
+    expect(src).toContain('aria-readonly="true"');
+    expect(src).toContain('<Money paisa={totals.lines[index]?.totalPaisa ?? 0} />');
+  });
+
+  it('never re-applies a fixed invoice template from a window media query', () => {
+    const css = readSource('src/renderer/styles/global.css');
+    for (const block of mediaBlocks(css)) {
+      for (const selector of ['.quick-line-grid', '.invoice-line', '.medicine-entry-grid']) {
+        expect(block.body, `window rule for ${selector} in ${block.query}`).not.toContain(selector);
+      }
+    }
+  });
+});
+
+describe('main invoice lines and medicine entry react to their own panel', () => {
+  it('keeps description, quantities and the line total inside the invoice dialog', () => {
+    const css = readSource('src/renderer/styles/global.css');
+    const narrow = areaRows(ruleBody(css, '.invoice-line'));
+    expect(rowOrder(narrow[0])).toEqual(['description', 'qty', 'price', 'remove']);
+    expect(rowOrder(narrow[1])).toEqual(['total']);
+    const bodies = ruleBodies(css, '.invoice-line');
+    const wide = areaRows(bodies[bodies.length - 1]);
+    expect(wide).toHaveLength(1);
+    expect(rowOrder(wide[0])).toEqual(['description', 'qty', 'price', 'total', 'remove']);
+    expect(css.lastIndexOf('@container (min-width: 620px)')).toBeLessThan(css.lastIndexOf('.invoice-line {'));
+  });
+
+  it('keeps the remove control in the line grid without overlapping a field', () => {
+    const css = readSource('src/renderer/styles/global.css');
+    const remove = ruleBody(css, '.invoice-line > .btn');
+    expect(remove).toContain('grid-area: remove');
+    expect(remove).toContain('align-self: end');
+    expect(readSource('src/renderer/pages/Patients.tsx')).toContain('ariaLabel={`Remove invoice line ${i + 1}`}');
+  });
+
+  it('declares the invoice-lines wrapper as the measured container', () => {
+    const css = readSource('src/renderer/styles/global.css');
+    expect(ruleBody(css, '.invoice-lines')).toContain('container-type: inline-size');
+    expect(readSource('src/renderer/pages/Patients.tsx')).toContain('<div className="invoice-lines">');
+  });
+
+  it('scales the medicine entry grid from one to three columns by panel width', () => {
+    const css = readSource('src/renderer/styles/global.css');
+    const bodies = ruleBodies(css, '.medicine-entry-grid');
+    expect(bodies[0]).toContain('grid-template-columns: minmax(0, 1fr)');
+    expect(bodies[1]).toContain('repeat(2, minmax(0, 1fr))');
+    expect(bodies[2]).toContain('repeat(3, minmax(0, 1fr))');
+    expect(css.indexOf('@container (min-width: 430px)')).toBeLessThan(css.indexOf('@container (min-width: 680px)'));
+  });
+});
+
+describe('grid tracks and their children can always shrink', () => {
+  it('lets the quick-document and customize panels shrink inside the page', () => {
+    const css = readSource('src/renderer/styles/documents.css');
+    expect(css).toContain('.quick-grid > *,\n.customize-grid > * { min-width: 0; }');
+  });
+
+  it('keeps the page-level splits shrinkable and stacks them when narrow', () => {
+    const css = readSource('src/renderer/styles/global.css');
+    for (const selector of ['.dashboard-split', '.reports-split', '.about-split']) {
+      expect(ruleBody(css, selector)).toContain('minmax(0,');
+    }
+    expect(css).toContain('.about-split > * { min-width: 0; }');
+    const stack = mediaBlocks(css).find((b) => b.query.includes('max-width: 900px'));
+    expect(stack).toBeDefined();
+    for (const selector of ['.dashboard-split', '.reports-split', '.about-split']) {
+      expect(stack!.body).toContain(selector);
+    }
+  });
+
+  it('keeps the patient overview grid and its full-width card in one column set', () => {
+    const css = readSource('src/renderer/styles/global.css');
+    expect(ruleBody(css, '.patient-overview-grid')).toContain('repeat(auto-fit, minmax(280px, 1fr))');
+    expect(ruleBody(css, '.patient-overview-grid .span-2')).toContain('grid-column: 1 / -1');
   });
 });
 

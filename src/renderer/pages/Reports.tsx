@@ -100,7 +100,7 @@ export function ReportsPage() {
         </div>
       </div>
 
-      <div className="grid gap-4" style={{ gridTemplateColumns: '280px 1fr', alignItems: 'start' }}>
+      <div className="grid gap-4 reports-split">
         <Card title="Report library">
           <div className="col" style={{ gap: 14 }}>
             {groups.map((g) => {
