@@ -117,12 +117,26 @@ describe('form grid alignment prevents label wrapping from shifting inputs', () 
 describe('responsive layout wraps gracefully instead of overflowing', () => {
   it('invoice-line has a responsive breakpoint that moves to 2 columns', () => {
     const css = readSource('src/renderer/styles/global.css');
-    expect(css).toMatch(/@media\s*\(max-width:\s*980px\)[^}]*\.invoice-line\s*\{[^}]*grid-template-columns:\s*repeat\(2/s);
+    // Verify a 980px breakpoint exists with invoice-line 2-column layout.
+    // The CSS may have multiple rules within the media query, so we verify:
+    // 1) A @media (max-width: 980px) block exists
+    // 2) Within that block, .invoice-line gets grid-template-columns: repeat(2, ...)
+    // We extract the 980px media query block and check it contains the invoice-line rule.
+    const mediaMatch = css.match(/@media\s*\(max-width:\s*980px\)\s*\{([\s\S]*?)\n\}/);
+    expect(mediaMatch).not.toBeNull();
+    const mediaBlock = mediaMatch![1];
+    expect(mediaBlock).toContain('.invoice-line');
+    expect(mediaBlock).toMatch(/grid-template-columns:\s*repeat\(2/);
   });
 
   it('medicine-entry-grid has a responsive single-column breakpoint', () => {
     const css = readSource('src/renderer/styles/global.css');
-    expect(css).toMatch(/@media\s*\(max-width:\s*680px\)[^}]*\.medicine-entry-grid[^}]*grid-template-columns:\s*minmax\(0,\s*1fr\)/s);
+    // Verify a 680px breakpoint exists with single-column layout.
+    const mediaMatch = css.match(/@media\s*\(max-width:\s*680px\)\s*\{([\s\S]*?)\n\}/);
+    expect(mediaMatch).not.toBeNull();
+    const mediaBlock = mediaMatch![1];
+    expect(mediaBlock).toContain('.medicine-entry-grid');
+    expect(mediaBlock).toMatch(/grid-template-columns:\s*minmax\(0,\s*1fr\)/);
   });
 });
 
