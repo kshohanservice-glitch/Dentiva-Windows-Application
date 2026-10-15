@@ -1,27 +1,29 @@
 import type { DB } from '../database';
-import { defaultPrintProfiles, normalizePrintProfiles, withRequiredProfiles } from '../../../shared/print-page';
+import { defaultPrintProfiles, planPrintProfiles, withRequiredProfiles } from '../../../shared/print-page';
 
 /**
- * Dentiva Pro 4.3.0 makes A4 the only supported document page size.
+ * Dentiva Pro 5.0 makes A4 the only supported document page size.
  *
  * Stored print profiles are the only place where a page size was ever persisted
  * (the `printProfiles` settings row), so this migration converts that row to the
- * A4 model:
+ * A4 model (see `planPrintProfiles` in src/shared/print-page.ts):
  *
- *  - every profile keeps its id, name, document type, printer, orientation,
- *    margins, scale and copies;
- *  - the legacy `paperSize` / `widthMm` / `heightMm` fields are dropped;
- *  - profiles that describe a *different medium* (the seeded A5 prescription
- *    profile, the retired 80mm thermal receipt profile, or any hand-added
- *    custom-size profile) are removed, because their margins and scale describe
- *    paper that the product no longer prints; the A4 profile for that document
- *    type is seeded instead, so no document is left without a profile;
- *  - an installation whose row is missing or unreadable gets the A4 defaults.
+ *  - A4 profiles keep their id, name, document type, printer, orientation,
+ *    margins, scale and copies; the legacy `paperSize` / `widthMm` / `heightMm`
+ *    fields are dropped;
+ *  - customised non-A4 profiles (A5, Letter, Legal, a custom page, a thermal
+ *    roll) are **converted** to A4 instead of deleted: page-like media keep the
+ *    printer, orientation, margins, scale and copies; roll/label media keep
+ *    copies and orientation but not the receipt printer, margins or scale;
+ *  - the seeded legacy profiles that a clinic never changed (`rx-a5`,
+ *    `inv-thermal`) are removed — they carry no customization;
+ *  - every document type ends up with at least one A4 profile, and an
+ *    installation whose row is missing or unreadable gets the A4 defaults.
  *
- * The migration is idempotent and forward-safe: it never touches patients,
- * clinical or financial rows, it only rewrites one settings key, and running it
- * twice produces the same result as running it once. Existing-profile
- * customization (printer, orientation, margins, scale, copies) is preserved.
+ * The full before/after profile lists are written to the append-only audit log
+ * (they contain printer names and margins only — no patient data), so the
+ * conversion can be reviewed and, if needed, re-created by hand. The migration
+ * is idempotent: running it again produces the same profile list.
  */
 export const migration008 = {
   version: 8,
@@ -38,26 +40,26 @@ export const migration008 = {
         stored = null;
       }
     }
-    const list = Array.isArray(stored) ? stored : [];
-    const keptProfiles = normalizePrintProfiles(Array.isArray(stored) ? stored : defaultPrintProfiles());
-    const profiles = withRequiredProfiles(keptProfiles);
-    // Every entry normalization dropped was a non-A4 medium, a duplicate id or
-    // junk; the count is exact (no double counting).
-    const removed = list.length - keptProfiles.length;
-    const keptIds = keptProfiles.map((p) => p.id);
-    const seededIds = profiles.map((p) => p.id).filter((id) => !keptIds.includes(id));
+    const plan = planPrintProfiles(Array.isArray(stored) ? stored : defaultPrintProfiles());
+    const profiles = withRequiredProfiles(plan.profiles);
+    const planIds = new Set(plan.profiles.map((p) => p.id));
+    const seeded = profiles.map((p) => p.id).filter((id) => !planIds.has(id));
     db.prepare(
       `INSERT INTO settings (key, value_json, updated_at, updated_by) VALUES ('printProfiles', ?, ?, NULL)
        ON CONFLICT(key) DO UPDATE SET value_json = excluded.value_json, updated_at = excluded.updated_at, updated_by = NULL`,
     ).run(JSON.stringify(profiles), new Date().toISOString());
 
+    const printersCleared = plan.converted.filter((c) => c.printerCleared).length;
     db.prepare(
       `INSERT INTO audit_log (at, user_id, username, action, entity_type, entity_id, summary, before_json, after_json, result, reason)
-       VALUES (?, NULL, 'system', 'system.migrate', 'system', 'print-profiles', ?, NULL, ?, 'success', NULL)`,
+       VALUES (?, NULL, 'system', 'system.migrate', 'system', 'print-profiles', ?, ?, ?, 'success', NULL)`,
     ).run(
       new Date().toISOString(),
-      `A4-only printing: ${keptIds.length} A4 print profile(s) kept, ${seededIds.length} re-seeded, ${removed} non-A4 profile(s) removed.`,
-      JSON.stringify({ kept: keptIds, seeded: seededIds, removedNonA4: removed }),
+      `A4-only printing: ${plan.kept.length} A4 profile(s) kept, ${plan.converted.length} converted to A4` +
+        `${printersCleared ? ` (${printersCleared} roll-printer setting(s) not carried over)` : ''}, ` +
+        `${plan.droppedSeeds.length} unchanged legacy default(s) removed, ${seeded.length} A4 default(s) added.`,
+      row ? row.value_json.slice(0, 20000) : null,
+      JSON.stringify({ kept: plan.kept, converted: plan.converted, removedLegacyDefaults: plan.droppedSeeds, seeded, droppedInvalid: plan.droppedInvalid }),
     );
   },
 };

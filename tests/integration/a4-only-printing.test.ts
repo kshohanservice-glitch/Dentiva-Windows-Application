@@ -1,5 +1,5 @@
 /**
- * A4-only document policy (Dentiva Pro 4.3.0).
+ * A4-only document policy (Dentiva Pro 5.0; groundwork from closed PR #42).
  *
  * A4 is the only supported document page size. These tests pin the policy from
  * four directions:
@@ -12,8 +12,10 @@
  *  2. **Fresh installation** — the stored profiles are A4 and carry no page-size
  *     field, with one profile per document type.
  *  3. **Upgrade** — a database that stored A5/thermal/custom profiles is
- *     converted by migration 008 without losing the profile's printer,
- *     orientation, margins, scale or copies, and the upgrade is audited.
+ *     converted by migration 008: customised legacy profiles become A4 profiles
+ *     that keep their printer (except roll printers), orientation, margins,
+ *     scale and copies (V5-022); only untouched legacy seeds are removed; the
+ *     upgrade is audited.
  *  4. **Write path** — a settings payload that still carries `paperSize`,
  *     `widthMm` or `heightMm` (e.g. from an older build, or a hand-crafted IPC
  *     call) cannot persist a non-A4 page size.
@@ -28,6 +30,7 @@ import { migration008 } from '../../src/main/db/migrations/008_a4_only_printing'
 import {
   A4_HEIGHT_MM, A4_WIDTH_MM, a4PageCss, a4PageSize, DEFAULT_PRINT_PROFILES,
   defaultPrintProfiles, PRINT_DOCUMENT_TYPES, isLegacyNonA4Profile, normalizePrintProfiles,
+  planPrintProfiles, withRequiredProfiles,
 } from '../../src/shared/print-page';
 import type { PrintProfile } from '../../src/shared/types';
 
@@ -105,7 +108,7 @@ describe('A4 is the only page size in the source', () => {
     expect(init).toContain("paperSize: 'a5'");
     expect(init).toContain("paperSize: 'thermal'");
     const conversion = read('src/main/db/migrations/008_a4_only_printing.ts');
-    expect(conversion).toContain('normalizePrintProfiles');
+    expect(conversion).toContain('planPrintProfiles');
     expect(conversion).toContain('withRequiredProfiles');
     // The legacy-marker matcher lives in one place only.
     expect(read('src/shared/print-page.ts')).toContain('export function isLegacyNonA4Profile');
@@ -161,9 +164,14 @@ describe('stored print profiles are A4-only', () => {
     const stored = JSON.parse(
       (env.db.prepare("SELECT value_json FROM settings WHERE key = 'printProfiles'").get() as { value_json: string }).value_json,
     ) as Record<string, unknown>[];
-    expect(JSON.stringify(stored)).not.toContain('a5');
+    expect(JSON.stringify(stored).toLowerCase()).not.toContain('a5');
     expect(JSON.stringify(stored)).not.toContain('widthMm');
-    // A profile that is not itself a legacy-medium description keeps its setup.
+    // The customised legacy profile is converted, keeping its setup (V5-022).
+    const converted = stored.find((p) => p.documentType === 'prescription') as Record<string, any>;
+    expect(converted).toMatchObject({
+      id: 'legacy-a4', name: 'Prescription A4 (converted)', printerName: 'HP LaserJet', orientation: 'landscape',
+      margins: { top: 8, right: 8, bottom: 8, left: 8 }, scale: 90, copies: 2,
+    });
     const kept = getSettings(ctx).printProfiles;
     expect(kept.every((p) => !('paperSize' in p))).toBe(true);
     for (const type of PRINT_DOCUMENT_TYPES) {
@@ -178,16 +186,51 @@ describe('stored print profiles are A4-only', () => {
     expect(normalizePrintProfiles(Array.from({ length: 40 }, (_, i) => ({ id: `p${i}` })))).toHaveLength(30);
   });
 
-  it('treats every retired medium as legacy', () => {
+  it('treats every retired medium as legacy, judged by stored geometry only (V5-023)', () => {
     expect(isLegacyNonA4Profile({ paperSize: 'a5' })).toBe(true);
     expect(isLegacyNonA4Profile({ paperSize: 'A5' })).toBe(true);
     expect(isLegacyNonA4Profile({ paperSize: 'thermal' })).toBe(true);
     expect(isLegacyNonA4Profile({ paperSize: 'custom', widthMm: 80, heightMm: 200 })).toBe(true);
+    expect(isLegacyNonA4Profile({ paperSize: 'custom', widthMm: 210, heightMm: 297 })).toBe(true);
     expect(isLegacyNonA4Profile({ paperSize: 'letter' })).toBe(true);
-    expect(isLegacyNonA4Profile({ name: 'Prescription A5' })).toBe(true);
-    // A plain A4 profile with custom margins is not legacy.
+    expect(isLegacyNonA4Profile({ paperSize: 'a4', widthMm: 148, heightMm: 210 })).toBe(true);
+    // A plain A4 profile with custom margins is not legacy …
     expect(isLegacyNonA4Profile({ paperSize: 'a4', widthMm: 210, heightMm: 297 })).toBe(false);
+    expect(isLegacyNonA4Profile({ paperSize: 'a4', widthMm: 297, heightMm: 210 })).toBe(false);
     expect(isLegacyNonA4Profile({ id: 'rx-a4', name: 'Prescription A4' })).toBe(false);
+    // … and a name never decides: these are the clinic's own A4 profiles.
+    expect(isLegacyNonA4Profile({ name: 'Prescription A5' })).toBe(false);
+    expect(isLegacyNonA4Profile({ paperSize: 'a4', name: 'Custom letterhead' })).toBe(false);
+    expect(normalizePrintProfiles([{ id: 'own', name: 'Custom letterhead', documentType: 'invoice', paperSize: 'a4' }])).toHaveLength(1);
+  });
+
+  it('converts customised legacy profiles and drops only untouched seeds (V5-022)', () => {
+    const plan = planPrintProfiles([
+      { id: 'rx-a4', name: 'Prescription A4', documentType: 'prescription', printerName: '', paperSize: 'a4', orientation: 'portrait', margins: { top: 12, right: 12, bottom: 12, left: 12 }, scale: 100, copies: 1 },
+      // untouched seeds → dropped
+      { id: 'rx-a5', name: 'Prescription A5', documentType: 'prescription', printerName: '', paperSize: 'a5', widthMm: 148, heightMm: 210, orientation: 'portrait', margins: { top: 8, right: 8, bottom: 8, left: 8 }, scale: 100, copies: 1 },
+      { id: 'inv-thermal', name: 'Receipt Thermal 80mm', documentType: 'receipt', printerName: '', paperSize: 'thermal', widthMm: 80, heightMm: 200, orientation: 'portrait', margins: { top: 4, right: 4, bottom: 4, left: 4 }, scale: 100, copies: 1 },
+      // customised legacy → converted
+      { id: 'rx-letter', name: 'Prescription Letter', documentType: 'prescription', printerName: 'Brother HL', paperSize: 'letter', orientation: 'landscape', margins: { top: 15, right: 10, bottom: 15, left: 10 }, scale: 95, copies: 3 },
+      { id: 'pos', name: 'POS receipt', documentType: 'receipt', printerName: 'POS-80', paperSize: 'custom', widthMm: 80, heightMm: 297, orientation: 'portrait', margins: { top: 2, right: 2, bottom: 2, left: 2 }, scale: 120, copies: 2 },
+    ]);
+    expect(plan.droppedSeeds).toEqual(['rx-a5', 'inv-thermal']);
+    expect(plan.kept).toEqual(['rx-a4']);
+    const letter = plan.profiles.find((p) => p.documentType === 'prescription' && p.id !== 'rx-a4')!;
+    expect(letter).toMatchObject({ id: 'rx-a4-2', name: 'Prescription A4 (converted)', printerName: 'Brother HL', orientation: 'landscape', margins: { top: 15, right: 10, bottom: 15, left: 10 }, scale: 95, copies: 3 });
+    // A roll printer cannot print A4: copies kept, printer/margins/scale reset.
+    const pos = plan.profiles.find((p) => p.documentType === 'receipt')!;
+    expect(pos).toMatchObject({ id: 'pos', name: 'POS receipt A4 (converted)', printerName: '', orientation: 'portrait', margins: { top: 12, right: 12, bottom: 12, left: 12 }, scale: 100, copies: 2 });
+    expect(plan.converted).toEqual([
+      { from: 'rx-letter', to: 'rx-a4-2', medium: 'LETTER', printerCleared: false },
+      { from: 'pos', to: 'pos', medium: 'custom 80 × 297 mm', printerCleared: true },
+    ]);
+    // Ids stay unique even after the missing document types are seeded.
+    const all = withRequiredProfiles(plan.profiles);
+    expect(new Set(all.map((p) => p.id)).size).toBe(all.length);
+    for (const type of PRINT_DOCUMENT_TYPES) expect(all.some((p) => p.documentType === type), type).toBe(true);
+    // Normalizing again changes nothing (idempotent read path).
+    expect(normalizePrintProfiles(all)).toEqual(all);
   });
 });
 
@@ -202,7 +245,7 @@ describe('migration 008 converts an upgrading installation', () => {
     (env.db.prepare("SELECT value_json FROM settings WHERE key = 'printProfiles'").get() as { value_json: string }).value_json,
   ) as Record<string, unknown>[];
 
-  it('keeps A4 profiles (with their customization) and removes the retired mediums', () => {
+  it('keeps A4 profiles (with their customization), converts customised legacy ones and removes untouched seeds', () => {
     writeProfiles([
       { id: 'rx-a4', name: 'Prescription A4', documentType: 'prescription', printerName: 'Clinic LaserJet', paperSize: 'a4', widthMm: 210, heightMm: 297, orientation: 'landscape', margins: { top: 18, right: 14, bottom: 18, left: 14 }, scale: 95, copies: 2 },
       { id: 'rx-a5', name: 'Prescription A5', documentType: 'prescription', printerName: '', paperSize: 'a5', widthMm: 148, heightMm: 210, orientation: 'portrait', margins: { top: 8, right: 8, bottom: 8, left: 8 }, scale: 100, copies: 1 },
@@ -218,6 +261,11 @@ describe('migration 008 converts an upgrading installation', () => {
     expect(ids).toContain('inv-a4');
     expect(ids).not.toContain('rx-a5');
     expect(ids).not.toContain('inv-thermal');
+    // The customised thermal receipt (printer POS-80) is converted, not deleted;
+    // its receipt printer is not carried over to A4 (V5-022).
+    const receipt = stored.find((p) => p.documentType === 'receipt') as Record<string, any>;
+    expect(receipt).toMatchObject({ id: 'inv-a4-2', name: 'Receipt A4 (converted)', printerName: '', copies: 1 });
+    expect(new Set(ids).size).toBe(ids.length);
     // The clinic's printer, orientation, margins, scale and copies survive.
     const kept = stored.find((p) => p.id === 'rx-a4') as Record<string, any>;
     expect(kept.printerName).toBe('Clinic LaserJet');
@@ -255,11 +303,11 @@ describe('migration 008 converts an upgrading installation', () => {
       .all(auditWatermark) as { summary: string; after_json: string }[];
     expect(audits).toHaveLength(2); // one per run, both describing the same result
     expect(audits[0].summary).toContain('A4-only printing');
-    expect(audits[0].summary).toContain('1 non-A4 profile(s) removed');
-    const after = JSON.parse(audits[0].after_json) as { kept: string[]; seeded: string[] };
-    // The final list is exactly the profiles that were already A4 plus the ones
-    // seeded for document types the retired mediums used to cover.
-    expect([...after.kept, ...after.seeded]).toEqual(afterFirst.map((p) => p.id));
+    expect(audits[0].summary).toContain('1 unchanged legacy default(s) removed');
+    const after = JSON.parse(audits[0].after_json) as { kept: string[]; converted: { to: string }[]; seeded: string[] };
+    // The final list is exactly the profiles that were already A4, the converted
+    // ones and the defaults seeded for document types nobody covered.
+    expect([...after.kept, ...after.converted.map((c) => c.to), ...after.seeded]).toEqual(afterFirst.map((p) => p.id));
   });
 
   it('seeds the A4 defaults when the settings row is missing or corrupt', () => {

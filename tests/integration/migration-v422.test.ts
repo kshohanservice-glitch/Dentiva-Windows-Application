@@ -101,14 +101,16 @@ describe('upgrade from v4.2.2 to the current schema', () => {
     }
   });
 
-  it('keeps the A4 profiles with their customization and removes the retired mediums', () => {
+  it('keeps the A4 profiles, converts the hand-added profile and removes the untouched legacy seeds', () => {
     const { db } = openDatabase(copyFixture(), { runMigrations: true });
     try {
       const profiles = readProfiles(db);
-      // rx-a4 and inv-a4 are untouched (the fixture had no customization on them);
-      // rx-a5, inv-thermal and the custom-millimetre profile are gone, and the two
-      // document types they covered are re-seeded so no type is left without one.
-      expect(profiles.map((p) => p.id)).toEqual(['rx-a4', 'inv-a4', 'rc-a4', 'rp-a4']);
+      // rx-a4 and inv-a4 are kept; the untouched seeds rx-a5 and inv-thermal are
+      // removed; the clinic's own custom-millimetre profile is converted to A4
+      // (V5-022) and keeps its landscape orientation; receipt and report get
+      // their A4 defaults so no document type is left without a profile.
+      expect(profiles.map((p) => p.id)).toEqual(['rx-a4', 'inv-a4', 'rx-a4-2', 'rc-a4', 'rp-a4']);
+      expect(profiles[2]).toMatchObject({ name: 'Prescription A4 (converted)', documentType: 'prescription', orientation: 'landscape' });
       for (const profile of profiles) {
         expect(profile.paperSize, JSON.stringify(profile)).toBeUndefined();
         expect(profile.widthMm).toBeUndefined();
@@ -132,15 +134,21 @@ describe('upgrade from v4.2.2 to the current schema', () => {
         "SELECT summary, before_json, after_json FROM audit_log WHERE action = 'system.migrate' AND entity_type = 'system' AND entity_id = 'print-profiles' ORDER BY id",
       ).all() as { summary: string; before_json: string | null; after_json: string }[];
       expect(rows).toHaveLength(1);
-      expect(rows[0].summary).toMatch(/A4-only printing: \d+ A4 print profile\(s\) kept, \d+ re-seeded, \d+ non-A4 profile\(s\) removed\./);
-      // 5 stored profiles -> the 2 A4 ones kept, the 3 other mediums (A5, 80mm
-      // thermal, custom millimetres) removed, and the receipt + report profiles
-      // re-seeded so every document type still has one.
-      expect(rows[0].summary).toContain('2 A4 print profile(s) kept, 2 re-seeded, 3 non-A4 profile(s) removed.');
+      expect(rows[0].summary).toMatch(/A4-only printing: \d+ A4 profile\(s\) kept, \d+ converted to A4, \d+ unchanged legacy default\(s\) removed, \d+ A4 default\(s\) added\./);
+      // 5 stored profiles -> the 2 A4 ones kept, the hand-added custom-millimetre
+      // profile converted, the 2 untouched legacy seeds (A5, 80mm thermal)
+      // removed, and the receipt + report defaults added (V5-022).
+      expect(rows[0].summary).toContain('2 A4 profile(s) kept, 1 converted to A4, 2 unchanged legacy default(s) removed, 2 A4 default(s) added.');
       expect(JSON.parse(rows[0].after_json)).toEqual({
-        kept: ['rx-a4', 'inv-a4'], seeded: ['rc-a4', 'rp-a4'], removedNonA4: 3,
+        kept: ['rx-a4', 'inv-a4'],
+        converted: [{ from: 'rx-custom', to: 'rx-a4-2', medium: 'custom 148 × 210 mm', printerCleared: false }],
+        removedLegacyDefaults: ['rx-a5', 'inv-thermal'],
+        seeded: ['rc-a4', 'rp-a4'],
+        droppedInvalid: 0,
       });
-      expect(rows[0].before_json).toBeNull();
+      // The complete pre-conversion row is kept in the audit entry for review.
+      const before = JSON.parse(rows[0].before_json!) as { id: string }[];
+      expect(before.map((p) => p.id)).toEqual(['rx-a4', 'rx-a5', 'inv-a4', 'inv-thermal', 'rx-custom']);
     } finally {
       db.close();
     }

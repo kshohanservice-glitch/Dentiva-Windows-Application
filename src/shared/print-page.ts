@@ -71,26 +71,96 @@ export function a4PageCss(orientation: 'portrait' | 'landscape' = 'portrait'): s
 }
 
 /**
- * Legacy page-size markers. They are matched only so that stored settings and
- * saved profiles written by older releases (< 4.3.0) can be detected and
- * removed; nothing in the product produces or accepts them any more.
+ * Legacy page-size handling (v5, V5-022 / V5-023).
+ *
+ * Releases before 5.0 stored a page size in each print profile (`paperSize`
+ * a4 | a5 | custom | thermal, plus `widthMm` / `heightMm`). A profile is
+ * *legacy* only when its stored **geometry** says it is not an A4 sheet — the
+ * profile name is never used for that decision, so a clinic's own A4 profile
+ * called, say, "Custom letterhead" can never be mistaken for one.
+ *
+ * Legacy profiles are converted, not deleted, because they carry a clinic's
+ * printing choices:
+ *  - page-like media (A5, Letter, Legal, a custom page): the printer,
+ *    orientation, margins, scale and copies are kept;
+ *  - roll and label media (thermal rolls, anything narrower than 120 mm):
+ *    copies and orientation are kept, but the printer is cleared (a receipt
+ *    printer cannot print A4) and margins/scale fall back to the A4 defaults;
+ *  - the two profiles older releases seeded and the clinic never changed
+ *    (`rx-a5` "Prescription A5", `inv-thermal` "Receipt Thermal 80mm") carry no
+ *    customization and are dropped; the document type keeps its A4 default.
  */
-const LEGACY_NON_A4_SIZE = /(^|[^a-z])(a5|b5|letter|legal|folio|tabloid|thermal|custom)([^a-z]|$)/i;
+const A4_SIZE_KEYS = new Set(['', 'a4']);
+const ROLL_SIZE_KEYS = new Set(['thermal', 'roll', 'receipt', 'label']);
+/** Media narrower or shorter than this (mm) are rolls/labels, never pages. */
+const MIN_PAGE_EDGE_MM = 120;
 
-/** True when a stored profile describes something other than an A4 sheet. */
+const LEGACY_SEEDS: readonly Record<string, unknown>[] = Object.freeze([
+  { id: 'rx-a5', name: 'Prescription A5', documentType: 'prescription', printerName: '', paperSize: 'a5', orientation: 'portrait', margins: { top: 8, right: 8, bottom: 8, left: 8 }, scale: 100, copies: 1 },
+  { id: 'inv-thermal', name: 'Receipt Thermal 80mm', documentType: 'receipt', printerName: '', paperSize: 'thermal', orientation: 'portrait', margins: { top: 4, right: 4, bottom: 4, left: 4 }, scale: 100, copies: 1 },
+]);
+
+function finiteMm(value: unknown): number | null {
+  const n = typeof value === 'number' ? value : Number(value);
+  return Number.isFinite(n) && n > 0 ? n : null;
+}
+
+/** True when a stored profile's geometry describes something other than an A4 sheet. */
 export function isLegacyNonA4Profile(value: unknown): boolean {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
   const raw = value as Record<string, unknown>;
   const paperSize = String(raw.paperSize ?? '').trim().toLowerCase();
-  if (paperSize && paperSize !== 'a4') return true;
-  // A custom geometry narrower than a landscape A4 half-sheet (e.g. the retired
-  // 80mm receipt roll, 148mm A5, 100mm label sheet) cannot be an A4 document.
-  const width = Number(raw.widthMm);
-  const height = Number(raw.heightMm);
-  if (Number.isFinite(width) && width > 0 && width < A4_WIDTH_MM / 2) return true;
-  if (Number.isFinite(height) && height > 0 && height < A4_HEIGHT_MM / 2) return true;
-  return LEGACY_NON_A4_SIZE.test(String(raw.name ?? ''));
+  if (!A4_SIZE_KEYS.has(paperSize)) return true;
+  const width = finiteMm(raw.widthMm);
+  const height = finiteMm(raw.heightMm);
+  if (width === null || height === null) return false; // no explicit geometry: an A4 profile
+  const near = (a: number, b: number) => Math.abs(a - b) <= A4_SIZE_TOLERANCE_MM;
+  const isA4 = (near(width, A4_WIDTH_MM) && near(height, A4_HEIGHT_MM)) || (near(width, A4_HEIGHT_MM) && near(height, A4_WIDTH_MM));
+  return !isA4;
 }
+
+/** The stored medium of a legacy profile, described for people (audit, names). */
+export function legacyMediumLabel(value: unknown): string {
+  const raw = value && typeof value === 'object' ? value as Record<string, unknown> : {};
+  const paperSize = String(raw.paperSize ?? '').trim().toLowerCase();
+  const width = finiteMm(raw.widthMm);
+  const height = finiteMm(raw.heightMm);
+  const dims = width && height ? ` ${Math.round(width)} × ${Math.round(height)} mm` : '';
+  if (paperSize === 'thermal') return `thermal${width ? ` ${Math.round(width)} mm` : ''} roll`;
+  if (!paperSize || paperSize === 'custom' || paperSize === 'a4') return `custom${dims}`;
+  return paperSize.toUpperCase();
+}
+
+function isRollOrLabel(raw: Record<string, unknown>): boolean {
+  const paperSize = String(raw.paperSize ?? '').trim().toLowerCase();
+  if (ROLL_SIZE_KEYS.has(paperSize)) return true;
+  const width = finiteMm(raw.widthMm);
+  const height = finiteMm(raw.heightMm);
+  return (width !== null && width < MIN_PAGE_EDGE_MM) || (height !== null && height < MIN_PAGE_EDGE_MM);
+}
+
+function sameMargins(a: unknown, b: unknown): boolean {
+  const x = (a && typeof a === 'object' ? a : {}) as Record<string, unknown>;
+  const y = (b && typeof b === 'object' ? b : {}) as Record<string, unknown>;
+  return ['top', 'right', 'bottom', 'left'].every((k) => Number(x[k]) === Number(y[k]));
+}
+
+/** An older release's seeded legacy profile that the clinic never changed. */
+export function isUntouchedLegacySeed(value: unknown): boolean {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
+  const raw = value as Record<string, unknown>;
+  return LEGACY_SEEDS.some((seed) =>
+    raw.id === seed.id && raw.name === seed.name && raw.documentType === seed.documentType &&
+    String(raw.printerName ?? '') === seed.printerName &&
+    String(raw.paperSize ?? '').toLowerCase() === seed.paperSize &&
+    (raw.orientation ?? 'portrait') === seed.orientation &&
+    sameMargins(raw.margins, seed.margins) &&
+    Number(raw.scale ?? 100) === seed.scale && Number(raw.copies ?? 1) === seed.copies,
+  );
+}
+
+const SIZE_WORDS = /\b(a5|b5|letter|legal|folio|tabloid|thermal|roll|custom)\b/gi;
+const SIZE_DIMENSIONS = /\b\d{2,4}\s*(?:mm)?\s*(?:[x×]\s*\d{2,4}\s*)?mm\b/gi;
 
 function clampNumber(value: unknown, min: number, max: number, fallback: number): number {
   const num = typeof value === 'number' ? value : Number(value);
@@ -141,25 +211,102 @@ export function normalizePrintProfile(value: unknown, index = 0): PrintProfile {
   };
 }
 
+const DOCUMENT_LABELS: Record<PrintDocumentType, string> = {
+  prescription: 'Prescription', invoice: 'Invoice', report: 'Report', receipt: 'Receipt',
+};
+
+/** Convert one legacy (non-A4) profile to A4, keeping the choices that still apply. */
+function convertLegacyProfile(raw: Record<string, unknown>, index: number): { profile: PrintProfile; printerCleared: boolean } {
+  const roll = isRollOrLabel(raw);
+  const base = normalizePrintProfile(raw, index);
+  // The new name never repeats the retired medium (the audit entry records it):
+  // "Prescription A5" → "Prescription A4 (converted)".
+  const stem = String(raw.name ?? '').replace(SIZE_DIMENSIONS, ' ').replace(SIZE_WORDS, ' ').replace(/\bA4\b/gi, ' ').replace(/\s+/g, ' ').trim()
+    || DOCUMENT_LABELS[base.documentType];
+  const name = `${stem.slice(0, 60)} A4 (converted)`;
+  const printerCleared = roll && base.printerName !== '';
+  return {
+    profile: {
+      ...base,
+      name,
+      printerName: roll ? '' : base.printerName,
+      margins: roll ? { ...DEFAULT_PRINT_MARGINS_MM } : base.margins,
+      scale: roll ? 100 : base.scale,
+    },
+    printerCleared,
+  };
+}
+
+/** What happened to each stored profile when it was brought to the A4 model. */
+export interface PrintProfilePlan {
+  profiles: PrintProfile[];
+  kept: string[];
+  converted: { from: string; to: string; medium: string; printerCleared: boolean }[];
+  droppedSeeds: string[];
+  droppedInvalid: number;
+}
+
 /**
- * Normalize a stored profile list: legacy non-A4 profiles are dropped, ids are
- * de-duplicated, the list is capped at 30 and every surviving profile is A4.
- * The result is identical for an upgraded installation and a fresh one.
+ * Bring a stored profile list to the A4 model. A4 profiles are kept (with their
+ * customization); legacy profiles are converted (ids and names lose retired
+ * size markers, ids stay unique); untouched legacy seeds and junk entries are
+ * dropped; the list is capped at 30. Never throws.
  */
-export function normalizePrintProfiles(value: unknown): PrintProfile[] {
+export function planPrintProfiles(value: unknown): PrintProfilePlan {
   const list = Array.isArray(value) ? value : [];
-  const seen = new Set<string>();
-  const out: PrintProfile[] = [];
+  const plan: PrintProfilePlan = { profiles: [], kept: [], converted: [], droppedSeeds: [], droppedInvalid: 0 };
+  const ids = new Set<string>();
+  const names = new Set<string>();
+  const uniqueName = (wanted: string): string => {
+    let name = wanted;
+    for (let n = 2; names.has(name.toLowerCase()); n += 1) name = `${wanted.replace(/\)$/, '')} ${n})`.slice(0, 80);
+    return name;
+  };
+  // Existing A4 profile ids/names and the canonical default ids are reserved
+  // first, so a converted profile never takes an identity that is already in
+  // use or that a default profile may need later (withRequiredProfiles).
+  const reservedIds = new Set<string>(CANONICAL_IDS);
+  list.forEach((entry, index) => {
+    if (entry && typeof entry === 'object' && !Array.isArray(entry) && !isLegacyNonA4Profile(entry)) {
+      const p = normalizePrintProfile(entry, index);
+      reservedIds.add(p.id);
+      names.add(p.name.toLowerCase());
+    }
+  });
+  const uniqueConvertedId = (wanted: string): string => {
+    let id = wanted;
+    for (let n = 2; ids.has(id) || reservedIds.has(id); n += 1) id = `${wanted}-${n}`.slice(0, 60);
+    return id;
+  };
   list.forEach((entry, index) => {
     // A non-object entry is junk (not a profile): never turn it into one.
-    if (!entry || typeof entry !== 'object' || Array.isArray(entry)) return;
-    if (isLegacyNonA4Profile(entry)) return;
-    const profile = normalizePrintProfile(entry, index);
-    if (seen.has(profile.id)) return;
-    seen.add(profile.id);
-    out.push(profile);
+    if (!entry || typeof entry !== 'object' || Array.isArray(entry)) { plan.droppedInvalid += 1; return; }
+    const raw = entry as Record<string, unknown>;
+    if (isLegacyNonA4Profile(raw)) {
+      if (isUntouchedLegacySeed(raw)) { plan.droppedSeeds.push(String(raw.id)); return; }
+      const { profile, printerCleared } = convertLegacyProfile(raw, index);
+      const cleanId = profile.id.replace(SIZE_WORDS, 'a4');
+      const id = uniqueConvertedId(cleanId);
+      ids.add(id);
+      const name = uniqueName(profile.name);
+      names.add(name.toLowerCase());
+      plan.profiles.push({ ...profile, id, name });
+      plan.converted.push({ from: String(raw.id ?? ''), to: id, medium: legacyMediumLabel(raw), printerCleared });
+      return;
+    }
+    const profile = normalizePrintProfile(raw, index);
+    if (ids.has(profile.id)) { plan.droppedInvalid += 1; return; }
+    ids.add(profile.id);
+    plan.profiles.push(profile);
+    plan.kept.push(profile.id);
   });
-  return out.slice(0, 30);
+  plan.profiles = plan.profiles.slice(0, 30);
+  return plan;
+}
+
+/** Normalize a stored profile list to the A4 model (see planPrintProfiles). */
+export function normalizePrintProfiles(value: unknown): PrintProfile[] {
+  return planPrintProfiles(value).profiles;
 }
 
 /**
@@ -178,6 +325,9 @@ const CANONICAL_PRINT_PROFILES: readonly PrintProfile[] = Object.freeze([
 
 export const DEFAULT_PRINT_PROFILES: readonly PrintProfile[] = CANONICAL_PRINT_PROFILES;
 
+/** Stable ids of the default A4 profiles (referenced by `?profile=`). */
+const CANONICAL_IDS: readonly string[] = CANONICAL_PRINT_PROFILES.map((profile) => profile.id);
+
 /** Fresh, mutable copies of the defaults (callers persist and edit them). */
 export function defaultPrintProfiles(): PrintProfile[] {
   return CANONICAL_PRINT_PROFILES.map((profile) => ({ ...profile, margins: { ...profile.margins } }));
@@ -192,7 +342,10 @@ export function withRequiredProfiles(profiles: readonly PrintProfile[]): PrintPr
   const out = profiles.map((profile) => ({ ...profile, margins: { ...profile.margins } }));
   for (const fallback of CANONICAL_PRINT_PROFILES) {
     if (!out.some((profile) => profile.documentType === fallback.documentType)) {
-      out.push({ ...fallback, margins: { ...fallback.margins } });
+      // Never duplicate an id that is already taken by another profile.
+      let id = fallback.id;
+      for (let n = 2; out.some((profile) => profile.id === id); n += 1) id = `${fallback.id}-${n}`;
+      out.push({ ...fallback, id, margins: { ...fallback.margins } });
     }
   }
   return out;
