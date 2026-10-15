@@ -315,13 +315,13 @@ test('validation and keyboard access still work in the invoice editor', async ()
 
 test('every supported window size keeps the required two-row arrangement', async () => {
   // A large amount so the read-only Line total carries the widest realistic
-  // value in this assertion (1,523,455,203.26 → ৳1,523,455,203.26).
+  // value in this assertion: 1234 × 1,234,567.89 − 99.99 = 1,523,456,676.27.
   const card = page.locator('.quick-line-card').first();
   await card.getByLabel('Qty').fill('1234');
   await card.getByLabel('Unit price (৳)').fill('1234567.89');
   await card.getByLabel('Discount (৳)').fill('99.99');
   await revealAmounts(page);
-  await expect(card.locator('.quick-line-total-value')).toContainText('৳1,523,455,203.26');
+  await expect(card.locator('.quick-line-total-value')).toContainText('৳1,523,456,676.27');
 
   // Minimum window, the reported defect size, and a large desktop: the panel
   // width varies from ~850px to ~450px across these, and the arrangement must
