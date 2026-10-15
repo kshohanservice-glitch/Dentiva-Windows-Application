@@ -170,7 +170,8 @@ test('creates an invoice and receives full payment', async () => {
   await pay.getByRole('button', { name: 'Record payment' }).click();
 
   await expect(page.locator('.toast-title', { hasText: 'Payment recorded' })).toBeVisible({ timeout: 30_000 });
-  await expect(detail.getByText('Paid', { exact: true })).toBeVisible();
+  // The status badge (enum shown as "Paid" since v5) — not the "Paid" amount label.
+  await expect(detail.locator('.kv', { hasText: 'Status' }).locator('.badge', { hasText: /^Paid$/ })).toBeVisible();
   await detail.getByRole('button', { name: 'Close' }).click();
 
   await expect(page.getByRole('cell', { name: 'INV-', exact: false }).first()).toBeVisible();
