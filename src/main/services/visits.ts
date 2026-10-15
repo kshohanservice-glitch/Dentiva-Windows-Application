@@ -86,7 +86,13 @@ export function createVisit(ctx: Ctx, raw: unknown): VisitDTO {
   const patient = ctx.db.prepare('SELECT id FROM patients WHERE id = ? AND deleted_at IS NULL').get(patientId);
   if (!patient) throw notFound('Patient not found.');
 
-  let datetime = new Date().toISOString();
+  // visits.datetime holds the clinic's local wall-clock time in ISO form
+  // (`YYYY-MM-DDTHH:MM:00.000Z`; the trailing Z is historical and does NOT mean
+  // UTC). Every visit created from the UI has always been stored this way, so
+  // the default for an omitted time follows the same convention (V5-012).
+  const now = new Date();
+  const pad = (n: number) => String(n).padStart(2, '0');
+  let datetime = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}T${pad(now.getHours())}:${pad(now.getMinutes())}:00.000Z`;
   if (input.datetime) {
     const m = /^(\d{4}-\d{2}-\d{2})T(\d{2}:\d{2})(?::\d{2})?/.exec(String(input.datetime));
     if (!m) throw validation('Visit date/time must be a valid date and time.');

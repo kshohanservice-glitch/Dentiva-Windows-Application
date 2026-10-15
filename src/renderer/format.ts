@@ -27,6 +27,18 @@ export function formatDate(value: string | Date | null | undefined): string {
   return `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`;
 }
 
+/**
+ * HH:MM of a stored visit time. `visits.datetime` is the clinic's local
+ * wall-clock time written in ISO form with a historical trailing `Z`, so the
+ * time is read from the text itself; converting it with `new Date()` would
+ * shift it by the computer's UTC offset (+6 h in Bangladesh) (V5-012).
+ */
+export function wallClockTime(value: string | null | undefined): string {
+  if (!value) return '';
+  const m = /^\d{4}-\d{2}-\d{2}[T ](\d{2}):(\d{2})/.exec(String(value));
+  return m ? `${m[1]}:${m[2]}` : '';
+}
+
 /** yyyy-MM-ddTHH:mm for <input type="datetime-local"> */
 export function localDateTime(d: Date): string {
   const tz = d.getTimezoneOffset() * 60_000;

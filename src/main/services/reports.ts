@@ -3,6 +3,7 @@ import type { ReportResult } from '../../shared/types';
 import { validation } from '../errors';
 import { requirePermission } from '../core/context';
 import { dateRangeFor, formatBdt, todayISO } from '../../shared/currency';
+import { instantRange, localDateTimeLabel, localMonthOf } from '../core/dates';
 
 export interface ReportParams {
   from?: string; to?: string; range?: string; dentistId?: number; categoryId?: number;
@@ -27,10 +28,8 @@ const paymentsReport: Builder = (ctx, params) => {
   requirePermission(ctx, 'billing.payment.view');
   requirePermission(ctx, 'finance.view');
   const { from, to } = resolveRange(params, 'today');
-  const where: string[] = [];
-  const args: unknown[] = [];
-  if (from) { where.push('pay.paid_at >= ?'); args.push(`${from}T00:00:00.000Z`); }
-  if (to) { where.push('pay.paid_at <= ?'); args.push(`${to}T23:59:59.999Z`); }
+  // paid_at is a UTC instant; the range is local calendar days (V5-012).
+  const { conds: where, args } = instantRange('pay.paid_at', from, to);
   const whereSql = where.length ? `WHERE ${where.join(' AND ')}` : '';
 
   const rows = (ctx.db
@@ -41,7 +40,7 @@ const paymentsReport: Builder = (ctx, params) => {
     )
     .all(...args as any[]) as any[])
     .map((r) => ({
-      time: r.paid_at.slice(0, 16).replace('T', ' '),
+      time: localDateTimeLabel(r.paid_at),
       patient: r.patient_name,
       method: r.method,
       type: r.type,
@@ -122,9 +121,10 @@ const incomeExpenseReport: Builder = (ctx, params) => {
   const fromD = from ?? '0000-01-01';
   const toD = to ?? '9999-12-31';
 
+  const payRange = instantRange('paid_at', from, to);
   const collections = Number((ctx.db
-    .prepare(`SELECT COALESCE(SUM(CASE WHEN type='payment' THEN amount_paisa ELSE -amount_paisa END),0) n FROM payments WHERE date(paid_at) BETWEEN ? AND ?`)
-    .get(fromD, toD) as any).n);
+    .prepare(`SELECT COALESCE(SUM(CASE WHEN type='payment' THEN amount_paisa ELSE -amount_paisa END),0) n FROM payments${payRange.conds.length ? ` WHERE ${payRange.conds.join(' AND ')}` : ''}`)
+    .get(...payRange.args) as any).n);
   const otherIncome = Number((ctx.db
     .prepare(`SELECT COALESCE(SUM(amount_paisa),0) n FROM incomes WHERE deleted_at IS NULL AND date BETWEEN ? AND ?`)
     .get(fromD, toD) as any).n);
@@ -367,15 +367,12 @@ const treatmentRevenueReport: Builder = (ctx, params) => {
 const auditReport: Builder = (ctx, params) => {
   requirePermission(ctx, 'audit.view');
   const { from, to } = resolveRange(params, '30');
-  const where: string[] = [];
-  const args: unknown[] = [];
-  if (from) { where.push('at >= ?'); args.push(`${from}T00:00:00.000Z`); }
-  if (to) { where.push('at <= ?'); args.push(`${to}T23:59:59.999Z`); }
+  const { conds: where, args } = instantRange('at', from, to);
   const whereSql = where.length ? `WHERE ${where.join(' AND ')}` : '';
   const rows = (ctx.db
     .prepare(`SELECT at, username, action, entity_type, summary, result FROM audit_log ${whereSql} ORDER BY at DESC LIMIT 5000`)
     .all(...args as any[]) as any[])
-    .map((r) => ({ time: r.at.slice(0, 16).replace('T', ' '), user: r.username, action: r.action, entity: r.entity_type, summary: r.summary, result: r.result }));
+    .map((r) => ({ time: localDateTimeLabel(r.at), user: r.username, action: r.action, entity: r.entity_type, summary: r.summary, result: r.result }));
   return {
     title: 'Audit Report', scope: scope(from, to),
     columns: [
@@ -420,9 +417,10 @@ const dailySummaryReport: Builder = (ctx, params) => {
   const toD = to ?? '9999-12-31';
   const n = (sql: string, ...a: unknown[]): number =>
     Number((ctx.db.prepare(sql).get(...a as any[]) as any).n);
+  const payRange = instantRange('paid_at', from, to);
   const collections = n(
     `SELECT COALESCE(SUM(CASE WHEN type='payment' THEN amount_paisa ELSE -amount_paisa END),0) n
-     FROM payments WHERE date(paid_at) BETWEEN ? AND ?`, fromD, toD);
+     FROM payments${payRange.conds.length ? ` WHERE ${payRange.conds.join(' AND ')}` : ''}`, ...payRange.args);
   const invoiced = n(
     `SELECT COALESCE(SUM(total_paisa),0) n FROM invoices
      WHERE deleted_at IS NULL AND voided_at IS NULL AND date BETWEEN ? AND ?`, fromD, toD);
@@ -459,16 +457,23 @@ const monthlyRevenueReport: Builder = (ctx, params) => {
   const payConds: string[] = [];
   const invArgs: unknown[] = [];
   const payArgs: unknown[] = [];
-  if (from) { invConds.push('i.date >= ?'); invArgs.push(from); payConds.push('pay.paid_at >= ?'); payArgs.push(`${from}T00:00:00.000Z`); }
-  if (to) { invConds.push('i.date <= ?'); invArgs.push(to); payConds.push('pay.paid_at <= ?'); payArgs.push(`${to}T23:59:59.999Z`); }
+  if (from) { invConds.push('i.date >= ?'); invArgs.push(from); }
+  if (to) { invConds.push('i.date <= ?'); invArgs.push(to); }
+  const payRange = instantRange('pay.paid_at', from, to);
+  payConds.push(...payRange.conds); payArgs.push(...payRange.args);
   const invByMonth = new Map<string, number>();
   for (const r of ctx.db
     .prepare(`SELECT substr(i.date,1,7) m, COALESCE(SUM(i.total_paisa),0) total FROM invoices i WHERE ${invConds.join(' AND ')} GROUP BY m`)
     .all(...invArgs as any[]) as { m: string; total: number }[]) invByMonth.set(r.m, r.total);
+  // Collections are bucketed by the *local* month of each payment instant, so a
+  // payment taken just after local midnight on the 1st lands in its own month.
   const payByMonth = new Map<string, number>();
   for (const r of ctx.db
-    .prepare(`SELECT substr(pay.paid_at,1,7) m, COALESCE(SUM(CASE WHEN pay.type='payment' THEN pay.amount_paisa ELSE -pay.amount_paisa END),0) total FROM payments pay WHERE ${payConds.join(' AND ')} GROUP BY m`)
-    .all(...payArgs as any[]) as { m: string; total: number }[]) payByMonth.set(r.m, r.total);
+    .prepare(`SELECT pay.paid_at, CASE WHEN pay.type='payment' THEN pay.amount_paisa ELSE -pay.amount_paisa END amount FROM payments pay${payConds.length ? ` WHERE ${payConds.join(' AND ')}` : ''}`)
+    .all(...payArgs as any[]) as { paid_at: string; amount: number }[]) {
+    const m = localMonthOf(r.paid_at);
+    payByMonth.set(m, (payByMonth.get(m) ?? 0) + Number(r.amount));
+  }
   const months = [...new Set([...invByMonth.keys(), ...payByMonth.keys()])].sort().reverse().slice(0, 120);
   const rows = months.map((m) => ({
     month: m,
@@ -495,10 +500,7 @@ const monthlyRevenueReport: Builder = (ctx, params) => {
 const paymentMethodsReport: Builder = (ctx, params) => {
   requirePermission(ctx, 'billing.payment.view');
   const { from, to } = resolveRange(params, '30');
-  const conds: string[] = [];
-  const args: unknown[] = [];
-  if (from) { conds.push('paid_at >= ?'); args.push(`${from}T00:00:00.000Z`); }
-  if (to) { conds.push('paid_at <= ?'); args.push(`${to}T23:59:59.999Z`); }
+  const { conds, args } = instantRange('paid_at', from, to);
   const whereSql = conds.length ? `WHERE ${conds.join(' AND ')}` : '';
   const rows = (ctx.db
     .prepare(

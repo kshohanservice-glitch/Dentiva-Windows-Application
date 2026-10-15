@@ -15,7 +15,7 @@ import { Field, Input, Select, Textarea, useForm } from '../components/forms';
 import { DataTable, TableToolbar, type Column } from '../components/table';
 import { Icon } from '../components/shell';
 import { ToothChart } from '../components/ToothChart';
-import { formatDate, isoDate, localDateTime } from '../format';
+import { formatDate, isoDate, localDateTime, wallClockTime } from '../format';
 import type { DuplicateCandidate, PatientDTO, PatientFilters, PatientDetailDTO, PrescriptionDTO, TreatmentDTO, VisitDTO } from '../../shared/types';
 import type { PatientInputPayload, ReferralRecord, ReferralInput } from '../../shared/ipc';
 import { hasInvoiceDraftChanges } from '../../shared/unsaved';
@@ -815,7 +815,7 @@ function VisitsTab(props: { patientId: number; refreshKey?: number; onCreate: ()
           <div className="mini-visit" key={v.id}>
             <div className="row between wrap">
               <div>
-                <strong>{formatDate(v.datetime)} {new Date(v.datetime).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}</strong>{' '}
+                <strong>{formatDate(v.datetime)} {wallClockTime(v.datetime)}</strong>{' '}
                 <Badge tone={v.status === 'open' ? 'warning' : 'neutral'}>{v.status}</Badge>
                 <div className="small muted">{v.dentistName ?? 'Any dentist'} · {v.chiefComplaint || 'no complaint recorded'}</div>
               </div>
