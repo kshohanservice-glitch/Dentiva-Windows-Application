@@ -176,3 +176,30 @@ describe('medicine entry labels shortened for alignment', () => {
     expect(src).not.toContain('label="One-line medicine instruction (optional)"');
   });
 });
+
+
+describe('walk-in invoice line two-row layout', () => {
+  it('uses the invoice card width for responsive layout', () => {
+    const css = readSource('src/renderer/styles/global.css');
+    expect(css).toMatch(/\.quick-line-card\s*\{[^}]*container-type:\s*inline-size/s);
+    expect(css).toContain('@container (max-width: 620px)');
+  });
+
+  it('keeps item, quantity, and unit price on the first row', () => {
+    const css = readSource('src/renderer/styles/global.css');
+    expect(css).toContain('"description qty price"');
+  });
+
+  it('moves discount and line total to the second row', () => {
+    const css = readSource('src/renderer/styles/global.css');
+    expect(css).toContain('"discount total total"');
+    expect(css).toContain('.quick-line-grid > .field:nth-child(4) { grid-area: discount; }');
+    expect(css).toContain('.quick-line-total { grid-area: total; }');
+  });
+
+  it('keeps the Remove action in the card heading, outside the fields grid', () => {
+    const src = readSource('src/renderer/pages/QuickDocuments.tsx');
+    expect(src).toContain('quick-line-card-heading');
+    expect(src).toContain('ariaLabel={`Remove invoice line ${index + 1}`}');
+  });
+});
