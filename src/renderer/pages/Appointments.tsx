@@ -383,7 +383,6 @@ export function AppointmentsPage() {
           type="button"
           className="link-button"
           onClick={(e) => { e.stopPropagation(); navigate(`/patients/${r.patientId}`); }}
-          aria-label={`Open profile of ${r.patientName} (${r.patientCode})`}
           title="Open patient profile"
         >
           <strong>{r.patientName}</strong>

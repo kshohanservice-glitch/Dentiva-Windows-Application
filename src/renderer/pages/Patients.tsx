@@ -267,6 +267,7 @@ function PatientFormModal(props: { open: boolean; initial?: (PatientDTO & Partia
                 {whatsappCheck && <span className="xsmall">{whatsappCheck}</span>}
               </div>
               <Select
+                ariaLabel="WhatsApp consent"
                 value={values.whatsappConsent ?? 'unknown'}
                 onChange={(v) => set('whatsappConsent', v as PatientFormValues['whatsappConsent'])}
                 options={[
@@ -1757,7 +1758,7 @@ export function InvoiceFormModal(props: { patientId: number; visitId?: number | 
                 {(id) => <Input id={id} type="number" min={0} step="0.01" value={String(line.unitPricePaisa / 100)} onChange={(v) => setItem(i, { unitPricePaisa: Math.round((Number(v) || 0) * 100) })} />}
               </Field>
               <Field label="Line total (৳)" labelFor={false} className="invoice-line-total">
-                {() => <div className="input" style={{ display: 'flex', alignItems: 'center', minHeight: 34 }} aria-readonly="true"><Money paisa={line.qty * line.unitPricePaisa} /></div>}
+                {() => <div className="input" style={{ display: 'flex', alignItems: 'center', minHeight: 34 }}><Money paisa={line.qty * line.unitPricePaisa} /></div>}
               </Field>
               <Button variant="ghost" size="sm" ariaLabel={`Remove invoice line ${i + 1}`} onClick={() => set('items', values.items.filter((_, j) => j !== i))} title="Remove line">✕</Button>
             </div>

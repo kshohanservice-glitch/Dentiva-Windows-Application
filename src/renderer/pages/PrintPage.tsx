@@ -318,7 +318,7 @@ export function PrintPage() {
           </Button>
         </div>
       </div>
-      <div className="print-stage">
+      <div className="print-stage" tabIndex={0} role="region" aria-label="Print preview">
         {loading && <Spinner label="Loading document…" />}
         {!loading && error != null && (
           <div className="card card-pad" style={{ width: 560 }}>

@@ -55,6 +55,13 @@ const EXTRA_SIZES = args.filter((a) => /^\d+x\d+$/.test(a)).map((a) => {
   return { name: a, width, height };
 });
 const SCREENS = flag('--screens');
+/**
+ * `--axe <path to axe.min.js>` runs an automated accessibility scan (axe-core,
+ * WCAG 2.0/2.1 A + AA rules) on every screen and modal scenario at one
+ * viewport (`--viewport`, default 1366x768) in the selected `--theme`. axe-core
+ * is not a project dependency: pass the path of a separately installed copy.
+ */
+const AXE_FILE = value('--axe');
 /** `--theme dark` renders every screen with the dark theme (default: light). */
 const THEME = value('--theme', 'light') === 'dark' ? 'dark' : 'light';
 const JSON_OUT = value('--json');
@@ -836,6 +843,58 @@ const isA4MmOriented = (widthMm, heightMm, orientation) => {
  * Renders every printable document, writes its PDF (the Save-as-PDF path) and
  * asserts that the on-screen page box and the PDF page are both A4.
  */
+/** Automated WCAG scan of every screen and modal scenario (see `--axe`). */
+async function auditAccessibility(browser, routes) {
+  const axeSource = fs.readFileSync(path.resolve(AXE_FILE), 'utf8');
+  const [width, height] = (value('--viewport', '1366x768')).split('x').map(Number);
+  const { server, port } = await serveRenderer();
+  const base = `http://127.0.0.1:${port}/`;
+  const context = await browser.newContext({ viewport: { width, height }, deviceScaleFactor: 1, reducedMotion: 'reduce' });
+  await context.addInitScript(createBridgeSource(allPermissions()));
+  // An init script, not a <script> tag: the app's CSP (script-src 'self') stays enforced.
+  await context.addInitScript({ content: axeSource });
+  const page = await context.newPage();
+  const scan = async (label) => {
+    const res = await page.evaluate(async () => {
+      // eslint-disable-next-line no-undef
+      const r = await axe.run(document, { runOnly: { type: 'tag', values: ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'] }, resultTypes: ['violations'] });
+      return r.violations.map((v) => ({ id: v.id, impact: v.impact, help: v.help, nodes: v.nodes.length, targets: v.nodes.slice(0, 3).map((n) => n.target.join(' ')) }));
+    });
+    return { screen: label, violations: res };
+  };
+  const report = [];
+  for (const route of routes) {
+    await page.goto(`${base}${route.hash}`, { waitUntil: 'load' });
+    await page.reload({ waitUntil: 'load' });
+    await page.waitForSelector('.shell, .auth-screen, .setup-screen, .lock-overlay, .print-stage, .print-toolbar', { timeout: 20000 }).catch(() => {});
+    await page.waitForTimeout(350);
+    report.push(await scan(route.key));
+    for (const step of SCENARIOS[route.key] || []) {
+      await step.run(page).catch((err) => console.error(`[scenario ${route.key}/${step.key}] ${err.message}`));
+      await page.waitForTimeout(200);
+      report.push(await scan(`${route.key}:${step.key}`));
+    }
+  }
+  await context.close();
+  server.close();
+  let total = 0;
+  const byRule = new Map();
+  for (const r of report) {
+    for (const v of r.violations) {
+      total += v.nodes;
+      const agg = byRule.get(v.id) || { impact: v.impact, help: v.help, nodes: 0, screens: [] };
+      agg.nodes += v.nodes;
+      agg.screens.push(r.screen);
+      byRule.set(v.id, agg);
+      console.log(`${r.screen.padEnd(36)} ${String(v.impact).padEnd(9)} ${v.id} x${v.nodes} :: ${v.targets.join(' | ')}`);
+    }
+  }
+  console.log(`\nAccessibility (axe-core WCAG 2.1 A/AA, ${width}x${height}, theme=${THEME}): ${total} violating nodes across ${report.length} screens/scenarios`);
+  for (const [id, a] of byRule) console.log(`  ${id} (${a.impact}) x${a.nodes} on ${a.screens.length} screen(s): ${a.help}`);
+  if (JSON_OUT) fs.writeFileSync(JSON_OUT, JSON.stringify({ theme: THEME, viewport: `${width}x${height}`, report }, null, 2));
+  process.exitCode = total > 0 ? 1 : 0;
+}
+
 async function auditPrintGeometry(browser, permissions, outDir) {
   const { server, port } = await serveRenderer();
   const base = `http://127.0.0.1:${port}/`;
@@ -1033,6 +1092,12 @@ async function main() {
     await context.close();
     await browser.close();
     server.close();
+    return;
+  }
+
+  if (AXE_FILE) {
+    await auditAccessibility(browser, routes);
+    await browser.close();
     return;
   }
 

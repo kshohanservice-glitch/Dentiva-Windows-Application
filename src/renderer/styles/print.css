@@ -40,6 +40,8 @@
     overflow: visible !important;
     background: #fff !important;
     display: block !important;
+    /* Keyboard-focusable on screen (scrollable preview); a focus ring never prints. */
+    outline: none !important;
   }
   .print-doc {
     box-shadow: none !important;

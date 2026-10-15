@@ -94,7 +94,7 @@ export function DocumentPreview(props: {
 }): React.ReactElement {
   const pageSize = props.pageSize ?? pageSizeFromProfile();
   return (
-    <div className={`doc-preview-frame ${props.className ?? ''}`.trim()}>
+    <div className={`doc-preview-frame ${props.className ?? ''}`.trim()} tabIndex={0} role="region" aria-label="Document preview">
       <DocumentStyleSheet styles={props.styles} />
       <div
         className="print-doc doc-preview"

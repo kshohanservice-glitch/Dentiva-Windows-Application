@@ -156,9 +156,9 @@ export function ToothChart(props: {
     <div className="tooth-chart" style={props.height ? { height: props.height } : undefined}>
       <div className="chart-toolbar">
         <div className="row gap-2 wrap">
-          <div className="seg" role="tablist" aria-label="Dentition">
-            <button className={dentition === 'adult' ? 'active' : ''} onClick={() => setDentition('adult')} type="button">Adult (FDI)</button>
-            <button className={dentition === 'pediatric' ? 'active' : ''} onClick={() => setDentition('pediatric')} type="button">Pediatric</button>
+          <div className="seg" role="group" aria-label="Dentition">
+            <button className={dentition === 'adult' ? 'active' : ''} aria-pressed={dentition === 'adult'} onClick={() => setDentition('adult')} type="button">Adult (FDI)</button>
+            <button className={dentition === 'pediatric' ? 'active' : ''} aria-pressed={dentition === 'pediatric'} onClick={() => setDentition('pediatric')} type="button">Pediatric</button>
           </div>
           {editable && (
             <>

@@ -268,9 +268,11 @@ describe('walk-in invoice lines are laid out from the panel width, not the windo
     }
     expect(src).toContain('onChange={(value) => setRow(index, { discount: value })}');
     expect(src).toContain('required />}');
-    // The line total stays a read-only, computed value.
-    expect(src).toContain('aria-readonly="true"');
-    expect(src).toContain('<Money paisa={totals.lines[index]?.totalPaisa ?? 0} />');
+    // The line total stays a read-only, computed value: plain text in a
+    // non-editable box, never an input. (v5: no aria-readonly — that attribute
+    // is not allowed on a generic element; axe-core aria-allowed-attr.)
+    expect(src).toContain('<div className="input quick-line-total-value"><Money paisa={totals.lines[index]?.totalPaisa ?? 0} /></div>');
+    expect(src).not.toContain('aria-readonly');
   });
 
   it('never re-applies a fixed invoice template from a window media query', () => {

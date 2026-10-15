@@ -455,7 +455,7 @@ function InvoiceFields({ form, set, treatments }: { form: any; set: (p: string[]
                 {(id) => <Input id={id} type="number" min={0} step="0.01" value={String(row.discount)} onChange={(value) => setRow(index, { discount: value })} />}
               </Field>
               <Field label="Line total (৳)" labelFor={false} className="quick-line-total">
-                {() => <div className="input quick-line-total-value" aria-readonly="true"><Money paisa={totals.lines[index]?.totalPaisa ?? 0} /></div>}
+                {() => <div className="input quick-line-total-value"><Money paisa={totals.lines[index]?.totalPaisa ?? 0} /></div>}
               </Field>
             </div>
           </div>

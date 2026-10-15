@@ -52,6 +52,8 @@
   --text-tertiary: #566874;              /* 5.3:1 on white, 5.0:1 on canvas */
   --text-disabled: var(--neutral-400);
   --text-on-brand: #ffffff;
+  --text-on-danger: #ffffff;
+  --text-on-success: #ffffff;
   --text-link: var(--brand-700);
 
   /* ---- Semantic borders ---- */
@@ -189,6 +191,9 @@
   --text-tertiary: #93a5b1;
   --text-disabled: #5d6f7b;
   --text-on-brand: #06212c;
+  /* Dark fills are light tints, so text on them is dark (>= 7:1, measured). */
+  --text-on-danger: #2b0b08;
+  --text-on-success: #052111;
   --text-link: var(--brand-700);
 
   --border-subtle: #1f2e39;
