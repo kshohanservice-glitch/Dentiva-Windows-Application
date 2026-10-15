@@ -1,25 +1,30 @@
 /**
- * V5-033 — dates and times read the same way everywhere.
+ * V5-033 — dates and times read the same way on every PC.
  *
  * Dentiva Pro formats dates as dd/mm/yyyy and times as 24-hour HH:MM itself
- * (formatDate, wallClockTime). Native date and time inputs are drawn by
- * Chromium in its UI locale instead, which follows the Windows language settings:
- * mm/dd/yyyy and AM/PM on English (US). The main process pins that locale to
- * en-GB. These tests cover what can be checked without a Windows desktop;
- * tests/e2e/app.spec.ts reads the field order from the running Electron app
- * on Windows CI.
+ * (formatDate, wallClockTime). Native date fields are drawn by Chromium instead.
+ * On Windows it uses the PC's own short date format whenever the app language
+ * and the Windows regional format are both English (Blink locale_win.cc returns
+ * LOCALE_USER_DEFAULT), so an English (US) PC shows mm/dd/yyyy and no app
+ * locale switch changes that. Windows CI run 38757316130 confirmed it: with
+ * --lang=en-GB the field still read Month, Day, Year. So the app spells the
+ * chosen date out under each date field, and nothing it formats itself depends
+ * on the machine locale. tests/e2e/app.spec.ts checks the read-back in the
+ * running app on Windows CI.
  */
 import { describe, expect, it } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
 import { createElement, type FunctionComponent } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { clockTime12, formatDate, wallClockTime } from '../../src/renderer/format';
+import { clockTime12, formatDate, formatDateLong, wallClockTime } from '../../src/renderer/format';
+import { Field, Input } from '../../src/renderer/components/forms';
 import { appointmentCardDoc } from '../../src/renderer/documents/print-documents';
 import { DOCUMENT_SAMPLES, stripDocumentMarkers } from '../../src/renderer/documents/samples';
 
 const ROOT = path.resolve(__dirname, '../..');
-const read = (rel: string): string => fs.readFileSync(path.join(ROOT, rel), 'utf8');
+// Windows checkouts may use CRLF line endings.
+const read = (rel: string): string => fs.readFileSync(path.join(ROOT, rel), 'utf8').replace(/\r\n/g, '\n');
 
 function sourceFiles(dir: string): string[] {
   return fs.readdirSync(path.join(ROOT, dir), { withFileTypes: true }).flatMap((entry) => {
@@ -29,21 +34,58 @@ function sourceFiles(dir: string): string[] {
   });
 }
 
-describe('V5-033: Chromium UI locale', () => {
-  it('is pinned to en-GB at module top level, before the app is ready', () => {
-    const src = read('src/main/index.ts');
-    const pin = src.indexOf("\napp.commandLine.appendSwitch('lang', 'en-GB');\n");
-    expect(pin, 'the switch must be a top-level statement in src/main/index.ts').toBeGreaterThan(0);
-    const ready = src.indexOf('app.whenReady(');
-    expect(ready).toBeGreaterThan(0);
-    expect(pin).toBeLessThan(ready);
-    expect(src).not.toContain("app.on('ready'");
+describe('V5-033: date fields spell out the chosen date', () => {
+  const field = (type: string, value: string): string =>
+    renderToStaticMarkup(
+      createElement(Field, { label: 'Date', children: (id: string) => createElement(Input, { id, type, value, onChange: () => undefined }) }),
+    );
+  const echoOf = (html: string): { id?: string; text?: string; describedBy?: string } => {
+    const echo = /<div class="date-echo" id="([^"]+)">([^<]*)<\/div>/.exec(html);
+    return { id: echo?.[1], text: echo?.[2], describedBy: / aria-describedby="([^"]+)"/.exec(html)?.[1] };
+  };
+
+  it('a date field shows the date in words and is described by it', () => {
+    const echo = echoOf(field('date', '2026-04-03'));
+    expect(echo.text).toBe('Fri 3 Apr 2026');
+    expect(echo.id).toBeTruthy();
+    expect(echo.describedBy).toBe(echo.id);
   });
 
-  it('is also used by the layout harness, so its screenshots match the app', () => {
-    const harness = read('scripts/layout-audit.mjs');
-    expect(harness).toContain("'--lang=en-GB'");
-    expect(harness).toContain("LANG: 'en_GB.UTF-8'");
+  it('a date-and-time field shows the date in words with the 24-hour time', () => {
+    expect(echoOf(field('datetime-local', '2026-03-04T14:30')).text).toBe('Wed 4 Mar 2026, 14:30');
+  });
+
+  it('shows nothing for an empty date field or for other field types', () => {
+    for (const html of [field('date', ''), field('text', '2026-04-03'), field('time', '14:30')]) {
+      expect(html).not.toContain('date-echo');
+      expect(html).not.toContain('aria-describedby');
+    }
+  });
+
+  it('formatDateLong spells out real dates only', () => {
+    expect(formatDateLong('2026-04-03')).toBe('Fri 3 Apr 2026');
+    expect(formatDateLong('2026-03-04')).toBe('Wed 4 Mar 2026');
+    expect(formatDateLong('2024-02-29')).toBe('Thu 29 Feb 2024');
+    expect(formatDateLong('1990-12-31')).toBe('Mon 31 Dec 1990');
+    expect(formatDateLong('2026-10-15T09:05')).toBe('Thu 15 Oct 2026, 09:05');
+    expect(formatDateLong('2026-10-15T09:05:00.000Z')).toBe('Thu 15 Oct 2026, 09:05');
+    for (const bad of [null, undefined, '', '2025-02-29', '2026-13-01', '2026-00-10', '15/10/2026', 'today']) {
+      expect(formatDateLong(bad), String(bad)).toBe('');
+    }
+  });
+
+  it('every form date field goes through the shared Input component', () => {
+    // Raw <input type="date"> elements are allowed only in the filter bars,
+    // which never save a date.
+    const isComment = (line: string): boolean => /^\s*(\/\/|\/\*|\*)/.test(line);
+    const raw = sourceFiles('src/renderer').flatMap((rel) =>
+      read(rel).split('\n').flatMap((line) => (!isComment(line) && /<input\b[^>]*type="(date|datetime-local)"/.test(line) ? [rel] : [])),
+    );
+    expect(raw.map((rel) => rel.replace(/\\/g, '/')).sort()).toEqual([
+      'src/renderer/pages/Accounting.tsx', 'src/renderer/pages/Accounting.tsx',
+      'src/renderer/pages/Audit.tsx', 'src/renderer/pages/Audit.tsx',
+      'src/renderer/pages/Reports.tsx', 'src/renderer/pages/Reports.tsx',
+    ]);
   });
 });
 

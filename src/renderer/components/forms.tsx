@@ -1,4 +1,5 @@
 import React, { useEffect, useId, useRef, useState } from 'react';
+import { formatDateLong } from '../format';
 
 export function Field(props: {
   label?: React.ReactNode; required?: boolean; hint?: string; error?: string | null;
@@ -34,14 +35,22 @@ export const Input = React.forwardRef<HTMLInputElement, {
   inputMode?: 'none' | 'text' | 'tel' | 'url' | 'email' | 'numeric' | 'decimal' | 'search';
   spellCheck?: boolean; style?: React.CSSProperties; readOnly?: boolean;
 }>(function Input(props, ref) {
-  return (
+  const fallbackId = useId();
+  const isDate = props.type === 'date' || props.type === 'datetime-local';
+  // On Windows, Chromium draws a native date field in the PC's own short date
+  // format, which is mm/dd/yyyy on English (US) while the app uses dd/mm/yyyy
+  // (the lang attribute below does not change that). Spell the chosen date out
+  // under the field so 03/04 can't be misread (V5-033).
+  const echo = isDate ? formatDateLong(props.value) : '';
+  const echoId = `${props.id ?? fallbackId}-date`;
+  const input = (
     <input
       ref={ref}
       id={props.id}
       name={props.name}
       className={`input ${props.invalid ? 'invalid' : ''}`}
       type={props.type ?? 'text'}
-      lang={props.type === 'date' || props.type === 'datetime-local' ? 'en-GB' : undefined}
+      lang={isDate ? 'en-GB' : undefined}
       value={props.value}
       placeholder={props.placeholder}
       disabled={props.disabled}
@@ -51,6 +60,7 @@ export const Input = React.forwardRef<HTMLInputElement, {
       step={props.step}
       autoComplete={props.autoComplete}
       aria-label={props.ariaLabel}
+      aria-describedby={echo ? echoId : undefined}
       maxLength={props.maxLength}
       required={props.required}
       onKeyDown={props.onKeyDown}
@@ -60,6 +70,13 @@ export const Input = React.forwardRef<HTMLInputElement, {
       style={props.style}
       onChange={(e) => props.onChange(e.target.value)}
     />
+  );
+  if (!isDate) return input;
+  return (
+    <>
+      {input}
+      {echo && <div className="date-echo" id={echoId}>{echo}</div>}
+    </>
   );
 });
 

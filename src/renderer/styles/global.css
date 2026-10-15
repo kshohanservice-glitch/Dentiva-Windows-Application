@@ -336,6 +336,7 @@ button, input, select, textarea {
 }
 .field .req { color: var(--danger); margin-left: 2px; }
 .field .hint { font-size: var(--fs-xs); color: var(--text-3); }
+.field .date-echo { font-size: var(--fs-xs); color: var(--text-2); font-variant-numeric: tabular-nums; }
 .field .error { font-size: var(--fs-xs); color: var(--danger); font-weight: 500; }
 
 .input,

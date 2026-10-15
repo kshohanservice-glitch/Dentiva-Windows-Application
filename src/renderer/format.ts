@@ -43,8 +43,8 @@ export function wallClockTime(value: string | null | undefined): string {
  * 12-hour clock for patient-facing print: "14:30" → "02:30 PM". The printed
  * appointment card used to take this from the Windows language settings
  * (02:30 PM on English (US), 14:30 on English (UK)). It is now fixed to the
- * English (US) look, so the card never depends on the PC or on the app's
- * pinned en-GB locale (V5-033). Returns '' for anything that isn't HH:MM.
+ * English (US) look, so the card never depends on the PC (V5-033). Returns ''
+ * for anything that isn't HH:MM.
  */
 export function clockTime12(value: string | null | undefined): string {
   const m = /^([01]\d|2[0-3]):([0-5]\d)/.exec(String(value ?? ''));
@@ -52,6 +52,29 @@ export function clockTime12(value: string | null | undefined): string {
   const hour = Number(m[1]);
   const hour12 = hour % 12 === 0 ? 12 : hour % 12;
   return `${String(hour12).padStart(2, '0')}:${m[2]} ${hour >= 12 ? 'PM' : 'AM'}`;
+}
+
+const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'] as const;
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'] as const;
+
+/**
+ * A date that can't be misread, for showing what a date field holds:
+ * "2026-04-03" → "Fri 3 Apr 2026" and "2026-04-03T14:30" → "Fri 3 Apr 2026,
+ * 14:30". On Windows, Chromium draws native date fields in the PC's own short
+ * date format (mm/dd/yyyy on English (US)), while the app uses dd/mm/yyyy, so
+ * forms show this under each date field (V5-033). Returns '' unless the value
+ * starts with a real calendar date.
+ */
+export function formatDateLong(value: string | null | undefined): string {
+  const m = /^(\d{4})-(\d{2})-(\d{2})(?:[T ](\d{2}):(\d{2}))?/.exec(String(value ?? ''));
+  if (!m) return '';
+  const year = Number(m[1]);
+  const month = Number(m[2]);
+  const day = Number(m[3]);
+  const utc = new Date(Date.UTC(year, month - 1, day));
+  if (utc.getUTCFullYear() !== year || utc.getUTCMonth() !== month - 1 || utc.getUTCDate() !== day) return '';
+  const date = `${WEEKDAYS[utc.getUTCDay()]} ${day} ${MONTHS[month - 1]} ${year}`;
+  return m[4] ? `${date}, ${m[4]}:${m[5]}` : date;
 }
 
 /** yyyy-MM-ddTHH:mm for <input type="datetime-local"> */
