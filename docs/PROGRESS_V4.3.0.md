@@ -13,8 +13,9 @@ then `git status` / `git log`, then the "Next step" row of §6.
 | Baseline commit | `bbb6d43cb4c6dcf1efe82d895b23eaa3b8517ebd` = `origin/main` HEAD ("Merge pull request #40 from … arena/19ed6337…") |
 | Baseline state of the checkout | clean working tree at session start; single-commit shallow clone (`git log` shows one commit) |
 | Published release used as the product baseline | `v4.2.2` → tag object `aa90da02a40afd35693f8d3c360caf14405c8ffe` ("Prepare Dentiva Pro v4.2.2 release (#36)"), published 2026-10-15T07:55:36Z, assets `DentivaPro-Setup-4.2.2.exe` (100 054 657 bytes) + `SHA256SUMS.txt` |
+| **Newer published release observed during this session** | `v4.2.3` (tag → `3c6fe3a2131061f788e47bd78d184a547778fc47`, release commit `b0eb022`, merge `303712e` = `origin/main`), published **2026-10-15T10:05:31Z**, assets `DentivaPro-Setup-4.2.3.exe` (100 055 216 bytes) + `SHA256SUMS.txt`. It contains the §4 layout work from this branch's base commit but **not** this branch's changes. `origin/main` is therefore 3 commits ahead of the branch base; the branch was merged up to `origin/main` (no rebase, no force-push) so the 4.3.0 candidate sits on the released tree |
 | `package.json` version at baseline | `4.2.2` (so `main` is *ahead* of the published release: it contains unreleased 4.2.3 layout work) |
-| Target version for this effort | `4.3.0` (minor: A4-only printing policy + layout overhaul + audit fixes; `4.2.2` is the published baseline, `4.2.3` was never released) |
+| Target version for this effort | `4.3.0` (minor: A4-only printing policy + the width-independent invoice line + audit/harness work). `4.2.2` and `4.2.3` are both published; `4.3.0` is the next unique version after them (`package.json` was bumped `4.2.2` → `4.3.0` in this branch, and the merge-up keeps `4.3.0` over `main`'s `4.2.3`) |
 | Files changed by the unreleased 4.2.3 work on `main` | `.gitignore`, `docs/RELEASE_NOTES_4.2.3.md`, `docs/RESPONSIVE_AUDIT_V4.2.3.md`, `package.json`, `scripts/layout-audit.mjs`, `src/renderer/pages/{About,Dashboard,Patients,QuickDocuments,Reports}.tsx`, `src/renderer/styles/{documents,global}.css`, `tests/e2e/{responsive-layout.spec.ts,support.ts}`, `tests/integration/ui-layout-regressions.test.ts` (15 files, +1920/−77 vs `v4.2.2`) |
 
 ### Baseline gate results (executed on the baseline commit, this sandbox)
@@ -56,6 +57,23 @@ it is 450–630px wide whenever the document preview shares the row (all support
 Also reproduced in the same run: the walk-in **examination report** procedure grid overflowed by 71px
 at 1366×768 (`Unit price (৳)+71`), the same fixed-template cause.
 
+### And still wrong on the released `v4.2.3`
+
+The base commit of this branch (`bbb6d43`) already contains a first fix: the line reflows from the
+width of its own panel, so the overflow is gone. That fix kept a *width-dependent alternative* — one
+row of five fields whenever the panel reaches ≈690px — which the required design does not allow. The
+harness (with the required row contract, §4) run against a renderer built from the released `v4.2.3`
+tag:
+
+| Viewport | Panel (`.quick-line-grid`) | Arrangement | Violations |
+| --- | --- | --- | --- |
+| 1180×720 (**minimum supported window**, panel 832px) | 832px | **one row of five**: `Item or procedure · Qty · Unit price (৳) · Discount (৳) · Line total (৳)` | 1 |
+| 2560×1440 / 1920×1080 / 1366×768 / 1024×768 / 800×600 / 680×900 / 480×800 | 603 / 603 / 450 / 676 / 628 / 516 / 316px | two rows as required | 0 |
+
+So `v4.2.3` no longer clips the fields, but a clinic running it at the minimum window size still gets
+the single cramped row — and no automated check prevented that. 4.3.0 removes the alternative
+altogether and makes the arrangement a harness/test violation.
+
 ## 3. Phases
 
 | Phase | Scope | Status |
@@ -96,7 +114,9 @@ at 1366×768 (`Unit price (৳)+71`), the same fixed-template cause.
 | 9 | `npm test` | **49 files / 564 tests passed** (baseline: 48 / 549) |
 | 10 | `npm run typecheck` (both `tsc -p` projects) and `npx eslint .` | clean |
 | 11 | `npm run build` (main `tsc` + preload bundle + vite) | clean; `dist/renderer` rebuilt from the 4.3.0 sources for every measurement above |
-| 12 | `node scripts/layout-audit.mjs --pdf /tmp/pdf-audit --json /tmp/pdf-audit.json`, 4.3.0 bundle | **0 violations**: 13 printable documents + 3 landscape views. Every document: screen 210×297mm, PDF `/MediaBox` 209.9×297mm (595.28×841.89pt), 1 page, padding 12/12mm, no overflow; landscape: screen 297×210mm, PDF 297×209.9mm. The landscape *prescription* paginates to 2 PDF pages with content on both (expected flow once the page is shorter) — recorded, not a violation |
+| 12 | Layout harness, quick-documents, renderer built from the **released `v4.2.3`** tag (`/tmp/wt-v423`, `/tmp/v423-quick.json`) | **1** walk-in-invoice violation: at 1180×720 (the minimum supported window) the line is a single row of five fields, i.e. not the required arrangement; every other measured size is two rows with 0 overflow, 0 clipped values |
+| 13 | Layout harness, quick-documents, 4.3.0 bundle, same contract | **0** violations in 8 panels; two rows at every size incl. 1180×720 |
+| 14 | `node scripts/layout-audit.mjs --pdf /tmp/pdf-audit-430 --json /tmp/pdf-audit-430.json`, 4.3.0 bundle | **0 violations**: 13 printable documents + 3 landscape views. Every document: screen 210×297mm, PDF `/MediaBox` 209.9×297mm (595.28×841.89pt), 1 page, padding 12/12mm, no overflow; landscape: screen 297×210mm, PDF 297×209.9mm. The landscape *prescription* paginates to 2 PDF pages with content on both (expected flow once the page is shorter) — recorded, not a violation |
 
 **Harness fixture note (why the first `--pdf` runs failed).** `context.addInitScript(fn)` serializes
 only the function body, so the injected bridge could not see any constant or helper defined in the

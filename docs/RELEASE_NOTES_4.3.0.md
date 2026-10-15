@@ -38,9 +38,17 @@ contains it is 450–630 px wide in every supported window (1180×720 and above)
   row 2 `Discount (৳)` · `Line total (৳)`. No width-dependent alternative arrangement exists.
 - `Remove` stays in the line heading (`Remove invoice line <n>`), clear of both rows.
 - Labels, validation, keyboard use, currency formatting and the line arithmetic are unchanged.
-- Measured with the responsive harness against the released baseline and this build: grid overflow
-  `+238 px` at 1366×768 and `+85 px` at 1920×1080 → `0 px` at every measured size from 480×800 to
-  2560×1440, and 0 clipped fields.
+- Measured with the responsive harness (`npm run layout:audit`, the same probe the repository uses
+  for layout gates) on three builds:
+
+  | Build | 1180×720 (minimum window) | 1366×768 | 1920×1080 / 2560×1440 | Violations |
+  | --- | --- | --- | --- | --- |
+  | `v4.2.2` (published baseline) | panel 714px, +0 (window below its minimum) | grid overflow **+238px**, `Discount (৳)`/`Line total (৳)` outside the card | grid **+85px**, `Line total (৳)` outside the card | **18** |
+  | `v4.2.3` (published) | one row of five fields — not the required arrangement | two rows, 0 overflow | two rows, 0 overflow | **1** (arrangement) |
+  | this release | two rows, 0 overflow | two rows, 0 overflow | two rows, 0 overflow | **0** |
+
+  No field is outside its card and no money value is clipped on this build (measured, and enforced by
+  the harness, at every size from 480×800 to 2560×1440).
 - The same fixed-template cause was repaired in the other surfaces the audit found: the five-field line
   in the New invoice dialog, the prescription medicine entry (1 → 2 → 3 columns from its own width),
   Dashboard/About/Reports splits, the patient profile overview, Settings → Customize documents and the
@@ -86,7 +94,9 @@ computer before relying on printed documents for clinical use.
 
 ## Notes
 
-- The 4.2.3 notes file (`docs/RELEASE_NOTES_4.2.3.md`) describes layout work that was prepared but
-  **never released**; that work ships here as part of 4.3.0.
+- `v4.2.3` (released 2026-10-15) already removed the *overflow* of this line, but it kept a
+  width-dependent alternative and therefore showed **one row of five fields** whenever the panel was
+  wide enough — which is the case at the application's minimum window size 1180×720 (panel 832px).
+  The required two-row arrangement is the only arrangement from 4.3.0 on.
 - Detailed progress, measurements and open gates: `docs/PROGRESS_V4.3.0.md`.
 - Printing policy and document geometry: `docs/PRINTING.md`. Database changes: `docs/DATABASE.md`.
