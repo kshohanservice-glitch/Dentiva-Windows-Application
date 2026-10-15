@@ -418,7 +418,7 @@ test('walk-in / quick documents print a real document without registering a pati
   // Prescription is the default document type for this workflow.
   await page.getByLabel('Customer name').fill('E2E Walk-in Customer');
   await page.getByLabel('Dentist name (typed)').fill('Dr. E2E Dentist');
-  await page.getByLabel('Medicine').first().fill('Amoxicillin');
+  await page.locator('.medicine-entry-editor input').first().fill('Amoxicillin');
   await page.getByLabel('Strength').first().fill('500mg');
 
   // The preview is the real document renderer, so it must show the same content
