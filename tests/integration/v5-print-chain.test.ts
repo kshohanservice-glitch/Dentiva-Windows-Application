@@ -87,10 +87,41 @@ describe('V5-026 / V5-025 multi-page and glyph rules in print.css', () => {
     expect(css).toContain('.print-doc tfoot { display: table-row-group; }');
   });
 
+  it('never strands a heading or clinical label without its content', () => {
+    // Measured on the landscape prescription: "TREATMENT" ended page 1 while its
+    // text started page 2.
+    const headingRule = /\.print-doc h2,([^{]*)\{([^}]*)\}/s.exec(css);
+    expect(headingRule, 'heading keep-with-next rule').not.toBeNull();
+    for (const sel of ['.prescription-column-title', '.rx-heading', '.clinical-label']) {
+      expect(headingRule![1]).toContain(sel);
+    }
+    expect(headingRule![2]).toMatch(/break-after:\s*avoid/);
+    expect(css).toMatch(/\.print-doc tr,[^{]*\.print-doc \.clinical-field,[^{]*\{[^}]*break-inside:\s*avoid/s);
+  });
+
   it('lets the prescription body break between medicines', () => {
     const rule = /@media print \{\s*\/\*[^*]*\*+(?:[^/*][^*]*\*+)*\/\s*\.prescription-header,\s*\.prescription-patient-strip\s*\{[^}]*\}/s.exec(css);
     expect(rule, 'header/strip avoid rule').not.toBeNull();
     expect(rule![0]).not.toContain('.prescription-body');
+  });
+
+  it('ships the font subsets that cover English, Bengali and ৳ (V5-032)', () => {
+    const root = path.resolve(__dirname, '..', '..');
+    const main = fs.readFileSync(path.join(root, 'src', 'renderer', 'main.tsx'), 'utf8');
+    const imports = [...main.matchAll(/import '(@fontsource\/[^']+)';/g)].map((m) => m[1]);
+    for (const w of ['400', '500', '600', '700']) {
+      expect(imports).toContain(`@fontsource/inter/latin-${w}.css`);
+      expect(imports).toContain(`@fontsource/inter/latin-ext-${w}.css`);
+    }
+    // The "bengali" subset is the Bengali block (U+0980–09FE), which holds ৳
+    // (U+09F3); the PDF audit confirms the glyph is embedded from this font.
+    for (const w of ['400', '600']) {
+      const i = `@fontsource/noto-sans-bengali/bengali-${w}.css`;
+      expect(imports).toContain(i);
+      const faceCss = fs.readFileSync(path.join(root, 'node_modules', i), 'utf8');
+      expect(faceCss).toContain("font-family: 'Noto Sans Bengali'");
+      expect(faceCss).toContain(`noto-sans-bengali-bengali-${w}-normal.woff2`);
+    }
   });
 
   it('printed amounts fall back to the bundled Bengali font for ৳', () => {

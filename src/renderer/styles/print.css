@@ -436,7 +436,13 @@
   margin: 10px 0;
 }
 
-.print-doc h2 {
+/* A heading or label is never stranded at the bottom of a sheet without the
+   content it introduces. */
+.print-doc h2,
+.print-doc .prescription-column-title,
+.print-doc .rx-heading,
+.print-doc .clinical-label {
+  break-after: avoid;
   page-break-after: avoid;
 }
 /* Pagination (v5, V5-026). A long table flows across sheets with its header
@@ -450,6 +456,7 @@
 .print-doc tr,
 .print-doc li,
 .print-doc .prescription-medication,
+.print-doc .clinical-field,
 .print-doc .print-kv,
 .print-doc .totals,
 .print-doc .sig-block,
