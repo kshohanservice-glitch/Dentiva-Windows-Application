@@ -1373,16 +1373,6 @@ tr.row-muted td { opacity: 0.55; }
   .quick-line-total { grid-area: total; }
 }
 
-@container (max-width: 360px) {
-  .quick-line-grid {
-    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-    grid-template-areas:
-      "description description"
-      "qty price"
-      "discount total";
-  }
-  .quick-line-description { grid-column: auto; }
-}
 
 /* Status pills in lists */
 .status-pill { font-size: 11px; font-weight: 750; text-transform: capitalize; }
