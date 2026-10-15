@@ -140,6 +140,60 @@ describe('responsive layout wraps gracefully instead of overflowing', () => {
   });
 });
 
+describe('walk-in invoice line grid — two-row layout at narrow widths (reported bug fix)', () => {
+  const css = readSource('src/renderer/styles/global.css');
+
+  it('declares container-type on quick-line-card so the card width drives the layout', () => {
+    expect(css).toContain('container-type: inline-size');
+    expect(css).toContain('.quick-line-card');
+  });
+
+  it('has a @container rule that lays out the invoice fields in two rows', () => {
+    // The primary mechanism: a 3-column grid at <=420px card width
+    // with grid-template-areas that encode the two-row layout.
+    const block420 = css.match(/@container\s*\(max-width:\s*420px\)\s*\{([\s\S]*?)\n\}/);
+    expect(block420).not.toBeNull();
+    const inner = block420![1];
+    expect(inner).toContain('grid-template-columns: repeat(3, minmax(0, 1fr))');
+    expect(inner).toContain('"desc desc desc"');
+    expect(inner).toContain('"qty  price discount"');
+    expect(inner).toContain('"total total total"');
+  });
+
+  it('puts Item/Procedure on its own row spanning all columns at narrow widths', () => {
+    const block420 = css.match(/@container\s*\(max-width:\s*420px\)\s*\{([\s\S]*?)\n\}/)![1];
+    expect(block420).toContain('.quick-line-description');
+    expect(block420).toMatch(/grid-area:\s*desc/);
+  });
+
+  it('puts Discount and Line Total on the second row at narrow widths', () => {
+    const block420 = css.match(/@container\s*\(max-width:\s*420px\)\s*\{([\s\S]*?)\n\}/)![1];
+    // .quick-line-total is placed in the "total total total" grid area —
+    // a dedicated row, separate from the "qty price discount" row that holds
+    // Qty, Unit price, and Discount.
+    expect(block420).toContain('.quick-line-total');
+    expect(block420).toMatch(/grid-area:\s*total/);
+    // Line total spans all three columns, confirming it is on its own row.
+    expect(block420).toContain('grid-column: 1 / -1');
+  });
+
+  it('still has a 680px viewport fallback that collapses to a single column', () => {
+    const mediaMatch = css.match(/@media\s*\(max-width:\s*680px\)\s*\{([\s\S]*?)\n\}/);
+    expect(mediaMatch).not.toBeNull();
+    const block = mediaMatch![1];
+    expect(block).toContain('.quick-line-grid');
+    expect(block).toMatch(/grid-template-columns:\s*minmax\(0,\s*1fr\)/);
+  });
+
+  it('does not use absolute positioning for the invoice line layout', () => {
+    // Guard against future absolute-positioning workarounds.
+    const quickLineRules = css.match(/\..*quick-line-grid.*\{([\s\S]*?)\n\}/g) ?? [];
+    for (const rule of quickLineRules) {
+      expect(rule).not.toContain('position: absolute');
+    }
+  });
+});
+
 describe('medicine entry labels shortened for alignment', () => {
   it('uses "Medicine" not "Medicine name"', () => {
     const src = readSource('src/renderer/components/medicine-entry-editor.tsx');

@@ -578,3 +578,260 @@ test('adapts cleanly across 1280×720 and 1920×1080 viewports without horizonta
     }
   }
 });
+
+/* ---------------------------------------------------------------------------
+ * Walk-in invoice line grid — responsive layout regression (ISS layout audit).
+ * The reported defect: at narrow widths the Discount (৳) and Line Total (৳)
+ * fields were crammed into the same row, overflowing or clipping.
+ * Required layout at narrow widths:
+ *   Row 1: Item/Procedure · Qty · Unit price
+ *   Row 2: Discount · Line total
+ *   Remove must stay visible and clickable.
+ * --------------------------------------------------------------------------- */
+
+test('walk-in invoice: narrow viewport lays out fields in two rows with Remove visible', async () => {
+  await page.getByRole('link', { name: 'Walk-in / Quick Docs', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'Walk-in / Quick Documents', level: 1 })).toBeVisible();
+
+  // Switch to the invoice tab.
+  await page.getByRole('tab', { name: 'Invoice', exact: true }).click();
+  await expect(page.locator('.quick-line-card')).toBeVisible({ timeout: 15_000 });
+
+  // Fill one invoice line so the fields are non-empty and easy to identify.
+  const card = page.locator('.quick-line-card').first();
+  await card.getByLabel('Item or procedure').fill('Scaling and polishing');
+  await card.getByLabel('Qty').fill('2');
+  await card.getByLabel('Unit price (৳)').fill('500');
+  await card.getByLabel('Discount (৳)').fill('50');
+
+  // Narrow window: at 680×900 the form panel is far narrower than the full
+  // window (sidebar + page padding eat into the available space), so this size
+  // exercises the same narrow-panel boundary the user reported.
+  await page.setViewportSize({ width: 680, height: 900 });
+
+  // Wait for the container-query / media-query layout to settle.
+  await page.waitForTimeout(200);
+
+  const cardBox = await card.boundingBox();
+  expect(cardBox).not.toBeNull();
+  const cBox = cardBox!;
+
+  // Helper: bounding box of a field's label element inside this card.
+  const fieldLabelBox = async (labelText: string): Promise<{ x: number; y: number; w: number }> => {
+    const lbl = card.locator(`text="${labelText}"`).first();
+    await expect(lbl).toBeVisible({ timeout: 5_000 });
+    const box = await lbl.boundingBox();
+    expect(box).not.toBeNull();
+    return { x: box!.x - cBox.x, y: box!.y - cBox.y, w: box!.width };
+  };
+
+  const descY  = (await fieldLabelBox('Item or procedure')).y;
+  const qtyY   = (await fieldLabelBox('Qty')).y;
+  const priceY = (await fieldLabelBox('Unit price (৳)')).y;
+  const discY  = (await fieldLabelBox('Discount (৳)')).y;
+  const totalY = (await fieldLabelBox('Line total (৳)')).y;
+
+  // Tolerance: sibling labels in the same grid row may differ by a pixel or two
+  // because of text baseline alignment inside the label box.
+  const sameRow = (a: number, b: number) => expect(Math.abs(a - b)).toBeLessThanOrEqual(2);
+
+  // Row 1: Item/Procedure, Qty, Unit price.
+  sameRow(descY, qtyY);
+  sameRow(descY, priceY);
+
+  // Row 2: Discount and Line total must be on a DIFFERENT row from row 1.
+  expect(discY).toBeGreaterThan(priceY + 2);
+  sameRow(discY, totalY);
+
+  // Discount and Line total must NOT be in the same row as Qty/Unit price.
+  expect(discY).not.toBeLessThanOrEqual(priceY + 2);
+
+  // Remove button must remain visible (not overlapped, not hidden).
+  const removeBtn = card.locator('button', { hasText: 'Remove' }).first();
+  await expect(removeBtn).toBeVisible({ timeout: 5_000 });
+  const btnBox = await removeBtn.boundingBox();
+  expect(btnBox).not.toBeNull();
+  // Button must sit inside the card bounds (not overflowing to the right).
+  expect(btnBox!.x + btnBox!.width).toBeLessThanOrEqual(cBox.x + cBox.width + 1);
+  expect(btnBox!.y + btnBox!.height).toBeLessThanOrEqual(cBox.y + cBox.height + 1);
+
+  // No horizontal overflow of the card or page at this narrow size.
+  const docOverflow = await page.evaluate(() =>
+    document.documentElement.scrollWidth - document.documentElement.clientWidth
+  );
+  expect(docOverflow).toBeLessThanOrEqual(2);
+
+  // Click Remove to prove it is clickable (not covered by another element).
+  await removeBtn.click();
+  await expect(card).toBeHidden({ timeout: 3_000 });
+});
+
+test('walk-in invoice: wide viewport retains a compact one-row-per-field layout', async () => {
+  await page.getByRole('link', { name: 'Walk-in / Quick Docs', exact: true }).click();
+  await page.getByRole('tab', { name: 'Invoice', exact: true }).click();
+  await expect(page.locator('.quick-line-card')).toBeVisible({ timeout: 15_000 });
+
+  const card = page.locator('.quick-line-card').first();
+  await card.getByLabel('Item or procedure').fill('Consultation');
+  await card.getByLabel('Qty').fill('1');
+  await card.getByLabel('Unit price (৳)').fill('300');
+
+  // Wide window: each field keeps its own column; the grid does not collapse.
+  await page.setViewportSize({ width: 1366, height: 768 });
+  await page.waitForTimeout(200);
+
+  // At wide size all five field labels should be visible inside the card.
+  const labels = ['Item or procedure', 'Qty', 'Unit price (৳)', 'Discount (৳)', 'Line total (৳)'];
+  const wCardBox = await card.boundingBox();
+  expect(wCardBox).not.toBeNull();
+  for (const label of labels) {
+    const lbl = card.locator(`text="${label}"`).first();
+    const box = await lbl.boundingBox();
+    expect(box).not.toBeNull();
+    // Label must be inside the card horizontally.
+    expect(box!.x).toBeGreaterThanOrEqual(wCardBox!.x - 1);
+    expect(box!.x + box!.width).toBeLessThanOrEqual(wCardBox!.x + wCardBox!.width + 1);
+    await expect(lbl).toBeVisible({ timeout: 5_000 });
+  }
+
+  // No horizontal overflow.
+  const docOverflow = await page.evaluate(() =>
+    document.documentElement.scrollWidth - document.documentElement.clientWidth
+  );
+  expect(docOverflow).toBeLessThanOrEqual(2);
+});
+
+test('walk-in invoice: long procedure names and large currency values do not break the layout', async () => {
+  await page.getByRole('link', { name: 'Walk-in / Quick Docs', exact: true }).click();
+  await page.getByRole('tab', { name: 'Invoice', exact: true }).click();
+  await expect(page.locator('.quick-line-card')).toBeVisible({ timeout: 15_000 });
+
+  const card = page.locator('.quick-line-card').first();
+  // A very long procedure name (mimics a verbose clinical description).
+  await card.getByLabel('Item or procedure').fill('Extensive scaling and root planing — full mouth, two visits');
+  await card.getByLabel('Unit price (৳)').fill('95000'); // ৳95,000.00
+  await card.getByLabel('Discount (৳)').fill('15000');  // ৳15,000.00
+
+  // Narrow window again to confirm the layout still holds with long content.
+  await page.setViewportSize({ width: 680, height: 900 });
+  await page.waitForTimeout(200);
+
+  // All five labels must still be visible inside the card.
+  const labels = ['Item or procedure', 'Qty', 'Unit price (৳)', 'Discount (৳)', 'Line total (৳)'];
+  for (const label of labels) {
+    await expect(card.locator(`text="${label}"`).first()).toBeVisible({ timeout: 5_000 });
+  }
+
+  // The card itself must not overflow the page.
+  const cardBox = await card.boundingBox();
+  expect(cardBox).not.toBeNull();
+  const pageBox = await page.locator('.page').boundingBox();
+  expect(pageBox).not.toBeNull();
+  expect(cardBox!.x + cardBox!.width).toBeLessThanOrEqual(pageBox!.x + pageBox!.width + 2);
+});
+
+test('walk-in invoice: adding and removing multiple lines keeps the layout stable', async () => {
+  await page.getByRole('link', { name: 'Walk-in / Quick Docs', exact: true }).click();
+  await page.getByRole('tab', { name: 'Invoice', exact: true }).click();
+  await expect(page.locator('.quick-line-card')).toBeVisible({ timeout: 15_000 });
+
+  // Add two more lines.
+  await page.getByRole('button', { name: '+ Add line' }).click();
+  await page.getByRole('button', { name: '+ Add line' }).click();
+  await expect(page.locator('.quick-line-card')).toHaveCount(3, { timeout: 5_000 });
+
+  // Fill all three lines.
+  for (let i = 0; i < 3; i++) {
+    const card = page.locator('.quick-line-card').nth(i);
+    await card.getByLabel('Item or procedure').fill(`Service ${i + 1}`);
+    await card.getByLabel('Qty').fill('1');
+    await card.getByLabel('Unit price (৳)').fill('100');
+  }
+
+  await page.setViewportSize({ width: 680, height: 900 });
+  await page.waitForTimeout(200);
+
+  // Every card must be fully inside the page; no card may overflow the right edge.
+  const pageBox = await page.locator('.page').boundingBox();
+  expect(pageBox).not.toBeNull();
+  for (let i = 0; i < 3; i++) {
+    const c = page.locator('.quick-line-card').nth(i);
+    const box = await c.boundingBox();
+    expect(box).not.toBeNull();
+    expect(box!.x + box!.width).toBeLessThanOrEqual(pageBox!.x + pageBox!.width + 2);
+    // Every Remove button must be visible.
+    await expect(c.locator('button', { hasText: 'Remove' }).first()).toBeVisible({ timeout: 5_000 });
+  }
+
+  // Removing lines one by one must not leave layout artifacts.
+  await page.locator('.quick-line-card').nth(2).locator('button', { hasText: 'Remove' }).first().click();
+  await expect(page.locator('.quick-line-card')).toHaveCount(2, { timeout: 5_000 });
+  await page.locator('.quick-line-card').nth(1).locator('button', { hasText: 'Remove' }).first().click();
+  await expect(page.locator('.quick-line-card')).toHaveCount(1, { timeout: 5_000 });
+  await expect(page.locator('.quick-line-card').first().locator('button', { hasText: 'Remove' }).first()).toBeVisible();
+});
+
+test('walk-in invoice: adding a line from saved treatments still works after layout fix', async () => {
+  await page.getByRole('link', { name: 'Walk-in / Quick Docs', exact: true }).click();
+  await page.getByRole('tab', { name: 'Invoice', exact: true }).click();
+  await expect(page.locator('.quick-line-card')).toBeVisible({ timeout: 15_000 });
+
+  // The treatment picker should be present.
+  const picker = page.locator('select[aria-label="Add an invoice line from saved treatments"]');
+  await expect(picker).toBeVisible({ timeout: 5_000 });
+  const options = await picker.locator('option').count();
+  expect(options).toBeGreaterThan(0);
+
+  // Picking a treatment fills a line.
+  await picker.selectOption({ index: 0 });
+  await expect(page.locator('.quick-line-card')).toHaveCount(2, { timeout: 5_000 });
+
+  // The new line must have its fields laid out correctly at narrow width.
+  await page.setViewportSize({ width: 680, height: 900 });
+  await page.waitForTimeout(200);
+  const lastCard = page.locator('.quick-line-card').last();
+  await expect(lastCard.getByLabel('Item or procedure')).toBeVisible({ timeout: 5_000 });
+  await expect(lastCard.locator('button', { hasText: 'Remove' }).first()).toBeVisible({ timeout: 5_000 });
+});
+
+test('walk-in invoice: line totals and discounts recalculate correctly', async () => {
+  await page.getByRole('link', { name: 'Walk-in / Quick Docs', exact: true }).click();
+  await page.getByRole('tab', { name: 'Invoice', exact: true }).click();
+  await expect(page.locator('.quick-line-card')).toBeVisible({ timeout: 15_000 });
+
+  const card = page.locator('.quick-line-card').first();
+  await card.getByLabel('Item or procedure').fill('Cleaning');
+  await card.getByLabel('Qty').fill('4');
+  await card.getByLabel('Unit price (৳)').fill('250');
+  await card.getByLabel('Discount (৳)').fill('100');
+
+  // Qty 4 × ৳250 = ৳1,000; minus ৳100 discount = ৳900.00
+  const totalEl = card.locator('[aria-readonly="true"]').first();
+  await expect(totalEl).toContainText('৳900.00', { timeout: 5_000 });
+
+  // Invoice summary must show the correct line total.
+  const summary = page.locator('.quick-invoice-summary');
+  await expect(summary.locator('text=Line discounts')).toBeVisible({ timeout: 5_000 });
+  await expect(summary.locator('text=৳100.00')).toBeVisible({ timeout: 5_000 });
+});
+
+test('walk-in invoice: keyboard focus and accessible labels remain functional', async () => {
+  await page.getByRole('link', { name: 'Walk-in / Quick Docs', exact: true }).click();
+  await page.getByRole('tab', { name: 'Invoice', exact: true }).click();
+  await expect(page.locator('.quick-line-card')).toBeVisible({ timeout: 15_000 });
+
+  const card = page.locator('.quick-line-card').first();
+
+  // Each field must have an associated label (for=id pair) — verified structurally
+  // in document-forms-a11y.test.ts, but confirm interactively here too.
+  const qtyInput = card.locator('input[aria-label="Qty"]').first();
+  // Focus the input and confirm it receives focus.
+  await qtyInput.focus();
+  const focused = await page.evaluate(() => (document.activeElement as HTMLElement)?.closest('.quick-line-card') !== null);
+  expect(focused).toBe(true);
+
+  // Tab forward to the next field.
+  await page.keyboard.press('Tab');
+  const afterTab = await page.evaluate(() => (document.activeElement as HTMLElement)?.tagName.toLowerCase());
+  expect(afterTab).toBe('input');
+});;

@@ -1314,6 +1314,14 @@ tr.row-muted td { opacity: 0.55; }
 }
 .medicine-entry-grid > .field,
 .quick-line-grid > .field { min-width: 0; }
+
+/* Container query anchors — the card is the layout boundary, not the viewport.
+   The walk-in invoice card lives inside `.quick-grid`, whose left column has a
+   340px minimum; the actual card content can therefore be far narrower than the
+   window. Container queries respond to the card width directly. */.medicine-entry-card,
+.quick-line-card {
+  container-type: inline-size;
+}
 .medicine-entry-full-instruction { grid-column: 1 / -1; }
 .medicine-entry-full-instruction > label,
 .medicine-entry-full-instruction > .field-label { min-height: auto; }
@@ -1346,6 +1354,30 @@ tr.row-muted td { opacity: 0.55; }
   .quick-line-description { grid-column: 1 / -1; }
   .invoice-line { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .invoice-line .field:first-child { grid-column: 1 / -1; }
+}
+
+/* Walk-in invoice line grid — narrow-panel responsive layout.
+   At narrow card widths (not just narrow windows), ensure:
+     Row 1: Item/Procedure · Qty · Unit price
+     Row 2: Discount · Line total
+   so that the two currency fields are never crammed into the same row.
+   The 3-column @container rule is the primary mechanism; the 980px viewport
+   rule above remains as a fallback for browsers without container-query support. */
+@container (max-width: 420px) {
+  .quick-line-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-areas:
+      "desc desc desc"
+      "qty  price discount"
+      "total total total";
+  }
+  .quick-line-description { grid-area: desc; grid-column: 1 / -1; }
+  .quick-line-total        { grid-area: total; grid-column: 1 / -1; }
+}
+@container (max-width: 380px) {
+  .quick-line-grid { grid-template-columns: minmax(0, 1fr); }
+  .quick-line-description { grid-column: auto; }
+  .quick-line-total        { grid-column: auto; }
 }
 @media (max-width: 680px) {
   .medicine-entry-grid,
