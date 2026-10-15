@@ -19,7 +19,12 @@ documented corrections below.
 - **Calmer interface.** Flat headers, clear focus rings, quieter tables and badges, and short modal and toast
   motion. All motion is off with Windows reduced motion or the in-app animation switch.
 - **Bengali.** Noto Sans Bengali is in the interface font stack, with a taller line height for Bengali text.
-- **Accessibility.** An automated WCAG 2.1 AA scan (axe-core, 24 screens and dialogs, light and dark themes)
+- **Dates you can't misread.** Each date field in a form now spells out the chosen date underneath, for
+  example "Fri 3 Apr 2026". The field itself uses the PC's Windows date format, which is mm/dd/yyyy on English
+  (United States), while Dentiva Pro shows dd/mm/yyyy, so 03/04/2026 could be read as either date.
+- **One clock style.** The header clock and the dashboard's "Last updated" time use the 24-hour clock on every
+  PC, like the rest of the app.
+- **Accessibility.** An automated WCAG 2.1 AA scan (axe-core, 25 screens and dialogs, light and dark themes)
   now reports 0 issues:
   - Dark-theme buttons and selected states meet contrast. They measured as low as 1.9:1 before.
   - Fields and dialogs have proper names.
@@ -47,6 +52,8 @@ documented corrections below.
   - Measured: a 70-line invoice prints on 5 sheets, a 30-medicine prescription on 2 and a 150-row report on 5.
 - **Printed reports show their totals.** Before 5.0.0 the "Total" row was empty.
 - **The taka sign ৳ always prints.** It falls back to the bundled Bengali font.
+- **Appointment card time.** The printed time always reads like 02:30 PM. It used to follow the PC's language
+  settings, so an English (United Kingdom) PC printed 14:30.
 
 ## Security and data safety
 
@@ -92,7 +99,9 @@ documented corrections below.
 - Physical printing and Electron's Save-as-PDF were not verified on a printer for this release candidate. Every
   document was measured as A4 in generated PDFs. Print a test page set on the clinic printer before relying on
   it.
-- Date fields may show mm/dd/yyyy on some Windows locales. Dates are stored correctly either way.
+- Date fields themselves still use the Windows date format (mm/dd/yyyy on English (United States)). The date
+  spelled out under each form field shows which date is meant. The date filters on the Accounting, Audit and
+  Reports pages have no read-back. Dates are stored correctly either way.
 - The minimum window size (1180 × 680) does not fit a 1366 × 768 screen at 125 % scaling.
 - Full list: `docs/KNOWN_LIMITATIONS.md`. Audit trail: `docs/audits/v5/`.
 

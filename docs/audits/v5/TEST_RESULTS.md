@@ -17,7 +17,31 @@ the commit named.
 Install note: `npm_config_nodedir=/usr/local npm ci --force` (the Windows-only Argon2 binary needs `--force` on
 Linux; documented in TESTING.md).
 
-## 2. Local gates on the release candidate `56ea4cb` (clean tree)
+## 2. Local gates
+
+### 2a. Release-candidate head `b40da3a` (V5-033)
+
+Run on a working tree whose code was byte-identical to `b40da3a` (the committed files), Node v22.22.3.
+
+| Gate | Command | Result |
+| --- | --- | --- |
+| Typecheck | `npm run typecheck` | ✔ exit 0 |
+| Lint | `npx eslint .` | ✔ exit 0, no output |
+| Unit + integration | `npx vitest run` | ✔ **57 files, 660 tests passed**, 0 failed, 0 skipped |
+| Build | `npm run build` | ✔ exit 0, with the expected chunk-size warning (§5); main chunk 589.13 kB (162.31 kB gzip) |
+| Production advisories | `npm audit --omit=dev --audit-level=moderate` | ✔ 0 vulnerabilities |
+| Marker gate | `grep -rEn 'TODO\|FIXME\|HACK' src tests scripts` | ✔ none |
+
+Also checked for this change:
+- The new tests pass with Node's default locale set to en-GB (`LC_ALL=en_GB.UTF-8`).
+- They also pass in a copy of the tree converted to CRLF line endings, as on a Windows checkout. The same copy
+  reproduces the CI failure of the `c557530` test.
+- Without the en-US pin in `document-layout`, the frozen appointment-card comparison fails under en-GB and passes
+  under en-US, so the pin is needed.
+- Mutation check on the `b40da3a` tests: removing the read-back fails 2 tests; putting the machine-locale calls
+  back fails 2 (appointment card) or 1 (dashboard).
+
+### 2b. Original release candidate `56ea4cb` (clean tree)
 
 | Gate | Command | Result |
 | --- | --- | --- |
@@ -41,9 +65,16 @@ Linux; documented in TESTING.md).
 | After fonts and headings (`22e6802`) | 54 | 621 |
 | After accessibility (`5eda3af`) | 55 | 639 |
 | After the audit filter and IPC surface (`dc1534b`) and RC (`56ea4cb`) | 56 | 646 |
+| First V5-033 attempt (`c557530`, superseded) | 57 | 657 |
+| V5-033 fix (`b40da3a`) | 57 | 660 |
 
-One test changed meaning on purpose: the ISS-010 case in `audit-regressions` now expects that an Owner
-**cannot** demote themselves (decision D-8). No test was deleted or skipped.
+Two tests changed on purpose:
+- The ISS-010 case in `audit-regressions` now expects that an Owner **cannot** demote themselves (decision D-8).
+- `document-layout` renders the frozen legacy appointment card with an en-US time format, so the comparison no
+  longer depends on the test machine's locale (V5-033).
+
+No test from the baseline or the RC was deleted or skipped. The `c557530` tests for the `--lang` switch were
+replaced in `b40da3a`, together with the switch.
 
 ## 3. Windows CI (GitHub Actions `CI` workflow)
 
@@ -56,6 +87,11 @@ One test changed meaning on purpose: the ISS-010 case in `audit-regressions` now
 | 38750058064 | `dc1534b` | ✔ | ✔ | ✔ | audit-log filter, IPC surface test. Artifact `DentivaPro-Windows-NSIS` (99,409,033 B, zip digest `sha256:5cceca4b51e54e6894d02e51e23edfcba8a0867097a34cd01cc61223fdac59b9`) |
 | 38751182873 | `56ea4cb` (RC) | ✔ | ✔ | ✔ | **release candidate.** Artifact `DentivaPro-Windows-NSIS` (99,409,026 B, zip digest `sha256:9282efa1d636a38567588fcdee046a07b69deac2cfa3e249bf3145edb9e36c48`, expires 2026-11-14). Publish step skipped (branch) |
 | 38752546753 | PR #43 merge ref (`338a6b8` into `main` `303712e`) | ✔ | ✔ | ✔ | `pull_request` event on draft PR #43. Same code as the RC; the merge with `main` is clean |
+| 38753767760 | PR #43 merge ref (`093af95`) | ✔ | ✔ | ✔ | Started by a docs-only push. For `pull_request` events `paths-ignore` is checked against the whole PR diff, so every push to the PR branch runs CI; only `push`-event runs skip docs-only commits |
+| 38757316130 | `c557530` | ✘ | ✘ | skipped | **First V5-033 attempt, disproved.** E2E: `date field order: Month,Day,Year`, so `--lang=en-GB` did not change the native date field in Electron on Windows. verify: a new unit test searched for `…;\n`, which never matches a CRLF checkout (test bug). Both read from the check-run annotations |
+| 38757325484 | PR #43 merge ref (`c557530`) | ✘ | ✘ | skipped | Same two failures |
+| 38759566953 | `b40da3a` | ✔ | ✔ | ✔ | **Current release-candidate head.** V5-033 read-back, including the new E2E test. Artifact `DentivaPro-Windows-NSIS` (99,409,337 B, zip digest `sha256:e20a71b70848ea4e06cdf974aecb155dec09757dbcb53f129802b3e0e2334022`, expires 2026-11-14). Every NSIS step succeeded, including the silent install and smoke test; publish skipped (branch) |
+| 38759574773 | PR #43 merge ref (`b40da3a`) | ✔ | ✔ | ✔ | `pull_request` event; same code |
 
 Steps in a green run (38750058064), from the jobs API:
 - **verify:** production audit, typecheck for main and for renderer plus tests, lint, vitest, build, marker gate.
@@ -81,17 +117,19 @@ The zip digest identifies the CI artifact. It is **not** the installer's own SHA
 artifact (`SHA256SUMS.txt`) and could not be downloaded from this environment. A release needs the tag run's
 checksum and an independent re-download check (Gate F).
 
-## 4. Harness results (Chromium 153, renderer bundle of the branch head)
+## 4. Harness results (Chromium 153, renderer bundle of `b40da3a`)
 
 | Check | Result |
 | --- | --- |
-| Layout: 24 screens and modal scenarios × 8 viewports (2560 → 480 px), light | ✔ 0 / 192 violations |
-| Layout, dark theme | ✔ 0 / 192 violations |
+| Layout: 25 screens and modal scenarios × 8 viewports (2560 → 480 px), light. The 25th is the New appointment modal (V5-033) | ✔ 0 / 200 violations |
+| Layout, dark theme | ✔ 0 / 200 violations |
 | Walk-in invoice panels | ✔ 0 violations in 8 measured panels |
 | A4 PDF audit: 13 documents + 3 landscape views | ✔ 0 violations; every page 210 × 297 mm or 297 × 210 mm (±2 pt) |
 | A4 PDF audit, `--long` | ✔ 0 violations. All 70 invoice lines, 150 report rows and 28 medicines each present once. Margins on every sheet. No stranded headings |
 | Glyphs | ✔ ৳ embedded from NotoSansBengali, 0 U+FFFD in 16 PDFs |
-| Accessibility: axe-core 4.14.0, WCAG 2.0/2.1 A + AA, 24 screens and modals, 1366 × 768 | ✔ light 0, dark 0 violating nodes (before the fixes: 8 and 29) |
+| Appointment card time (V5-033) | ✔ PDF text reads "10:00 AM" (appointment card) and "05:30 PM" (walk-in card) |
+| Date read-back (V5-033) | ✔ screenshot: native field "10/15/2026" (en-US harness browser), read-back "Thu 15 Oct 2026" |
+| Accessibility: axe-core 4.14.0, WCAG 2.0/2.1 A + AA, 25 screens and modals, 1366 × 768 | ✔ light 0, dark 0 violating nodes (before the fixes: 8 and 29) |
 | Boot cost proxy (V5-031) | Script 41 ms, tasks 104 ms, FCP 116 ms (median of 7, 2 vCPU) |
 
 ## 5. Warnings (not suppressed)

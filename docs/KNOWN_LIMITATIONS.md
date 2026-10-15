@@ -132,12 +132,19 @@ label is a follow-up UI change, not a correctness fix.
 * **Activation code exposure (V5-018, owner decision).** The offline activation code can be derived
   from a test helper in the public repository. Activation is a soft gate, not patient-data access
   control; changing the scheme changes who can activate and needs the owner's decision.
-* **Date input display (V5-033).** Native date inputs follow the Windows/Chromium locale and may show
-  mm/dd/yyyy; values are stored as ISO dates either way. Needs a device check.
+* **Date fields follow the Windows short date format (V5-033).** Date fields use the PC's Windows
+  short date format: mm/dd/yyyy on English (United States), while Dentiva Pro shows dd/mm/yyyy. The
+  app can't change that on a PC with an English regional format (Windows CI showed the field
+  ignoring an en-GB app locale). Since 5.0.0 each form date field spells out the chosen date
+  underneath, for example "Fri 3 Apr 2026". The date filters on the Accounting, Audit and Reports
+  pages have no read-back. Values are stored as ISO dates either way. To make the fields themselves
+  read dd/mm/yyyy, set the Windows short date format to dd/MM/yyyy (Settings → Time & language →
+  Language & region → Regional format on Windows 11). That follows from Chromium's source; it was
+  not tried on a clinic PC.
 * **Window minimum (V5-036, owner decision).** The documented 1180 × 680 minimum is larger than a
   1366 × 768 screen at 125 % scaling; the layouts themselves pass the harness down to 480 px.
 * **A second invoice for an already-invoiced visit** is still allowed (unchanged billing rule); the
   visit keeps its first invoice link.
 * **Accessibility** was checked with an automated WCAG 2.1 AA scan (axe-core: 0 violations in both
-  themes over 24 screens and modals). Automated scans find only part of the WCAG issues; no manual
+  themes over 25 screens and modals). Automated scans find only part of the WCAG issues; no manual
   keyboard walk-through on Windows and no screen-reader session (NVDA/Narrator) was run.

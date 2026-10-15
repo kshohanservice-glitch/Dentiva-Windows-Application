@@ -68,6 +68,9 @@ bundle built from the branch head of 2026-10-15 (commits up to `dc1534b`).
 - All 16 PDFs contain 0 replacement characters (U+FFFD).
 - The landscape prescription needs 2 sheets even with the normal fixture. Page 1 now fills to 192.5 mm. Before
   v5, page 1 ended at 64.6 mm and the whole body moved to page 2.
+- Both appointment cards print the time in one style on every PC, for example 02:30 PM (V5-033). It used to
+  follow the PC's language settings. In the audit of `b40da3a` the PDF text reads 10:00 AM (appointment card)
+  and 05:30 PM (walk-in card). Geometry and page counts are unchanged.
 
 **Long fixtures, PyMuPDF checks (after the fixes):**
 - **Completeness:** all 70 invoice lines, 150 report rows and 28 numbered medicines (3–30) are present, each

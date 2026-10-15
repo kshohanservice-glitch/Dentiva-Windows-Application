@@ -30,7 +30,7 @@ Linux installation requires the documented `npm_config_nodedir=/usr/local npm ci
 Runs the production renderer bundle (`npm run build:renderer`) in a Chromium with a stubbed bridge.
 Set `LAYOUT_BROWSER` (and `LAYOUT_BROWSER_LIBS` if the browser needs extra libraries).
 
-- default: 24 screens and modal scenarios × 8 viewports (2560 → 480 px) — overflow, clipping and
+- default: 25 screens and modal scenarios × 8 viewports (2560 → 480 px) — overflow, clipping and
   overlap checks; `--theme dark`; `--screens` writes screenshots to `layout-audit/` (git-ignored).
 - `--pdf <dir>`: every printable document rendered in the print window, page box measured, PDF
   written and checked for A4 geometry; `--long` uses long fixtures for pagination checks.

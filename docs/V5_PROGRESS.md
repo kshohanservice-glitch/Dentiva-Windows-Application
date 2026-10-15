@@ -11,9 +11,17 @@ This log is the recovery record for the v5 effort. A task is marked done only wh
 
 ## 1. Current phase
 
-**Phase 9: release candidate and handoff.** Phases 0–8 are done. Version 5.0.0 is committed as a release
-candidate (`56ea4cb`). It is **not** merged, tagged or published. The verdict is **NOT READY FOR FINAL PRODUCTION
-RELEASE**, for the reasons in `docs/audits/v5/RELEASE_READINESS.md`.
+**Phase 9: release candidate and handoff.** Phases 0–8 are done. Version 5.0.0 is a release candidate, now at
+`b40da3a`. That commit supersedes the first candidate `56ea4cb` with the V5-033 date read-back. It is **not**
+merged, tagged or published. The verdict is **NOT READY FOR FINAL PRODUCTION RELEASE**, for the reasons in
+`docs/audits/v5/RELEASE_READINESS.md`.
+
+**Latest session (2026-10-15, "Continue" without owner decisions):** V5-033 resolved.
+- The first attempt, `c557530`, pinned Chromium's locale with `--lang=en-GB`. Windows CI disproved it: the
+  native date field still read Month, Day, Year.
+- `b40da3a` removed the switch. Each form date field now spells out the chosen date underneath.
+- Windows CI on `b40da3a` is all green (run 38759566953).
+- No owner decision was made or assumed.
 
 ## 2. Branch
 
@@ -24,7 +32,7 @@ RELEASE**, for the reasons in `docs/audits/v5/RELEASE_READINESS.md`.
 ## 3. Baseline and HEAD
 
 - **Baseline:** `main` = tag `v4.2.3` = `303712e489d9747bf6769ce1fd7f3705f5604883`.
-- **Release-candidate code commit:** `56ea4cb` (5.0.0). Later commits on the branch change docs only.
+- **Release-candidate code commit:** `b40da3a` (5.0.0). The first candidate was `56ea4cb`.
 - **Commits since the baseline, in order:**
 
 | Commit | Change |
@@ -43,6 +51,9 @@ RELEASE**, for the reasons in `docs/audits/v5/RELEASE_READINESS.md`.
 | `dc1534b` | audit filter and IPC surface |
 | `df8a499` | docs |
 | `56ea4cb` | 5.0.0 release candidate |
+| `338a6b8`, `093af95` | docs (gates, readiness, PR #43) |
+| `c557530` | V5-033 first attempt: `--lang=en-GB`, explicit display locales, appointment-card time (switch disproved by CI) |
+| `b40da3a` | V5-033 fix: date read-back; switch removed (current release-candidate code) |
 
 ## 4. Working-tree status
 
@@ -54,15 +65,15 @@ logs were written under `/tmp`, outside the repository.
 | Phase | Result |
 | --- | --- |
 | 0 Baseline | Git/GitHub/CI inventory; baseline gates: 48 files / 549 tests, 0 production advisories, layout 0/144; screenshots reviewed (BASELINE_AUDIT) |
-| 1 Audit | Issue register, now 39 entries; feature-parity matrix with 83 rows |
+| 1 Audit | Issue register, now 39 entries; feature-parity matrix with 84 rows |
 | 2 Security and data | V5-001…017 fixed and Windows-CI-verified; local-day dates (V5-012); later the audit-log filter (V5-037) |
 | 3 Core and architecture | Shared date helpers, access policy, navigation guard, pre-migration copy; IPC surface pinned by a permanent test (K-01). Route splitting measured and declined (V5-031) |
 | 4 Design system | Semantic tokens, sentence case (V5-030), `enumLabel`, StatCard as a button, calmer components, Bengali typography, dashboard permission fix (V5-034) |
 | 5 A4 printing | PR #42 merged and corrected (V5-020…023); fonts (V5-025); multi-page margins and pagination (V5-026); report totals (V5-027); stranded headings (V5-028); PDF audit, normal and long |
-| 6 Parity regression | All 83 rows re-verified (55 preserved, 28 changed with references); matrix error C-04 corrected |
+| 6 Parity regression | All 84 rows re-verified (55 preserved, 29 changed with references); matrix error C-04 corrected. K-07 (date entry) added for V5-033 |
 | 7 Performance, accessibility, hardening | Font subsets −23 % (V5-032); axe-core WCAG 2.1 AA scan with 0 violations in both themes (V5-035); boot-cost measurement (V5-031) |
 | 8 Final audit | Full gates re-run on the release candidate; claims in the docs re-checked against the code (found and fixed V5-037, the C-04 matrix error, the V5-008 wording, the wrong logger/errors paths in the parity notes) |
-| 9 Release candidate | Version 5.0.0, release notes, readiness report; chunk-size warning made visible |
+| 9 Release candidate | Version 5.0.0, release notes, readiness report; chunk-size warning made visible. After the first candidate: V5-033 resolved (`b40da3a`) |
 
 ## 6. Files changed
 
@@ -73,9 +84,9 @@ logs were written under `/tmp`, outside the repository.
 | Main process | `core/session.ts`, `core/dates.ts` (new), `core/validate.ts`, `ipc/access-policy.ts` (new), `ipc/router.ts`, `navigation.ts` (new), `index.ts`, `print.ts`, `db/database.ts`, `db/migrations/008_a4_only_printing.ts` |
 | Services | auth, users, backup, settings, billing, prescriptions, chart, visits, reports, dashboard |
 | Shared | `print-page.ts`, document-watermark, settings types |
-| Renderer | `styles/tokens.css`, `global.css`, `print.css`, `format.ts`, `main.tsx`, `components/` (primitives, shell, ToothChart), `documents/` (print-documents, document-preview), pages (Users, Dashboard, Patients, Settings, Appointments, QuickDocuments, PrintPage and others), `state/app-context.tsx` |
-| Tests | new `v5-security`, `access-policy`, `v5-local-dates`, `v5-print-chain`, `v5-accessibility`, `ipc-surface`; updated a4-only-printing, migration-v422, audit-regressions (ISS-010), branding, search-hit-row, ui-layout-regressions, E2E `app.spec.ts` |
-| Tooling | `scripts/layout-audit.mjs` (`--theme dark`, `--long`, `--axe`), `vite.config.ts` |
+| Renderer | `styles/tokens.css`, `global.css`, `print.css`, `format.ts`, `main.tsx`, `components/` (primitives, shell, ToothChart, forms), `documents/` (print-documents, document-preview), pages (Users, Dashboard, Patients, Settings, Appointments, QuickDocuments, PrintPage and others), `state/app-context.tsx` |
+| Tests | new `v5-security`, `access-policy`, `v5-local-dates`, `v5-print-chain`, `v5-accessibility`, `ipc-surface`, `v5-locale`; updated a4-only-printing, document-layout, migration-v422, audit-regressions (ISS-010), branding, search-hit-row, ui-layout-regressions, E2E `app.spec.ts` |
+| Tooling | `scripts/layout-audit.mjs` (`--theme dark`, `--long`, `--axe`, New appointment modal scenario), `vite.config.ts` |
 | Docs | `docs/audits/v5/*` (7 files), `V5_PROGRESS.md`, `RELEASE_NOTES_5.0.0.md`, SECURITY, PRINTING, DATABASE, ARCHITECTURE, TESTING, KNOWN_LIMITATIONS; superseded banners on the 4.3.0 docs |
 
 ## 7. Decisions
@@ -97,6 +108,7 @@ logs were written under `/tmp`, outside the repository.
 | D-13 | Keep the pre-existing no-op invoke handler on `event/session-expired` and pin it in the IPC surface test | Parity; it is unreachable from the preload |
 | D-14 | A second invoice for an already-invoiced visit stays allowed; the visit keeps its first link | Changing it would alter a billing rule (needs the owner) |
 | D-15 | axe-core is not a project dependency. The harness takes a path to a separate install | No new supply-chain surface for a dev-only check |
+| D-16 | V5-033: no app locale switch. Each form date field spells out the chosen date underneath ("Fri 3 Apr 2026"); filter bars are unchanged. Displays that used the machine locale pass `'en-GB'`. The printed appointment card shows a 12-hour time in the English (US) style | Windows CI showed `--lang=en-GB` does not change native date fields when the Windows regional format is English (Blink `locale_win.cc`). A read-back is unambiguous on every PC and keeps the native field, its value format and keyboard entry. The card keeps what an English (US) PC printed before (D-10) |
 
 ## 8. Findings
 
@@ -104,33 +116,45 @@ There are 39 issues in `docs/audits/v5/ISSUE_REGISTER.md`:
 
 | Status | Count | Issues |
 | --- | --- | --- |
-| verified | 31 | — |
+| verified | 32 | — |
 | fixed | 1 | V5-050, docs |
 | accepted | 2 | V5-031, V5-042 |
-| open | 5 | V5-018, V5-033, V5-036, V5-040, V5-041 |
+| open | 4 | V5-018, V5-036, V5-040, V5-041 |
 
 There is no open P0 or P1.
 
+Key finding from V5-033: on Windows, native date fields use the PC's own short date format whenever the app
+language and the Windows regional format are both English, and no app locale switch changes that.
+
 ## 9. Tests and checks run
 
-- **Local on `56ea4cb`:** typecheck, eslint, vitest, build, `npm audit` (production and full), marker grep.
+- **Local on `b40da3a`:** typecheck, eslint, vitest, build, production `npm audit`, marker grep. The full audit and
+  boot proxy were last run on `56ea4cb`.
+- **V5-033 extras:** the tests under an en-GB Node locale and in a CRLF copy of the tree, plus mutation checks.
 - **Harness:** layout light and dark, the A4 PDF audit (normal and `--long`) inspected with PyMuPDF, axe-core in
   light and dark, and the boot-cost proxy.
-- **Windows CI:** six runs on this branch, listed in TEST_RESULTS.md §3.
+- **Windows CI:** twelve runs on this branch, push and pull_request, listed in TEST_RESULTS.md §3.
 
 ## 10. Results
 
-- **Local:** 56 files / 646 tests pass; typecheck and lint are clean; the build passes with one documented
+- **Local:** 57 files / 660 tests pass; typecheck and lint are clean; the build passes with one documented
   warning; 0 production advisories.
-- **Harness:** layout 0/192 in light and dark; A4 0 violations in 16 normal and 16 long PDFs; axe 0/0.
+- **Harness (renderer of `b40da3a`):** layout 0/200 in light and dark; A4 0 violations in 16 normal and 16 long
+  PDFs; axe 0/0 over 25 screens.
 - **Windows CI:** green on `c7869bf`, `5eda3af` and `dc1534b`, and on the **release candidate `56ea4cb`** (run
   38751182873: verify, Electron E2E, NSIS and installed smoke all ✔; publish skipped).
-- **Draft PR #43** (merge with `main`): run 38752546753 all ✔. It is not merged.
+- **Windows CI on the current candidate `b40da3a`:** run 38759566953, all ✔ (verify, E2E with the V5-033 test,
+  NSIS and installed smoke; publish skipped).
+- **Draft PR #43** (merge with `main`): run 38759574773 on `b40da3a` all ✔. It is not merged.
 
 ## 11. Failures
 
 - **CI 38744605558 (`f148208`):** the E2E strict-mode locator matched two "Paid" texts. Fixed in the test
   (`1cf5a6e`); green since.
+- **CI 38757316130 and 38757325484 (`c557530`):**
+  - E2E: the date field still read Month, Day, Year, which disproved the `--lang=en-GB` approach.
+  - verify: a new unit test searched for `…;\n`, which never matches a CRLF checkout on Windows.
+  - Both fixed in `b40da3a`. The CRLF case is now simulated locally before pushing.
 - **Local, caught before push:**
   - a renderer type error in the report summary (`c7869bf`);
   - a wrong `createPatient` field in a new test;
@@ -138,7 +162,8 @@ There is no open P0 or P1.
 
 ## 12. Outstanding work
 
-- Device checks (A4 printing, Save-as-PDF, date locale, upgrade from real data, restore, screen reader).
+- Device checks (A4 printing, Save-as-PDF, upgrade from real data, restore, screen reader; a look at the date
+  read-back is a confirmation only).
 - Owner decisions (§16).
 - After authorization: merge, tag, publish, then record and re-verify the installer SHA-256.
 - Optional CI maintenance: Node 24 action majors.
@@ -178,4 +203,5 @@ There is no open P0 or P1.
 3. **V5-036:** window minimum 1180 × 680 versus small scaled screens.
 4. **V5-041:** branch protection on `main`.
 
-**Release-candidate CI:** run 38751182873 on `56ea4cb`, all jobs green (RELEASE_READINESS §3).
+**Release-candidate CI:** run 38759566953 on `b40da3a`, all jobs green (RELEASE_READINESS §3). The first
+candidate `56ea4cb` was green in run 38751182873.
