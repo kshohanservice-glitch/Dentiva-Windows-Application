@@ -256,7 +256,10 @@ describe('migration 008 converts an upgrading installation', () => {
     expect(audits).toHaveLength(2); // one per run, both describing the same result
     expect(audits[0].summary).toContain('A4-only printing');
     expect(audits[0].summary).toContain('1 non-A4 profile(s) removed');
-    expect(JSON.parse(audits[0].after_json).kept).toEqual(afterFirst.map((p) => p.id));
+    const after = JSON.parse(audits[0].after_json) as { kept: string[]; seeded: string[] };
+    // The final list is exactly the profiles that were already A4 plus the ones
+    // seeded for document types the retired mediums used to cover.
+    expect([...after.kept, ...after.seeded]).toEqual(afterFirst.map((p) => p.id));
   });
 
   it('seeds the A4 defaults when the settings row is missing or corrupt', () => {

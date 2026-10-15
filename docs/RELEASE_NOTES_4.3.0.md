@@ -57,18 +57,25 @@ contains it is 450–630 px wide in every supported window (1180×720 and above)
 ## Verification for this version
 
 - Typecheck (main + renderer), ESLint and `npm run build`: clean.
-- Vitest: **564 tests in 49 files pass**, including the 37 layout-contract tests
-  (`tests/integration/ui-layout-regressions.test.ts`) and the 13-test A4-only policy suite
+- Vitest: **570 tests in 50 files pass**, including the 37 layout-contract tests
+  (`tests/integration/ui-layout-regressions.test.ts`), the 13-test A4-only policy suite
   (`tests/integration/a4-only-printing.test.ts`: source gate, fresh-install defaults, upgrade migration,
-  legacy-profile detection, write-path rejection).
+  legacy-profile detection, write-path rejection) and a 6-test upgrade suite that runs the migration on
+  a database written by the **real v4.2.2 code** (`tests/fixtures/v4.2.2/dentiva-v4.2.2.db`, rebuilt by
+  `scripts/build-v422-fixture.mjs`): patients, appointments, visits, prescriptions (including the
+  v4.2.2 medicine instruction), invoices and payments are untouched, the A4 profiles survive with their
+  setup, the retired A5/thermal/custom mediums are replaced by the A4 profile for their document type,
+  the outcome is audited, and the reopen is idempotent.
 - Responsive harness (`npm run layout:audit`): **0 violations of 192** screen/viewport pairs
   (24 screens × 8 sizes, 2560×1440 → 480×800) and 0 walk-in-invoice violations.
 - Print/PDF geometry audit (`npm run layout:audit -- --pdf`): **0 violations in 13 printable documents
   plus 3 landscape views** — every document measured 210×297 mm on screen with a 209.9×297 mm PDF page
   box, 1 page, 12/12 mm padding; landscape views measured 297×210 mm with 297×209.9 mm PDF pages.
-- Windows gates (Electron end-to-end suite, NSIS installer build, silent install and installed smoke
-  test, installer SHA-256) run on the GitHub Actions Windows runner for this commit; they cannot run in
-  the Linux authoring sandbox.
+- Windows gates run on the GitHub Actions Windows runner for the head of PR
+  [#42](https://github.com/kshohanservice-glitch/Dentiva-Windows-Application/pull/42) — the dependency
+  audit, typecheck, lint, Vitest, build (`verify`) and the real Electron end-to-end suite are green on
+  the candidate; the NSIS installer build, silent install, installed smoke test and installer SHA-256
+  (`package`) follow in the same workflow. They cannot run in the Linux authoring sandbox.
 
 ### Not verified here
 

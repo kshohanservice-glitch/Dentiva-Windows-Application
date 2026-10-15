@@ -96,6 +96,8 @@ altogether and makes the arrangement a harness/test violation.
 | `src/main/services/settings.ts`, `src/main/print.ts`, `src/renderer/pages/PrintPage.tsx`, `src/renderer/pages/Settings.tsx` | Profile read/write goes through the shared model; `profilePageCss`, the renderer's local paper tables and the receipt fallback were deleted; Settings shows the static A4 label | One source of truth for the `@page` rule; a stored legacy profile can no longer reach it |
 | `src/main/db/migrations/008_a4_only_printing.ts` (new), `src/main/db/migrations/index.ts` | Migration 8 `a4-only-printing`: A4 profiles kept verbatim (printer/orientation/margins/scale/copies), page-size keys stripped, document types left without a profile re-seeded, one append-only `system.migrate` audit row, idempotent, no patient/clinical/financial writes | Published 4.2.2 databases must upgrade without silently losing printer or margin choices |
 | `scripts/layout-audit.mjs` | Screens mode marks the four resizeable sizes (`supported`) and measures 24 screens × 8 viewports; `--explain`; new `--pdf [dir]` mode: all 13 printable documents rendered in the real print window plus a 3-view landscape pass, `.print-doc` measured in mm, PDFs written with `preferCSSPageSize`, `/MediaBox` parsed, per-route on-screen/console reason captured when a document fails to render | The A4 policy and the layout fix need geometry evidence, not only unit tests |
+| `scripts/build-v422-fixture.mjs` (new), `tests/fixtures/v4.2.2/dentiva-v4.2.2.db` (new), `tests/integration/migration-v422.test.ts` (new) | A fixture database built from the **real released v4.2.2 code** (migrations 001–007, `user_version` 7) and seeded with clinic-shaped rows, including the historic A4/A5/80mm-thermal print profiles plus a hand-added custom-millimetre profile; a 6-test upgrade suite asserts the 4.3.0 migration on it (no clinical/financial change, A4-only profiles, audited outcome, idempotent reopen, integrity checks) | The A4-only rewrite had only synthetic-row coverage; a real published-version database is the upgrade a clinic will actually run |
+| `src/main/db/migrations/008_a4_only_printing.ts` | Audit summary now distinguishes profiles kept from profiles re-seeded, and stores both id lists (`{kept, seeded, removedNonA4}`) | "N kept" alone was ambiguous once retired mediums are replaced by seeded A4 profiles |
 | `tests/unit/print.test.ts`, `tests/unit/document-watermark.test.ts`, `tests/integration/a4-only-printing.test.ts` (new), `tests/integration/migration-v303.test.ts`, `tests/integration/ui-layout-regressions.test.ts`, `tests/e2e/app.spec.ts`, `tests/e2e/responsive-layout.spec.ts` | A4-only unit suite, 13-test policy suite (source gate, stored profiles, migration, legacy detection, write-path normalization), idempotency compared across 8 migrations via `migrationAuditSummaries()`, 37-test layout contract, E2E profile list = the four A4 options | Regression cover for both defects; the `tests/e2e/*` files execute on Windows CI only |
 | `docs/PRINTING.md`, `docs/DATABASE.md` | "A4-only document policy (4.3.0)" section, rewritten runtime-path/watermark/customization geometry, new "Print/PDF geometry audit" section, corrected verification limits (what a Chromium run does and does not prove); migration-008 bullet | The documentation must not claim more than was measured |
 
@@ -109,13 +111,16 @@ altogether and makes the arrangement a harness/test violation.
 | 4 | Layout harness, `v4.2.2` worktree, quick-documents | 1 violation of 18; invoice grid overflow +238px @1366×768, +85px @1920×1080 (defect reproduced) |
 | 5 | Layout harness, `main` (baseline commit), all routes | 0 violations of 144 |
 | 6 | `npx vitest run tests/integration/ui-layout-regressions.test.ts tests/integration/a4-only-printing.test.ts` | 2 files / **50 tests passed** (37 layout contract + 13 A4-only policy) |
+| 6b | `node scripts/build-v422-fixture.mjs` → `npx vitest run tests/integration/migration-v422.test.ts` | fixture built from tag `v4.2.2` (`user_version` 7 confirmed) with the historic A4/A5/thermal/custom profiles; **6 tests pass**: 2 A4 profiles kept, 3 non-A4 mediums removed, receipt + report re-seeded, audit entry `2 A4 print profile(s) kept, 2 re-seeded, 3 non-A4 profile(s) removed.`, patients/appointments/visits/prescriptions/invoices/payments untouched, idempotent on reopen, `full_integrity_check` ok |
 | 7 | Layout harness, `--only quick-documents`, 4.3.0 bundle | **0** invoice violations in 8 measured panels; every size reports the required two-row arrangement `[Item or procedure* · Qty · Unit price (৳)] [Discount (৳) · Line total (৳)]` with 0 grid scroll (was +238px overflow at 1366×768 and +85px at 1920×1080 on `v4.2.2`) |
 | 8 | Layout harness, all screens, 4.3.0 bundle (`/tmp/main-a4.json`) | **0 violations of 192** screen/viewport pairs (24 screens × 8 viewport sizes incl. 2560×1440 and 1180×720), 0 walk-in-invoice violations |
-| 9 | `npm test` | **49 files / 564 tests passed** (baseline: 48 / 549) |
+| 9 | `npm test` | **50 files / 570 tests passed** (baseline: 48 / 549; the extra file is `tests/integration/migration-v422.test.ts`, 6 tests) |
 | 10 | `npm run typecheck` (both `tsc -p` projects) and `npx eslint .` | clean |
 | 11 | `npm run build` (main `tsc` + preload bundle + vite) | clean; `dist/renderer` rebuilt from the 4.3.0 sources for every measurement above |
 | 12 | Layout harness, quick-documents, renderer built from the **released `v4.2.3`** tag (`/tmp/wt-v423`, `/tmp/v423-quick.json`) | **1** walk-in-invoice violation: at 1180×720 (the minimum supported window) the line is a single row of five fields, i.e. not the required arrangement; every other measured size is two rows with 0 overflow, 0 clipped values |
 | 13 | Layout harness, quick-documents, 4.3.0 bundle, same contract | **0** violations in 8 panels; two rows at every size incl. 1180×720 |
+| 14a | **Windows CI**, run [38721232487](https://github.com/kshohanservice-glitch/Dentiva-Windows-Application/actions/runs/38721232487) (branch push) and run [38721261642](https://github.com/kshohanservice-glitch/Dentiva-Windows-Application/actions/runs/38721261642) (PR [\#42](https://github.com/kshohanservice-glitch/Dentiva-Windows-Application/pull/42)) on `a7a6366` | Windows `verify` **SUCCESS** (dependency audit, typecheck, lint, Vitest, build) and real **Electron E2E SUCCESS** — the four-A4-profile print window, the two-row arrangement at 1180×720 / 1366×768 / 1920×1080 and the walk-in document journeys all pass in the real app window. An earlier run on `822f845` failed the E2E job on one wrong expected constant in `tests/e2e/responsive-layout.spec.ts` (expected ৳1,523,455,203.26, the app renders 1234 × 1,234,567.89 − 99.99 = ৳1,523,456,676.27); fixed in `a7a6366` |
+| 14b | Windows `NSIS installer + installed-artifact smoke test` job | see the row below / §6 — the job runs only after verify + E2E pass |
 | 14 | `node scripts/layout-audit.mjs --pdf /tmp/pdf-audit-430 --json /tmp/pdf-audit-430.json`, 4.3.0 bundle | **0 violations**: 13 printable documents + 3 landscape views. Every document: screen 210×297mm, PDF `/MediaBox` 209.9×297mm (595.28×841.89pt), 1 page, padding 12/12mm, no overflow; landscape: screen 297×210mm, PDF 297×209.9mm. The landscape *prescription* paginates to 2 PDF pages with content on both (expected flow once the page is shorter) — recorded, not a violation |
 
 **Harness fixture note (why the first `--pdf` runs failed).** `context.addInitScript(fn)` serializes
@@ -128,25 +133,28 @@ product change — only fixtures (`payments/list` with `invoiceId`, an array fro
 
 ## 6. Release gates still open
 
-- Full local gate on the final candidate commit (typecheck, lint, vitest, build, harness).
-- Windows CI on the branch: verify job, Electron E2E job, NSIS installer + silent install + installed
-  smoke test, installer SHA-256.
-- Installed-application smoke test on Windows (CI job `package`).
-- Tag + GitHub Release publication: **requires the candidate commit to be on `main`** (CI refuses to
-  publish a tag that is not an ancestor of `main`), and the task brief forbids merging into `main`
-  without explicit authorisation — so publication is a pending, clearly-flagged gate.
+- Windows `package` job on the final candidate commit: NSIS installer build, silent install, installed
+  smoke test, installer SHA-256 (it runs only when `verify` and `Electron E2E` pass; it is the last
+  automated gate that cannot run in this Linux sandbox).
+- Manual Windows-device checks: physical printer output, on-paper watermark, installed DPI, Bengali
+  glyph shaping, real Save-as-PDF dialog, an upgrade of a real clinic database (disposable copy) and
+  uninstall with data retained.
+- Tag + GitHub Release publication for `4.3.0`: **requires the candidate commit to be on `main`** (CI
+  refuses to publish a tag that is not an ancestor of `main`), and the task brief forbids merging into
+  `main` without explicit authorisation — so publication is a pending, clearly-flagged gate. PR
+  [#42](https://github.com/kshohanservice-glitch/Dentiva-Windows-Application/pull/42) is open and must
+  not be merged until the user says so.
 
 ## 7. Next step
 
-**Committed? No.** Everything in §4/§5 is still uncommitted on the working branch. Order of work from
-here:
+State at the end of this batch: the 4.3.0 candidate is committed except for the v4.2.2-fixture batch
+described above (fixture, upgrade suite, audit-summary clarification, doc updates). Sequence:
 
-1. Write `docs/RELEASE_NOTES_4.3.0.md` and bump `package.json` to `4.3.0`.
-2. Re-run the full gate set on the final commit (typecheck, lint, `npm test`, `npm run build`,
-   layout harness screens + `--pdf`), then commit and push the branch.
-3. Push and let Windows CI run (verify job, Electron E2E, NSIS package + installed smoke) — the only
-   place the Electron print path, the installer and the Windows E2E suites can execute.
-4. Phases C–G of the audit plan (functional/wiring, security/database/dependencies, UI/UX,
+1. Commit and push this batch; wait for the Windows `verify`, `Electron E2E` and `package` jobs on the
+   new head (the previous head `a7a6366` is already green for `verify` + E2E).
+2. Re-run the local gate set on the pushed head (typecheck, lint, `npm test`, `npm run build`,
+   `layout-audit` screens and `--pdf`) and record the numbers here.
+3. Phases C–G of the audit plan (functional/wiring, security/database/dependencies, UI/UX,
    maintainability, full regression, release verification).
-5. Release (tag + GitHub Release) remains a **pending, explicitly-blocked gate**: CI only publishes a
-   tag that is an ancestor of `main`, and merging into `main` requires explicit user authorisation.
+4. Ask for explicit authorisation before merging PR #42 into `main`; only then tag `v4.3.0` at the
+   merge commit and let the tag-gated workflow publish the installer and checksum.

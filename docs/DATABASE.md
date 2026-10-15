@@ -86,7 +86,11 @@ retained across migrations 003/004.
   replaced by the A4 profile of the same document type. It touches no clinical or
   financial row, is idempotent, and records one `system.migrate` audit entry
   naming the profiles it kept and the number it removed.
-  See `tests/integration/a4-only-printing.test.ts`.
+  The audit entry names the exact outcome (`N A4 print profile(s) kept, M re-seeded, K non-A4
+  profile(s) removed`) and stores the kept/seeded ids. Verified on a database written by the
+  released v4.2.2 code (`tests/fixtures/v4.2.2/dentiva-v4.2.2.db`, rebuilt by
+  `scripts/build-v422-fixture.mjs`) in `tests/integration/migration-v422.test.ts`, and on
+  synthetic rows in `tests/integration/a4-only-printing.test.ts`.
 
 ### Prescriptions
 - `prescriptions` — patient_id, visit_id?, dentist_id, date, c_c, o_e, r_e, diagnosis,
