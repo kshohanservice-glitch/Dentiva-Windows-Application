@@ -139,8 +139,18 @@ function ruleBodies(css: string, selector: string): string[] {
 
 /** Source ranges of every @media block, so window rules can be inspected. */
 function mediaBlocks(css: string): { query: string; body: string }[] {
+  return queryBlocks(css, '@media');
+}
+
+/** Source ranges of every @container block, so panel rules can be inspected. */
+function containerBlocks(css: string): { query: string; body: string }[] {
+  return queryBlocks(css, '@container');
+}
+
+/** Source ranges of every at-rule block whose prelude starts with `prefix`. */
+function queryBlocks(css: string, prefix: string): { query: string; body: string }[] {
   const blocks: { query: string; body: string }[] = [];
-  const marker = /@media[^{]*\{/g;
+  const marker = new RegExp(`${prefix}[^{]*\\{`, 'g');
   let match: RegExpExecArray | null;
   while ((match = marker.exec(css)) !== null) {
     let depth = 1;
@@ -179,27 +189,48 @@ describe('walk-in invoice lines are laid out from the panel width, not the windo
     expect(rowOrder(rows[1])).toEqual(['discount', 'total']);
   });
 
-  it('keeps a compact single row, but only under a container query that fits it', () => {
+  it('uses exactly one arrangement, so no width can force five fields into one row', () => {
     const css = readSource('src/renderer/styles/global.css');
-    // The wide variant is the *second* rule for the selector and must sit inside
-    // a container query: window width alone must never force five fields into a
-    // panel that cannot hold them.
+    // One rule only: there is no wide-panel variant any more. The reported
+    // defect was exactly such a variant — a single row of five fields whose
+    // minimum widths (~690px with gaps) could never fit the 450–650px invoice
+    // panel, which pushed Discount/Line total outside the card at every
+    // supported window size.
     const bodies = ruleBodies(css, '.quick-line-grid:not(.quick-procedure-grid)');
-    expect(bodies.length).toBeGreaterThanOrEqual(2);
-    const wide = bodies[bodies.length - 1];
-    expect(areaRows(wide)).toHaveLength(1);
-    expect(rowOrder(areaRows(wide)[0])).toEqual(['item', 'qty', 'price', 'discount', 'total']);
+    expect(bodies).toHaveLength(1);
+    const rows = areaRows(bodies[0]);
+    expect(rows).toHaveLength(2);
+    expect(rowOrder(rows[0])).toEqual(['item', 'qty', 'price']);
+    expect(rowOrder(rows[1])).toEqual(['discount', 'total']);
+    // Every track can shrink to zero, so nothing in the row can exceed the panel.
+    const minimums = [...bodies[0].matchAll(/minmax\(([^,]+),/g)].map((m) => m[1].trim());
+    expect(minimums).toEqual(['0', '0', '0']);
+    // No container query may re-impose another arrangement for this grid.
+    for (const block of containerBlocks(css)) {
+      expect(block.body, `container rule for the invoice line in ${block.query}`)
+        .not.toContain('quick-line-grid:not(.quick-procedure-grid)');
+    }
+  });
 
-    const wideIndex = css.lastIndexOf('.quick-line-grid:not(.quick-procedure-grid)');
-    const containerIndex = css.lastIndexOf('@container (min-width: 690px)');
-    expect(containerIndex).toBeGreaterThan(-1);
-    expect(containerIndex).toBeLessThan(wideIndex);
-    // The compact row is only allowed when its minimum column widths plus the
-    // gaps genuinely fit the container threshold that triggers it (--sp-3 = 12px).
-    const minimums = [...wide.matchAll(/minmax\((\d+)px/g)].map((m) => Number(m[1]));
-    expect(minimums).toHaveLength(5);
-    const required = minimums.reduce((sum, px) => sum + px, 0) + 12 * 4;
-    expect(required).toBeLessThanOrEqual(690);
+  it('keeps the Line total read-out from wrapping or painting outside its cell', () => {
+    const css = readSource('src/renderer/styles/global.css');
+    const total = ruleBody(css, '.quick-line-total-value');
+    expect(total).toContain('white-space: nowrap');
+    expect(total).toContain('min-width: 0');
+    expect(total).toContain('font-variant-numeric: tabular-nums');
+    // Guarded against painting outside the fixed-height box, but never silently
+    // truncating the amount: the exact value stays in the summary and on paper.
+    expect(total).toContain('overflow: hidden');
+    expect(total).toContain('text-overflow: ellipsis');
+  });
+
+  it('has no dead description class left on the invoice item field', () => {
+    const src = readSource('src/renderer/pages/QuickDocuments.tsx');
+    // `quick-line-description` was superseded by `quick-line-item`; a class that
+    // matches no rule is dead markup.
+    expect(src).not.toContain('quick-line-description');
+    expect(src).toContain('className="quick-line-item"');
+    expect(readSource('src/renderer/styles/global.css')).not.toContain('.quick-line-description');
   });
 
   it('gives every invoice field an explicit grid area', () => {

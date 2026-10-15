@@ -5,6 +5,7 @@ import { Button, ErrorState, Spinner, useToast } from '../components/primitives'
 import { useApp } from '../state/app-context';
 import { Icon } from '../components/shell';
 import type { PrintProfile } from '../../shared/types';
+import { a4PageCss, a4PageSize, defaultPrintProfiles } from '../../shared/print-page';
 import type { DocumentStyleMap } from '../../shared/document-styles';
 import { normalizeDocumentStyles } from '../../shared/document-styles';
 import {
@@ -18,19 +19,6 @@ import {
 import { quickDocumentNode, quickDocumentTitle } from '../documents/quick-document-view';
 import { DocumentStyleSheet } from '../documents/document-style-sheet';
 import type { QuickDocumentInput, QuickDocumentKind } from '../../shared/quick-documents';
-
-const DEFAULT_PRINT_PROFILES: PrintProfile[] = [
-  { id: 'rx-a4', name: 'Prescription A4', documentType: 'prescription', printerName: '', paperSize: 'a4', widthMm: 210, heightMm: 297, orientation: 'portrait', margins: { top: 12, right: 12, bottom: 12, left: 12 }, scale: 100, copies: 1 },
-  { id: 'rx-a5', name: 'Prescription A5', documentType: 'prescription', printerName: '', paperSize: 'a5', widthMm: 148, heightMm: 210, orientation: 'portrait', margins: { top: 8, right: 8, bottom: 8, left: 8 }, scale: 100, copies: 1 },
-  { id: 'inv-a4', name: 'Invoice A4', documentType: 'invoice', printerName: '', paperSize: 'a4', widthMm: 210, heightMm: 297, orientation: 'portrait', margins: { top: 12, right: 12, bottom: 12, left: 12 }, scale: 100, copies: 1 },
-  { id: 'rc-a4', name: 'Receipt A4', documentType: 'receipt', printerName: '', paperSize: 'a4', widthMm: 210, heightMm: 297, orientation: 'portrait', margins: { top: 12, right: 12, bottom: 12, left: 12 }, scale: 100, copies: 1 },
-];
-
-const PAPER_DIMS_MM: Record<string, { widthMm: number; heightMm: number }> = {
-  a4: { widthMm: 210, heightMm: 297 },
-  a5: { widthMm: 148, heightMm: 210 },
-  custom: { widthMm: 210, heightMm: 297 },
-};
 
 interface PrintParams { [k: string]: string }
 
@@ -56,7 +44,7 @@ export function PrintPage() {
   const kind = parts[0] ?? '';
   const id = parts[1]?.split('?')[0] ?? '';
   const [state, setState] = useState<PrintState | null>(null);
-  const [profiles, setProfiles] = useState<PrintProfile[]>(DEFAULT_PRINT_PROFILES);
+  const [profiles, setProfiles] = useState<PrintProfile[]>(() => defaultPrintProfiles());
   const [selectedProfileId, setSelectedProfileId] = useState<string>(query.profile ?? '');
   const [error, setError] = useState<unknown>(null);
   const [loading, setLoading] = useState(true);
@@ -69,7 +57,7 @@ export function PrintPage() {
   const canOutput = !loading && !error && !locked && !!user;
 
   const activeProfile = useMemo(
-    () => profiles.find((p) => p.id === selectedProfileId) ?? profiles[0] ?? DEFAULT_PRINT_PROFILES[0],
+    () => profiles.find((p) => p.id === selectedProfileId) ?? profiles[0] ?? defaultPrintProfiles()[0],
     [profiles, selectedProfileId],
   );
 
@@ -80,11 +68,9 @@ export function PrintPage() {
     const settingsOf = async () => {
       const s = await api['settings/get']();
       const storedProfiles = 'printProfiles' in s && Array.isArray(s.printProfiles) ? s.printProfiles : [];
-      const loadedProfiles = storedProfiles.length > 0 ? [...storedProfiles] : [...DEFAULT_PRINT_PROFILES];
-      if (!loadedProfiles.some((p: PrintProfile) => p.documentType === 'receipt')) {
-        const receiptFallback = DEFAULT_PRINT_PROFILES.find((p) => p.documentType === 'receipt');
-        if (receiptFallback) loadedProfiles.push(receiptFallback);
-      }
+      // The settings service already normalizes to A4 and guarantees one profile
+      // per document type; the defaults cover a first run with no stored row.
+      const loadedProfiles = storedProfiles.length > 0 ? [...storedProfiles] : defaultPrintProfiles();
       if (!cancelled) {
         setProfiles(loadedProfiles);
         setSelectedProfileId((cur) => {
@@ -244,13 +230,8 @@ export function PrintPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [kind, id]);
 
-  const dims = useMemo(() => {
-    const base = PAPER_DIMS_MM[activeProfile.paperSize] ?? PAPER_DIMS_MM.a4;
-    return {
-      widthMm: activeProfile.widthMm || base.widthMm,
-      heightMm: activeProfile.heightMm || base.heightMm,
-    };
-  }, [activeProfile]);
+  // A4 is the only document size: the profile chooses the orientation, nothing else.
+  const dims = useMemo(() => a4PageSize(activeProfile.orientation), [activeProfile.orientation]);
 
   const print = async () => {
     if (!canOutput) return;
@@ -291,11 +272,11 @@ export function PrintPage() {
     }
   };
 
-  const pageW = activeProfile.orientation === 'landscape' ? dims.heightMm : dims.widthMm;
-  const pageH = activeProfile.orientation === 'landscape' ? dims.widthMm : dims.heightMm;
-  // WYSIWYG contract: the preview page and the physical page share the same
+  const pageW = dims.widthMm;
+  const pageH = dims.heightMm;
+  // WYSIWYG contract: the preview page and the physical page share the same A4
   // dimensions. Profile margins are document padding, not a second @page margin.
-  const profilePrintCss = '@page { size: ' + pageW + 'mm ' + pageH + 'mm; margin: 0; }';
+  const profilePrintCss = a4PageCss(activeProfile.orientation);
   const docStyle: React.CSSProperties = {
     width: pageW + 'mm',
     minHeight: pageH + 'mm',

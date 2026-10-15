@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { api, useAsync } from '../api';
 import { useApp } from '../state/app-context';
+import { A4_PAGE_LABEL } from '../../shared/print-page';
 import { Badge, Button, Card, Kbd, Modal, Spinner, Tabs, useToast } from '../components/primitives';
 import { Field, Input, Select, Textarea } from '../components/forms';
 import { ClinicLogo } from '../components/clinic-brand';
@@ -387,12 +388,6 @@ function SecurityTab(props: { form: any; set: (path: string[], v: unknown) => vo
   );
 }
 
-const PAPER_DEFAULT_MM: Record<string, [number, number]> = {
-  a4: [210, 297],
-  a5: [148, 210],
-  custom: [210, 297],
-};
-
 function PrintTab(props: { form: any; set: (path: string[], v: unknown) => void }) {
   const toast = useToast();
   const [printers, setPrinters] = useState<{ name: string; displayName: string; description: string }[]>([]);
@@ -429,20 +424,16 @@ function PrintTab(props: { form: any; set: (path: string[], v: unknown) => void 
         <div className="table-wrap">
           <table className="table compact">
             <thead>
-              <tr><th>Name</th><th>Document</th><th>Paper</th><th>Size</th><th>Orientation</th><th>Scale (%)</th><th>Copies</th></tr>
+              <tr><th>Name</th><th>Document</th><th>Paper</th><th>Orientation</th><th>Scale (%)</th><th>Copies</th></tr>
             </thead>
             <tbody>
               {profiles.map((p) => {
-                const [defW, defH] = PAPER_DEFAULT_MM[String(p.paperSize).toLowerCase()] ?? [210, 297];
-                const w = p.widthMm ?? defW;
-                const h = p.heightMm ?? defH;
                 const scalePct = Math.round(p.scale && p.scale <= 2 ? p.scale * 100 : (p.scale ?? 100));
                 return (
                   <tr key={p.id}>
                     <td><strong>{p.name}</strong></td>
                     <td>{p.documentType ?? 'general'}</td>
-                    <td>{p.paperSize}</td>
-                    <td className="mono">{w}×{h}mm</td>
+                    <td className="mono">{A4_PAGE_LABEL}</td>
                     <td>
                       <select
                         className="select"
@@ -483,7 +474,9 @@ function PrintTab(props: { form: any; set: (path: string[], v: unknown) => void 
           </table>
         </div>
         <p className="xsmall muted mt-4">
-          Profiles control paper size, margins and scaling for prescriptions, invoices and reports. You can also switch profiles inside the print preview window.
+          Every document prints on A4. A profile chooses the orientation, margins, scale, copies and printer for
+          prescriptions, invoices, receipts, reports and walk-in documents; you can also switch profiles inside the
+          print preview window.
         </p>
         <div className="mt-4">
           <Button

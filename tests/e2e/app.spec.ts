@@ -384,12 +384,13 @@ test('invoice print window uses standard profiles and closes with Back', async (
   await printWin.waitForLoadState('domcontentloaded');
   const profile = printWin.getByRole('combobox', { name: 'Print profile' });
   await expect(profile).toHaveValue('inv-a4');
+  // A4 is the only document size: one profile per document type, no A5/thermal.
   await expect(profile.locator('option')).toHaveCount(4);
   await expect(profile.locator('option')).toHaveText([
     'Prescription A4',
-    'Prescription A5',
     'Invoice A4',
     'Receipt A4',
+    'Report A4',
   ]);
   await expect(printWin.locator('.print-doc .doc-title', { hasText: 'Invoice' })).toBeVisible({ timeout: 60_000 });
   const printedAmount = printWin.locator('.print-doc .print-money').first();

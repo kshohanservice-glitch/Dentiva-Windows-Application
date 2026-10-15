@@ -1,0 +1,92 @@
+# Dentiva Pro 4.3.0
+
+Dentiva Pro 4.3.0 is a printing-policy and layout release. Printed documents are now **A4 only** — the
+saved per-document print profiles can no longer carry a page size, only orientation, printer, margins,
+scale and copies — and the reported Walk-in / Quick Documents invoice-line defect is fixed with a
+width-independent two-row arrangement. No patient, clinical or financial behaviour changed.
+
+## Changed — A4-only document printing
+
+- **One document size.** Every printable document (prescription, prescription duplicate, invoice,
+  receipt, visit summary / treatment plan, appointment card, report, stock/expiry labels and the five
+  Walk-in / Quick documents) is laid out on A4 — 210 × 297 mm — portrait or **landscape** (297 × 210 mm)
+  per profile. There is no A5, Letter, Legal, thermal-roll or custom page size anywhere in the product.
+- **Profiles describe how, not how big.** A print profile keeps its name, document type, printer,
+  orientation, margins, scale and copies; the page-size fields (`paperSize`, `widthMm`, `heightMm`) are
+  gone from the stored model, the settings API and the print window. Profile margins are document
+  padding inside the A4 sheet (0–50 mm), never a second `@page` margin.
+- **Upgrade is automatic and non-destructive.** Database migration 8 (`a4-only-printing`, schema
+  version 8) rewrites the stored `printProfiles`: A4 profiles are kept verbatim — printer, orientation,
+  margins, scale and copies survive — page-size keys are stripped, and any document type left without a
+  profile is re-seeded with its A4 default (`Prescription A4`, `Invoice A4`, `Receipt A4`,
+  `Report A4`). The migration is idempotent, writes one append-only audit entry, and does not touch
+  patient, clinical or financial rows. Legacy profiles that cannot be mapped to A4 are removed; deleting
+  a profile remains the only removal path.
+- **Settings.** The print-profile table shows a static `A4 · 210 × 297 mm` size column; the page-size
+  picker is gone.
+- **WYSIWYG unchanged in spirit and stricter in fact.** The preview page, `@page size` rule, the
+  main-process print call and the Save-as-PDF call all use the same A4 box and the same orientation, so
+  what is on screen is the sheet that is printed.
+
+## Fixed — Walk-in / Quick Documents invoice line (reported defect)
+
+The invoice line put five fields in one fixed row whose columns needed ≈690 px, while the panel that
+contains it is 450–630 px wide in every supported window (1180×720 and above); `Discount (৳)` and
+`Line total (৳)` were clipped and pushed outside the card.
+
+- The line is now one grid at every width: row 1 `Item or procedure` · `Qty` · `Unit price (৳)`,
+  row 2 `Discount (৳)` · `Line total (৳)`. No width-dependent alternative arrangement exists.
+- `Remove` stays in the line heading (`Remove invoice line <n>`), clear of both rows.
+- Labels, validation, keyboard use, currency formatting and the line arithmetic are unchanged.
+- Measured with the responsive harness against the released baseline and this build: grid overflow
+  `+238 px` at 1366×768 and `+85 px` at 1920×1080 → `0 px` at every measured size from 480×800 to
+  2560×1440, and 0 clipped fields.
+- The same fixed-template cause was repaired in the other surfaces the audit found: the five-field line
+  in the New invoice dialog, the prescription medicine entry (1 → 2 → 3 columns from its own width),
+  Dashboard/About/Reports splits, the patient profile overview, Settings → Customize documents and the
+  Walk-in procedure rows. See `docs/RESPONSIVE_AUDIT_V4.2.3.md` for the audit itself.
+
+## Verification for this version
+
+- Typecheck (main + renderer), ESLint and `npm run build`: clean.
+- Vitest: **564 tests in 49 files pass**, including the 37 layout-contract tests
+  (`tests/integration/ui-layout-regressions.test.ts`) and the 13-test A4-only policy suite
+  (`tests/integration/a4-only-printing.test.ts`: source gate, fresh-install defaults, upgrade migration,
+  legacy-profile detection, write-path rejection).
+- Responsive harness (`npm run layout:audit`): **0 violations of 192** screen/viewport pairs
+  (24 screens × 8 sizes, 2560×1440 → 480×800) and 0 walk-in-invoice violations.
+- Print/PDF geometry audit (`npm run layout:audit -- --pdf`): **0 violations in 13 printable documents
+  plus 3 landscape views** — every document measured 210×297 mm on screen with a 209.9×297 mm PDF page
+  box, 1 page, 12/12 mm padding; landscape views measured 297×210 mm with 297×209.9 mm PDF pages.
+- Windows gates (Electron end-to-end suite, NSIS installer build, silent install and installed smoke
+  test, installer SHA-256) run on the GitHub Actions Windows runner for this commit; they cannot run in
+  the Linux authoring sandbox.
+
+### Not verified here
+
+Physical printer output, paper handling, on-paper watermark centering/repetition, Bengali glyph shaping,
+installed DPI, and a real Electron Save-as-PDF/print dialog on a Windows device. The geometry audit
+above drives the production renderer bundle in a plain Chromium over HTTP — it is evidence about the
+page box and the PDF `/MediaBox`, not about a printer driver. Check these once on the target clinic
+computer before relying on printed documents for clinical use.
+
+## Migration and data
+
+- Clinic data is preserved on upgrade; `deleteAppDataOnUninstall` remains `false`.
+- Schema version 8. Migration 8 is forward-only and idempotent; take a backup before upgrading a real
+  clinic (Settings → Backup, or `.dpv` export) as with any release.
+- The supported window minimum is 1180×720.
+
+## Assets
+
+- `DentivaPro-Setup-4.3.0.exe` — per-user Windows x64 installer (NSIS).
+- `SHA256SUMS.txt` — SHA-256 of the installer above; verify with
+  `certutil -hashfile DentivaPro-Setup-4.3.0.exe SHA256` (or `sha256sum -c SHA256SUMS.txt`) before
+  installing on a clinic computer.
+
+## Notes
+
+- The 4.2.3 notes file (`docs/RELEASE_NOTES_4.2.3.md`) describes layout work that was prepared but
+  **never released**; that work ships here as part of 4.3.0.
+- Detailed progress, measurements and open gates: `docs/PROGRESS_V4.3.0.md`.
+- Printing policy and document geometry: `docs/PRINTING.md`. Database changes: `docs/DATABASE.md`.

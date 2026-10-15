@@ -1,5 +1,11 @@
 # Dentiva Pro 4.2.3
 
+> **Never released.** This draft was prepared on `main` after `v4.2.2` but no `v4.2.3` tag or
+> installer was ever published. Its layout work (including a later revision that made the walk-in
+> invoice-line arrangement width-independent) ships in **v4.3.0** — see
+> `docs/RELEASE_NOTES_4.3.0.md`. The text below is kept as the record of what was planned and
+> measured at that time.
+
 Dentiva Pro 4.2.3 is a responsive-layout release. It fixes the reported Walk-in /
 Quick Documents invoice layout defect, repairs the other layout defects found by
 a repository-wide responsive audit, and adds automated geometry tests so the

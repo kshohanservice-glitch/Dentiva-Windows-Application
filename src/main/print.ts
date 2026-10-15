@@ -1,7 +1,6 @@
 import { BrowserWindow, dialog, app, type WebContents } from 'electron';
 import path from 'node:path';
 import fs from 'node:fs';
-import type { PrintProfile } from '../shared/types';
 import { AppError } from './errors';
 
 export interface PrintDocRef {
@@ -234,16 +233,4 @@ export async function listPrinters(from: WebContents): Promise<PrinterInfo[]> {
   } catch {
     return [];
   }
-}
-
-export function profilePageCss(profile: PrintProfile): string {
-  const portrait = profile.orientation !== 'landscape';
-  const w = profile.paperSize === 'a4' ? 210 : profile.paperSize === 'a5' ? 148 : profile.widthMm;
-  const h = profile.paperSize === 'a4' ? 297 : profile.paperSize === 'a5' ? 210 : profile.heightMm;
-  const width = portrait ? w : h;
-  const height = portrait ? h : w;
-  // The document element carries the profile margins as padding. The page
-  // itself must have zero native margin so screen and physical geometry share
-  // one coordinate system.
-  return `@page { size: ${width}mm ${height}mm; margin: 0; }`;
 }

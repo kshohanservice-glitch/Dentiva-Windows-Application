@@ -162,6 +162,24 @@ these needed changes.
   container-based and therefore width-driven, but a 125%/150% display scale
   should be eyeballed once on the clinic PC.
 
+## Update for 4.3.0 (supersedes the invoice-line arrangement described above)
+
+The Walk-in / Quick Documents invoice line is now **width-independent**: the required two-row
+arrangement (`Item or procedure` · `Qty` · `Unit price (৳)` / `Discount (৳)` · `Line total (৳)`) is the
+only arrangement at every width, and the single-row container branch described in this document was
+removed — a panel wide enough to hold five fields in one row does not exist inside the application
+shell. The New-invoice **dialog** line and the prescription medicine entry keep their container-driven
+variants, because those containers really do change width.
+
+The harness grew with it and now *fails* (exit code 2) on a different arrangement, grid or card
+overflow, a field outside its card, a clipped money value, a control narrower than 40px or a hidden
+`Remove`. It measures **24 screens × 8 viewport sizes** (2560×1440, 1920×1080, 1366×768, 1180×720,
+1024×768, 800×600, 680×900, 480×800; the first four are sizes the application window can actually
+have) and gained a `--pdf [dir]` mode that measures A4 print/PDF geometry for all 13 printable
+documents (`docs/PRINTING.md`). Latest run on the 4.3.0 bundle: **0 violations of 192 screen/viewport
+pairs**, 0 walk-in-invoice violations, and 0 A4 print/PDF violations in 13 documents + 3 landscape
+views. See `docs/RELEASE_NOTES_4.3.0.md` and `docs/PROGRESS_V4.3.0.md` for the numbers.
+
 ## Files changed
 
 - `src/renderer/styles/global.css` — invoice + quick-line + medicine grids

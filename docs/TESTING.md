@@ -27,7 +27,7 @@ The serial E2E suite covers activation/setup/login, patient entry and chart, inv
 ## Manual release checks still needed
 
 - Upgrade and restore disposable copies of clinic data on target Windows devices; preserve pre-upgrade backup and historical finance/clinical records.
-- Real printer/PDF content (including Bengali glyphs), A4/A5/custom margins, long-page pagination, installed DPI and 1280×720 / 1920×1080 interactions.
+- Real printer/PDF content (including Bengali glyphs), A4 portrait/landscape margins and profile padding, long-page pagination, installed DPI and 1180×720 / 1920×1080 interactions.
 - Rehearse install/uninstall and data retention on a clinic-equivalent Windows machine; inspect permissions and secure-storage behavior without modifying the user's only data copy.
 - Check unsaved-change navigation, duplicate-action guards, all template kinds, screen-reader operation and staff-role privacy end to end.
 

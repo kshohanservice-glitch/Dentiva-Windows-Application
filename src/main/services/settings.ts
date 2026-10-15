@@ -11,6 +11,7 @@ import { reqString } from '../core/validate';
 import { DEFAULT_GREETING_RANGES, isValidTimeOfDay, type GreetingRange } from '../../shared/whatsapp';
 import { normalizeDocumentStyles } from '../../shared/document-styles';
 import { DEFAULT_DOCUMENT_WATERMARK, normalizeDocumentWatermark } from '../../shared/document-watermark';
+import { defaultPrintProfiles, normalizePrintProfiles, withRequiredProfiles } from '../../shared/print-page';
 
 function readSetting<T>(ctx: Ctx, key: string, fallback: T): T {
   const row = ctx.db.prepare('SELECT value_json FROM settings WHERE key = ?').get(key) as { value_json: string } | undefined;
@@ -61,7 +62,12 @@ export function getSettings(ctx: Ctx): SettingsDTO {
   const appearance = readSetting<SettingsDTO['appearance']>(ctx, 'appearance', { theme: 'light', density: 'comfortable', animations: true, sidebarCollapsed: false });
   const notifications = readSetting(ctx, 'notifications', { appointments: true, lowStock: true, dues: true, backup: true });
   const paymentMethods = readSetting(ctx, 'paymentMethods', ['cash', 'bank', 'card', 'bkash', 'nagad', 'rocket', 'upay', 'other']);
-  const printProfiles = readSetting<PrintProfile[]>(ctx, 'printProfiles', []).filter((p) => String(p.paperSize).toLowerCase() !== 'thermal');
+  // A4-only printing (docs/PRINTING.md): stored profiles are normalized on the
+  // way out, so a legacy row that still carries an A5/custom/thermal page size
+  // can never reach a printer, and every document type has an A4 profile.
+  const printProfiles = withRequiredProfiles(
+    normalizePrintProfiles(readSetting<PrintProfile[]>(ctx, 'printProfiles', defaultPrintProfiles())),
+  );
   // Printable-document customizations. An absent/empty map means every document
   // keeps its original design; validation drops anything unrecognized so an old
   // or hand-edited settings row can never break rendering.
@@ -232,29 +238,15 @@ export function saveSettings(ctx: Ctx, patch: Partial<SettingsDTO>): SettingsDTO
     }
 
     if (patch.printProfiles) {
-      const profiles = (Array.isArray(patch.printProfiles) ? patch.printProfiles : [])
-        .filter((p) => String(p.paperSize).toLowerCase() !== 'thermal')
-        .slice(0, 30).map((p, i) => {
-        const id = reqString(p.id, `Printer profile #${i + 1} id`, { max: 60 });
-        const name = reqString(p.name, `Printer profile name`, { max: 80 });
-        const width = Number(p.widthMm); const height = Number(p.heightMm);
-        if (!Number.isFinite(width) || width < 20 || width > 1000) throw validation(`Profile "${name}": width must be 20–1000 mm.`);
-        if (!Number.isFinite(height) || height < 20 || height > 2000) throw validation(`Profile "${name}": height must be 20–2000 mm.`);
-        return {
-          id, name,
-          documentType: (['prescription', 'invoice', 'report', 'receipt'] as const).includes(p.documentType as any) ? p.documentType : 'invoice',
-          printerName: String(p.printerName ?? ''),
-          paperSize: (['a4', 'a5', 'custom'] as const).includes(p.paperSize as any) ? p.paperSize : 'custom',
-          widthMm: width, heightMm: height,
-          orientation: p.orientation === 'landscape' ? 'landscape' : 'portrait',
-          margins: {
-            top: clampNum(p.margins?.top, 0, 50, 10), right: clampNum(p.margins?.right, 0, 50, 10),
-            bottom: clampNum(p.margins?.bottom, 0, 50, 10), left: clampNum(p.margins?.left, 0, 50, 10),
-          },
-          scale: clampNum(p.scale, 50, 200, 100),
-          copies: clampNum(p.copies, 1, 10, 1),
-        } satisfies PrintProfile;
-      });
+      const raw = Array.isArray(patch.printProfiles) ? patch.printProfiles : [];
+      if (raw.length > 30) throw validation('At most 30 print profiles are supported.');
+      // Every profile is re-validated into the A4-only shape; an unknown or
+      // legacy page size in the payload is ignored rather than stored.
+      const profiles = withRequiredProfiles(normalizePrintProfiles(raw));
+      for (const p of profiles) {
+        reqString(p.id, 'Printer profile id', { max: 60 });
+        reqString(p.name, 'Printer profile name', { max: 80 });
+      }
       writeSetting(ctx, 'printProfiles', profiles);
     }
 
@@ -262,12 +254,6 @@ export function saveSettings(ctx: Ctx, patch: Partial<SettingsDTO>): SettingsDTO
   });
 
   return getSettings(ctx);
-}
-
-function clampNum(v: unknown, min: number, max: number, fallback: number): number {
-  const n = Number(v);
-  if (!Number.isFinite(n)) return fallback;
-  return Math.max(min, Math.min(max, n));
 }
 
 /**

@@ -2,11 +2,40 @@
 
 This describes the current print path; see `RELEASE_EXECUTION_JOURNAL.md` for tests and blockers. It is **not** a certification of printer/DPI output.
 
+## A4-only document policy (4.3.0)
+
+**A4 is the only supported document page size.** Every printable artefact — invoice,
+receipt, prescription (including the duplicate copy), visit summary, treatment plan,
+referral, appointment card, report, walk-in/quick document and stock-label sheet — is
+paginated on A4, portrait or landscape. There is no A5, Letter, Legal, Folio, Tabloid,
+thermal-roll or custom page size anywhere in the product.
+
+- One source of truth: `src/shared/print-page.ts` (`A4_WIDTH_MM` 210, `A4_HEIGHT_MM` 297,
+  `a4PageSize(orientation)`, `a4PageCss(orientation)`). The print window, the
+  print/PDF path, the watermark geometry and the settings interface all use it; no
+  component computes a page box of its own.
+- A print profile therefore describes **who prints and how**, not what size: printer,
+  orientation, margins, scale and copies. `PrintProfile` (`src/shared/types.ts`) has no
+  page-size field, so a profile cannot carry an invalid size.
+- Margins are 0–50mm per side (default 12mm) and are applied as document padding, while
+  the `@page` rule keeps a zero native margin, so the preview and the physical page share
+  one coordinate system. Orientation is the only geometry choice: portrait is
+  210 × 297mm, landscape is 297 × 210mm.
+- Upgrade safety: `migration 008` rewrites the stored `printProfiles` row — A4 profiles
+  keep their printer/orientation/margins/scale/copies, profiles that described another
+  medium are removed and replaced by the A4 profile of that document type, and the change
+  is audited. A clinic that upgrades from 4.2.2 cannot be left with a page size that
+  breaks document rendering. See `docs/DATABASE.md` and
+  `tests/integration/a4-only-printing.test.ts`.
+- A source-level gate test fails if a `paperSize` field, a retired page-size literal, a
+  non-A4 `@page` size or a non-A4 hard-coded millimetre value is reintroduced anywhere in
+  `src/`.
+
 ## Runtime path
 
 The main process opens a sandboxed, context-isolated Electron BrowserWindow at `#print/<kind>/<id>`. The renderer retrieves the document data through authenticated, permission-gated IPC and shows a print preview. Supported routes include invoice, receipt, prescription, visit summary, appointment card, stock labels and reports.
 
-The print toolbar selects a saved profile and offers Print and Save PDF. Profiles contain document type, paper dimensions/orientation, margins, scale, printer name and copies. `PrintPage.tsx` computes the page width/height and inline padding from the selected profile; `@page` uses the same dimensions without a second native margin. `src/main/print.ts` calls Electron's `webContents.print` or `printToPDF` and returns errors/cancellation rather than claiming an unsuccessful export succeeded. For actual supported fields and formats, consult `src/shared/types.ts` (`PrintProfile`) and `src/renderer/pages/PrintPage.tsx`.
+The print toolbar selects a saved A4 profile and offers Print and Save PDF. `PrintPage.tsx` derives the page box from the shared A4 constants and applies the profile margins as inline padding; the emitted `@page` rule uses the same A4 dimensions without a second native margin. `src/main/print.ts` calls Electron's `webContents.print` or `printToPDF` and returns errors/cancellation rather than claiming an unsuccessful export succeeded. For actual supported fields and formats, consult `src/shared/print-page.ts`, `src/shared/types.ts` (`PrintProfile`) and `src/renderer/pages/PrintPage.tsx`.
 
 The whole printable document tree is reachable only from that authenticated, permission-checked print window, and the window closes on lock or logout.
 
@@ -48,8 +77,8 @@ override, and resetting an element/section/document restores the original.
 * Preview: `src/renderer/components/customize-documents.tsx` renders a real document (see
   `src/renderer/documents/document-preview.tsx` and `documents/samples.ts`) inside a `.print-doc`
   frame, so the preview and the printed page come from the same builders.
-* Geometry is untouched by customization: page size, margins, scale and copies remain owned by
-  `profilePageCss()` and the selected print profile.
+* Geometry is untouched by customization: the A4 page box, the profile margins, the scale and the
+  copies remain owned by `src/shared/print-page.ts` and the selected print profile.
 
 ## Walk-in / Quick Documents
 
@@ -85,9 +114,9 @@ An optional page-centered clinic-logo watermark, off by default.
 * Eligibility is an allow-list (`supportsLogoWatermark`): prescriptions (including the watermarked
   duplicate copy), invoices, visit summaries, appointment cards and reports. Receipts and stock/expiry
   labels are excluded so nothing is printed on a label that has no space for it.
-* Geometry comes from the document's own print profile (paper size, custom millimetre size and
-  orientation) via `pageSizeFromProfile()` / `pageSizeForDocument()`, and the mark is drawn as a
-  physical-millimetre box: `.print-logo-watermark` is `position: absolute; inset: 0` inside the page box
+* Geometry comes from the document's own print profile orientation (A4: 210 × 297mm, or
+  297 × 210mm in landscape) via `pageSizeFromProfile()` / `pageSizeForDocument()`, and the mark is
+  drawn as a physical-millimetre box: `.print-logo-watermark` is `position: absolute; inset: 0` inside the page box
   with flex centering, and `position: fixed; inset: 0` in `@media print` so a document that flows onto
   a second sheet repeats the mark page-centered on every sheet.
 * **Layering:** the mark paints at `z-index: 0` — above the white page backgrounds of `.print-stage` /
@@ -104,6 +133,20 @@ An optional page-centered clinic-logo watermark, off by default.
   `watermark={…}`), names the size/opacity sliders with the shared `Field` labels, and offers
   **Reset watermark** (back to disabled/default) next to the normal Settings save.
 
+## Print/PDF geometry audit (`scripts/layout-audit.mjs --pdf`)
+
+`npm run layout:audit -- --pdf <dir>` (default `layout-audit/pdf`, or
+`node scripts/layout-audit.mjs --pdf`) opens every printable document in the real print window
+(`#/print/<kind>/<id>`) against the production renderer bundle, measures the `.print-doc` page box in
+millimetres, writes a PDF per document with `preferCSSPageSize` — the same rule Electron's
+`printToPDF` honours for "Save as PDF" — and parses each PDF's `/MediaBox`. It fails (exit code 2)
+when a document does not render, when the on-screen box and the PDF page are not A4 in the profile's
+orientation (±2pt on the PDF, ±1.5mm on screen, ±1.5mm screen-vs-PDF agreement), or when content
+overflows the page box. A `--json <file>` report mirrors the console table.
+
+The run is evidence, not a substitute for Windows: it exercises the renderer bundle in a plain
+Chromium over HTTP, not Electron's own print path.
+
 ## Verification still required
 
-Automated unit checks cover print dimensions, format helpers, the real-amount render contract, the absence of a media swap (`tests/unit/print-money.test.ts`) and the watermark's settings normalization, page geometry, layering and rendered markup (`tests/unit/document-watermark.test.ts`). The print-window assertion in `tests/e2e/app.spec.ts` additionally requires that no `****` appears anywhere in the rendered `.print-doc`. Physical printer, PDF content, on-paper watermark centering/repetition, Bengali glyph shaping, long-page overflow, paper sizes, orientation, DPI/layout and a real print window have **not** been verified in this sandbox, because no Electron/Chromium binary can be downloaded here. Before release, run these checks on a Windows device using disposable patient data. Do not claim successful printer or PDF output solely because the renderer build passes.
+Automated unit checks cover the A4 `@page`/geometry rules and the print-window hash (`tests/unit/print.test.ts`), the A4-only policy end to end — source gate, fresh install, upgrade migration, write-path rejection (`tests/integration/a4-only-printing.test.ts`) — format helpers, the real-amount render contract, the absence of a media swap (`tests/unit/print-money.test.ts`) and the watermark's settings normalization, page geometry, layering and rendered markup (`tests/unit/document-watermark.test.ts`). The print-window assertion in `tests/e2e/app.spec.ts` additionally requires that no `****` appears anywhere in the rendered `.print-doc`. The print/PDF geometry audit above was run against the 4.3.0 renderer bundle and passed for all 13 printable documents plus three landscape views (see the change log in `docs/PROGRESS_V4.3.0.md` for the exact numbers). Electron's own print path (`print/execute` → OS dialog/printer, `print/pdf` → main-process `printToPDF`), physical printing, on-paper watermark centering/repetition, Bengali glyph shaping, DPI, and how a long document paginates past page one have **not** been verified in this sandbox, and neither has any Windows printer driver behaviour. Before release, run these checks on a Windows device using disposable patient data. Do not claim successful printer output, or a successful Electron Save-as-PDF, solely because the renderer build and the Chromium geometry audit pass.

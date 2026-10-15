@@ -43,6 +43,12 @@ function copyFixture(name = 'legacy.db'): string {
   return dest;
 }
 
+/** summaries of every migration audit entry, in write order. */
+function migrationAuditSummaries(db: DB): string[] {
+  return (db.prepare("SELECT summary FROM audit_log WHERE action = 'system.migrate' ORDER BY id").all() as { summary: string }[])
+    .map((row) => row.summary);
+}
+
 function sha256(file: string): string {
   return crypto.createHash('sha256').update(fs.readFileSync(file)).digest('hex');
 }
@@ -118,13 +124,18 @@ describe('upgrade from v3.0.3 to the current schema', () => {
 
   it('is idempotent: reopening a migrated database changes nothing and writes no second audit row', () => {
     const file = copyFixture();
-    openDatabase(file, { runMigrations: true }).db.close();
+    const first = openDatabase(file, { runMigrations: true });
+    const auditsAfterMigrating = migrationAuditSummaries(first.db);
+    first.db.close();
+    // Each migration that rewrites stored settings records what it did (queue
+    // retirement, A4-only print profiles); that is the audit trail of the upgrade.
+    expect(auditsAfterMigrating.length).toBeGreaterThan(0);
     const hashAfterFirst = sha256(file);
     const reopened = openDatabase(file, { runMigrations: true });
     try {
       expect(reopened.schemaVersion).toBe(CURRENT);
-      const audits = (reopened.db.prepare("SELECT COUNT(*) c FROM audit_log WHERE action = 'system.migrate'").get() as { c: number }).c;
-      expect(Number(audits)).toBe(1);
+      // A second open runs no migration, so no further audit row is written.
+      expect(migrationAuditSummaries(reopened.db)).toEqual(auditsAfterMigrating);
     } finally {
       reopened.db.close();
     }

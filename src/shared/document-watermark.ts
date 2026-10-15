@@ -1,3 +1,5 @@
+import { a4PageSize } from './print-page';
+
 /** Optional clinic-logo watermark configuration for printable documents. */
 export interface DocumentWatermarkSettings {
   /** Off by default: existing print output is unchanged until explicitly enabled. */
@@ -13,12 +15,13 @@ export interface DocumentPageSize {
   heightMm: number;
 }
 
-/** Minimal shape shared by print profiles without coupling settings to rendering. */
+/**
+ * Minimal shape shared by print profiles without coupling settings to rendering.
+ * There is no paper size here on purpose: A4 is the only document page size and
+ * the orientation is the only geometry a profile can influence.
+ */
 export interface PrintPageProfileLike {
   documentType?: string;
-  paperSize?: string;
-  widthMm?: number;
-  heightMm?: number;
   orientation?: string;
 }
 
@@ -40,12 +43,7 @@ const MIN_SIZE_PERCENT = 15;
 const MAX_SIZE_PERCENT = 70;
 const MIN_OPACITY = 0.04;
 const MAX_OPACITY = 0.3;
-const A4: DocumentPageSize = { widthMm: 210, heightMm: 297 };
-const PAPER_SIZES: Record<string, DocumentPageSize> = {
-  a4: A4,
-  a5: { widthMm: 148, heightMm: 210 },
-  custom: A4,
-};
+const A4: DocumentPageSize = a4PageSize('portrait');
 
 function clamp(value: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, value));
@@ -109,19 +107,12 @@ export function supportsLogoWatermark(documentType: string | null | undefined): 
   return (WATERMARK_ELIGIBLE_DOCUMENT_TYPES as readonly string[]).includes(normalized);
 }
 
-/** Apply print-profile orientation to actual physical page coordinates. */
+/**
+ * Physical page coordinates of a document: the oriented A4 box. A profile can
+ * only choose the orientation — every document is A4 (see src/shared/print-page.ts).
+ */
 export function pageSizeFromProfile(profile?: PrintPageProfileLike | null): DocumentPageSize {
-  if (!profile) return { ...A4 };
-  const base = PAPER_SIZES[String(profile.paperSize ?? '').toLowerCase()] ?? A4;
-  const widthMm = Number.isFinite(Number(profile.widthMm)) && Number(profile.widthMm) > 0
-    ? Number(profile.widthMm)
-    : base.widthMm;
-  const heightMm = Number.isFinite(Number(profile.heightMm)) && Number(profile.heightMm) > 0
-    ? Number(profile.heightMm)
-    : base.heightMm;
-  return profile.orientation === 'landscape'
-    ? { widthMm: heightMm, heightMm: widthMm }
-    : { widthMm, heightMm };
+  return a4PageSize(profile?.orientation === 'landscape' ? 'landscape' : 'portrait');
 }
 
 /** Find the document's configured profile for matching screen previews. */

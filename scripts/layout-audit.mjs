@@ -15,7 +15,12 @@
  *
  * Usage:
  *   npm run build:renderer
- *   node scripts/layout-audit.mjs [--only <route>] [--screens] [--json <file>]
+ *   node scripts/layout-audit.mjs [--only <route>] [--screens] [--json <file>] [--explain]
+ *   node scripts/layout-audit.mjs --pdf [dir] [--json <file>]
+ *     A4 print/PDF geometry mode: opens all 13 printable documents (plus a
+ *     landscape pass), measures the .print-doc page box in mm, writes each PDF
+ *     with preferCSSPageSize and asserts its /MediaBox is A4. Exit code 2 on
+ *     any violation. See `docs/PRINTING.md` ("Print/PDF geometry audit").
  *
  * Browser selection:
  *   LAYOUT_BROWSER      path to a Chromium/Chrome executable (optional;
@@ -51,12 +56,31 @@ const EXTRA_SIZES = args.filter((a) => /^\d+x\d+$/.test(a)).map((a) => {
 });
 const SCREENS = flag('--screens');
 const JSON_OUT = value('--json');
+/**
+ * `--pdf [directory]` switches the harness to the A4 print/PDF audit: every
+ * printable document is rendered in the real print window, its page box measured
+ * and a PDF written (the Save-as-PDF geometry). Default directory:
+ * `layout-audit/pdf` (git-ignored together with the screenshots).
+ */
+const PDF_MODE = flag('--pdf');
+const PDF_DIR = value('--pdf', path.join(ROOT, 'layout-audit', 'pdf'));
 
-/** Viewport sizes requested by the audit brief. */
+/**
+ * Viewport sizes requested by the audit brief.
+ *
+ * The first two are the sizes the application can actually be resized to
+ * (`minWidth/minHeight` in `src/main/index.ts` and the print window minimum);
+ * they are listed first so the supported range is always measured. The remaining
+ * sizes are smaller than the supported window and exist to prove that the layout
+ * is width-driven rather than window-driven (browser-like states, the document
+ * preview window, future window minimums).
+ */
 const VIEWPORTS = [
   ...EXTRA_SIZES,
-  { name: '1920x1080', width: 1920, height: 1080 },
-  { name: '1366x768', width: 1366, height: 768 },
+  { name: '2560x1440', width: 2560, height: 1440, supported: true },
+  { name: '1920x1080', width: 1920, height: 1080, supported: true },
+  { name: '1366x768', width: 1366, height: 768, supported: true },
+  { name: '1180x720', width: 1180, height: 720, supported: true },
   { name: '1024x768', width: 1024, height: 768 },
   { name: '800x600', width: 800, height: 600 },
   { name: '680x900', width: 680, height: 900 },
@@ -178,7 +202,7 @@ const invoices = Array.from({ length: 6 }, (_, i) => ({
   items: [
     {
       id: 1, description: 'Root canal treatment — molar, single visit with rotary instrumentation',
-      qty: 1, unitPricePaisa: 1250000, discountPaisa: 0, treatmentId: 3,
+      qty: 1, unitPricePaisa: 1250000, discountPaisa: 0, totalPaisa: 1250000, treatmentId: 3,
     },
   ],
 }));
@@ -230,6 +254,80 @@ const dashboard = {
   alerts: [],
 };
 
+/**
+ * Synthetic printable-document fixtures for the print window. They contain no
+ * real patient or clinic data — the same names and amounts used everywhere else
+ * in this harness.
+ */
+const PRESCRIPTION = {
+  id: 1, number: 'RX-2026-0001', date: today, patientId: 1, dentistId: 1,
+  dentistName: dentists[0].name, visitId: 1,
+  cC: 'Pain in the lower right back tooth for 3 days.',
+  oE: 'Deep caries 46; tender on percussion; no swelling.',
+  rE: 'IOPA 46: radiolucency approaching the pulp.',
+  diagnosis: 'Irreversible pulpitis 46.', treatment: 'Root canal treatment 46.',
+  advice: 'Avoid chewing hard food on that side for 48 hours.',
+  followUp: today, createdAt: `${today}T09:00:00.000Z`,
+  items: [
+    { id: 1, seq: 1, medicineName: 'Amoxicillin 500mg', generic: 'Amoxicillin', form: 'Capsule', strength: '500mg', dosage: '1 capsule', frequency: '3 times daily', duration: '5 days', qty: '15', timing: 'after', instruction: 'After food', medicineInstruction: 'Take after meals with water.' },
+    { id: 2, seq: 2, medicineName: 'Ibuprofen 400mg', generic: 'Ibuprofen', form: 'Tablet', strength: '400mg', dosage: '1 tablet', frequency: 'Twice daily', duration: '3 days', qty: '6', timing: 'after', instruction: 'Only if pain', medicineInstruction: null },
+  ],
+};
+
+const PRESCRIPTION_SUMMARY = {
+  id: 1, number: PRESCRIPTION.number, date: PRESCRIPTION.date, patientId: 1, patientName: patients[0].name,
+  patientCode: patients[0].code, dentistId: 1, dentistName: dentists[0].name, visitId: 1,
+  itemCount: PRESCRIPTION.items.length, createdAt: `${today}T09:00:00.000Z`,
+};
+
+const VISIT = {
+  id: 1, patientId: 1, patientName: patients[0].name, patientCode: patients[0].code,
+  dentistId: 1, dentistName: dentists[0].name, datetime: `${today}T10:30:00.000Z`,
+  chiefComplaint: 'Sensitivity in the upper left molar.', history: null,
+  examination: 'Reversible pulpitis 26 with a leaking composite.', diagnosis: 'Reversible pulpitis 26.',
+  treatmentPlan: 'Replace the composite restoration; review in two weeks.',
+  notes: null, advice: 'Review in two weeks.', followUpDate: today, status: 'closed',
+  treatments: [
+    { id: 1, treatmentId: 6, description: 'Composite filling (anterior)', tooth: '26', qty: 1, unitPricePaisa: 300000, totalPaisa: 300000 },
+    { id: 2, treatmentId: 2, description: 'Scaling and polishing (upper + lower arch)', tooth: null, qty: 1, unitPricePaisa: 250000, totalPaisa: 250000 },
+  ],
+};
+
+const quickCustomer = { name: 'Synthetic Walk-in Customer', ageYears: 34, gender: 'female', phone: '01712000000' };
+const QUICK_DOCUMENTS = {
+  rx: { kind: 'prescription', payload: {
+    reference: 'QD-RX-0001', date: today, dentistName: dentists[0].name, dentistId: 1, customer: quickCustomer,
+    cC: 'Bleeding gums while brushing.', oE: 'Generalised marginal gingivitis.', rE: null,
+    diagnosis: 'Chronic generalised gingivitis.', treatment: 'Scaling and polishing.', advice: 'Warm salt-water rinse.', followUp: today,
+    items: [
+      { medicineName: 'Chlorhexidine mouthwash', generic: 'Chlorhexidine', strength: '0.2%', form: 'Mouthwash', dosage: '10 ml', frequency: 'Twice daily', duration: '7 days', qty: '1', instruction: 'Rinse after brushing', medicineInstruction: 'Do not swallow.' },
+    ],
+  } },
+  inv: { kind: 'invoice', payload: {
+    reference: 'QD-INV-0001', date: today, customer: quickCustomer,
+    lines: [
+      { description: 'Consultation', qty: 1, unitPricePaisa: 50000, discountPaisa: 0 },
+      { description: 'Scaling and polishing (upper + lower arch)', qty: 1, unitPricePaisa: 250000, discountPaisa: 50000 },
+    ],
+    invoiceDiscountPaisa: 10000, amountReceivedPaisa: 240000, method: 'Cash', note: null,
+  } },
+  rc: { kind: 'receipt', payload: {
+    reference: 'QD-RC-0001', date: today, customer: quickCustomer,
+    amountPaisa: 240000, method: 'Cash', paymentReference: null,
+  } },
+  vsum: { kind: 'visit-summary', payload: {
+    reference: 'QD-VS-0001', date: today, customer: quickCustomer, dentistName: dentists[0].name,
+    chiefComplaint: 'Food lodgement between the lower teeth.', diagnosis: 'Early periodontal pocketing.',
+    treatmentNotes: 'Scaling completed; oral hygiene instructions given.',
+    procedures: [{ toothNumber: null, treatmentName: 'Scaling and polishing (upper + lower arch)', qty: 1, unitPricePaisa: 250000 }],
+    nextVisitDate: today, nextVisitPurpose: 'Review healing.',
+  } },
+  appt: { kind: 'appointment-card', payload: {
+    reference: 'QD-AP-0001', date: today, time: '17:30', customer: quickCustomer,
+    dentistName: dentists[0].name, purpose: 'Review after scaling', durationMin: 20,
+  } },
+};
+
 function paged(items, payload) {
   const pageSize = payload && payload.pageSize ? payload.pageSize : 25;
   return { items, total: items.length, page: payload && payload.page ? payload.page : 1, pageSize };
@@ -242,19 +340,24 @@ const pkg = JSON.parse(fs.readFileSync(path.join(ROOT, 'package.json'), 'utf8'))
  * Synthetic bridge. Unknown channels resolve to an empty page so a new screen
  * degrades to an empty state instead of a crash.
  */
-function createBridgeSource(permissions) {
+function createBridgeSource(permissions, printProfiles) {
   const session = {
     userId: 1, username: 'synthetic.owner', displayName: 'Synthetic Owner', roleName: 'Owner',
     roleKey: 'owner', staffId: null, permissions,
   };
+  const effectiveSettings = printProfiles ? { ...settings, printProfiles } : settings;
   return `
     const SESSION = ${JSON.stringify(session)};
-    const SETTINGS = ${JSON.stringify(settings)};
+    const SETTINGS = ${JSON.stringify(effectiveSettings)};
     const VERSION = ${JSON.stringify(pkg.version)};
     const TODAY = ${JSON.stringify(today)};
     const PATIENTS = ${JSON.stringify(patients)};
     const INVOICES = ${JSON.stringify(invoices)};
     const TREATMENTS = ${JSON.stringify(treatments)};
+    const PRESCRIPTION = ${JSON.stringify(PRESCRIPTION)};
+    const PRESCRIPTION_SUMMARY = ${JSON.stringify(PRESCRIPTION_SUMMARY)};
+    const VISIT = ${JSON.stringify(VISIT)};
+    const QUICK_DOCUMENTS = ${JSON.stringify(QUICK_DOCUMENTS)};
     const DENTISTS = ${JSON.stringify(dentists)};
     const DASHBOARD = ${JSON.stringify(dashboard)};
     const APPOINTMENTS = ${JSON.stringify(appointments)};
@@ -264,6 +367,7 @@ function createBridgeSource(permissions) {
     const CATEGORIES = ${JSON.stringify(categories)};
 
     const emptyPage = (payload) => ({ items: [], total: 0, page: 1, pageSize: payload && payload.pageSize ? payload.pageSize : 25 });
+    const paged = (items, payload) => ({ items, total: items.length, page: 1, pageSize: payload && payload.pageSize ? payload.pageSize : 25 });
     const handlers = {
       'dashboard/get': () => DASHBOARD,
       'system/info': () => ({ version: VERSION, schemaVersion: 7, dataDir: 'C:\\\\Dentiva', platform: 'win32', demo: false }),
@@ -286,14 +390,14 @@ function createBridgeSource(permissions) {
       'chart/get': () => ({ teeth: {}, updatedAt: TODAY }),
       'treatments/list': () => TREATMENTS,
       'dentists/list': () => DENTISTS,
-      'appointments/list': () => emptyPage(),
+      'appointments/list': () => APPOINTMENTS,
       'appointments/agenda': () => APPOINTMENTS,
       'appointments/get': (id) => APPOINTMENTS.find((a) => a.id === id) || APPOINTMENTS[0],
       'invoices/list': (p) => ({ items: INVOICES, total: INVOICES.length, page: 1, pageSize: (p && p.pageSize) || 25 }),
       'invoices/get': (id) => INVOICES.find((inv) => inv.id === id) || INVOICES[0],
-      'payments/list': (p) => paged(INVOICES.filter((i) => i.paidPaisa > 0).map((i) => ({
+      'payments/list': (p) => paged(INVOICES.filter((i) => !p || !p.invoiceId || i.id === p.invoiceId).map((i) => ({
         id: i.id, invoiceId: i.id, number: i.number, patientId: i.patientId, patientName: i.patientName,
-        amountPaisa: i.paidPaisa, type: 'payment', method: 'Cash', reference: null, note: null,
+        amountPaisa: i.paidPaisa > 0 ? i.paidPaisa : i.totalPaisa, type: 'payment', method: 'Cash', reference: null, note: null,
         paidAt: TODAY + 'T10:00:00.000Z', receivedByName: 'Synthetic Owner',
       })), p),
       'inventory/items': () => ITEMS,
@@ -312,7 +416,12 @@ function createBridgeSource(permissions) {
       'backups/list': () => [],
       'notifications/list': () => [],
       'search/query': () => [],
-      'prescriptions/list': () => emptyPage(),
+      'prescriptions/get': () => PRESCRIPTION,
+      'prescriptions/list': () => ({
+        items: [PRESCRIPTION_SUMMARY], total: 1, page: 1, pageSize: 25,
+      }),
+      'visits/get': () => VISIT,
+      'quick-documents/payload': (token) => QUICK_DOCUMENTS[token] ?? QUICK_DOCUMENTS.inv,
       'referrals/list': () => [],
       'appointments/upcoming': () => DASHBOARD.upcomingAppointments,
       'backup/list': () => [],
@@ -428,10 +537,21 @@ const INVOICE_PROBE = `(() => {
     if (!field) return null;
     const box = field.getBoundingClientRect();
     const control = field.querySelector('input, .input');
+    const labelEl = field.querySelector('label, .field-label');
+    const fieldCardRect = card.getBoundingClientRect();
     return {
       label: (field.querySelector('label, .field-label') || {}).textContent.replace(/\\s+/g, ' ').trim(),
       left: Math.round(box.left), right: Math.round(box.right), top: Math.round(box.top), bottom: Math.round(box.bottom),
       width: Math.round(box.width), inputWidth: control ? Math.round(control.getBoundingClientRect().width) : null,
+      // A money cell whose content is wider than its own box is unreadable even
+      // when the box itself still sits inside the card.
+      // Only meaningful for value cells (money read-outs and number inputs): a
+      // text input legitimately scrolls a long description.
+      contentClipped: control && (control.tagName === 'DIV' || control.getAttribute('type') === 'number')
+        ? Math.max(0, control.scrollWidth - control.clientWidth)
+        : null,
+      labelLines: labelEl ? Math.round(labelEl.getBoundingClientRect().height / 15) : null,
+      insideCard: box.left >= fieldCardRect.left - 0.5 && box.right <= fieldCardRect.right + 0.5,
     };
   };
   const card = cards[0];
@@ -459,9 +579,15 @@ const INVOICE_PROBE = `(() => {
       visible: removeRect.width > 0 && removeRect.height > 0 && removeRect.right <= cardRect.right + 1,
       top: Math.round(removeRect.top), bottom: Math.round(removeRect.bottom),
       width: Math.round(removeRect.width),
+      overlapsGrid: !(removeRect.bottom <= gridRect.top || removeRect.top >= gridRect.bottom),
     } : null,
     lineTops: fields.map((f) => (f ? f.top : null)),
     cardOverflow: card.scrollWidth - card.clientWidth,
+    // 0 means the read-only Line total amount is fully readable in its box.
+    totalValueClipped: (() => {
+      const value = card.querySelector('.quick-line-total-value');
+      return value ? Math.max(0, value.scrollWidth - value.clientWidth) : null;
+    })(),
   };
 })()`;
 
@@ -594,6 +720,206 @@ const EXPLAIN_PROBE = `(() => {
   return { mainWidth: Math.round(mainRect.width), mainScroll: main.scrollWidth - main.clientWidth, offenders: offenders.slice(0, 14) };
 })()`;
 
+/* ---------------------------------------------------- A4 print/PDF audit */
+
+/**
+ * Every printable document, opened exactly as the application opens it
+ * (`#print/<kind>/<id>`), including the transient walk-in documents. Print and
+ * Save-as-PDF share this window and its `@page` rule, so measuring the rendered
+ * page box *and* the PDF `MediaBox` here covers both paths.
+ */
+/**
+ * Orientation is the only page-size dimension the A4-only policy keeps, so a
+ * second pass proves the print window and the generated PDF both rotate.
+ */
+const LANDSCAPE_PROFILES = [
+  { id: 'rx-a4', name: 'Prescription A4', documentType: 'prescription', printerName: '', orientation: 'landscape', margins: { top: 12, right: 12, bottom: 12, left: 12 }, scale: 100, copies: 1 },
+  { id: 'inv-a4', name: 'Invoice A4', documentType: 'invoice', printerName: '', orientation: 'landscape', margins: { top: 12, right: 12, bottom: 12, left: 12 }, scale: 100, copies: 1 },
+  { id: 'rc-a4', name: 'Receipt A4', documentType: 'receipt', printerName: '', orientation: 'landscape', margins: { top: 12, right: 12, bottom: 12, left: 12 }, scale: 100, copies: 1 },
+  { id: 'rp-a4', name: 'Report A4', documentType: 'report', printerName: '', orientation: 'landscape', margins: { top: 12, right: 12, bottom: 12, left: 12 }, scale: 100, copies: 1 },
+];
+const LANDSCAPE_KEYS = ['invoice', 'report', 'prescription'];
+
+const PRINT_ROUTES = [
+  { key: 'invoice', hash: '#/print/invoice/1', label: 'Invoice' },
+  { key: 'receipt', hash: '#/print/receipt/1', label: 'Receipt' },
+  { key: 'prescription', hash: '#/print/prescription/1', label: 'Prescription' },
+  { key: 'prescription-duplicate', hash: '#/print/prescription-duplicate/1', label: 'Prescription (duplicate copy)' },
+  { key: 'visit-summary', hash: '#/print/visit-summary/1', label: 'Visit summary / treatment plan' },
+  { key: 'appointment-card', hash: '#/print/appointment-card/1', label: 'Appointment card' },
+  { key: 'stock-labels', hash: '#/print/stock-labels/0', label: 'Stock-label sheet' },
+  { key: 'report', hash: '#/print/report/0?report=daily_collection', label: 'Report' },
+  { key: 'quick-prescription', hash: '#/print/quick/rx', label: 'Walk-in prescription' },
+  { key: 'quick-invoice', hash: '#/print/quick/inv', label: 'Walk-in invoice' },
+  { key: 'quick-receipt', hash: '#/print/quick/rc', label: 'Walk-in receipt' },
+  { key: 'quick-visit-summary', hash: '#/print/quick/vsum', label: 'Walk-in examination report' },
+  { key: 'quick-appointment-card', hash: '#/print/quick/appt', label: 'Walk-in appointment card' },
+];
+
+/** A4 in PostScript points: 595.276 × 841.89 (the landscape box is rotated). */
+const A4_PT = { portrait: [595.28, 841.89], landscape: [841.89, 595.28] };
+const PT_TO_MM = 25.4 / 72;
+const mm = (pt) => Math.round(pt * PT_TO_MM * 10) / 10;
+
+/** Physical size of the document element on screen, in millimetres. */
+const PAGE_BOX_PROBE = `(() => {
+  const doc = document.querySelector('.print-doc');
+  if (!doc) return { found: false };
+  const mmPerPx = 25.4 / 96;
+  const rect = doc.getBoundingClientRect();
+  const cs = getComputedStyle(doc);
+  return {
+    found: true,
+    widthMm: Math.round(rect.width * mmPerPx * 10) / 10,
+    minHeightMm: Math.round(Number.parseFloat(cs.minHeight || '0') * mmPerPx * 10) / 10,
+    paddingTopMm: Math.round(Number.parseFloat(cs.paddingTop || '0') * mmPerPx * 10) / 10,
+    paddingLeftMm: Math.round(Number.parseFloat(cs.paddingLeft || '0') * mmPerPx * 10) / 10,
+    overflowsX: doc.scrollWidth - doc.clientWidth,
+    overflowsY: doc.scrollHeight - doc.clientHeight,
+  };
+})()`;
+
+/** Reads the /MediaBox of every page in a generated PDF, in points. */
+function pdfPageBoxes(file) {
+  const raw = fs.readFileSync(file).toString('latin1');
+  const boxes = [];
+  for (const match of raw.matchAll(/\/MediaBox\s*\[\s*([\d.-]+)\s+([\d.-]+)\s+([\d.-]+)\s+([\d.-]+)\s*\]/g)) {
+    boxes.push({
+      widthPt: Math.round((Number(match[3]) - Number(match[1])) * 100) / 100,
+      heightPt: Math.round((Number(match[4]) - Number(match[2])) * 100) / 100,
+    });
+  }
+  return boxes;
+}
+
+const isA4Pt = (box) => [A4_PT.portrait, A4_PT.landscape]
+  .some(([w, h]) => Math.abs(box.widthPt - w) <= 2 && Math.abs(box.heightPt - h) <= 2);
+
+const isA4Mm = (widthMm, heightMm) => [[210, 297], [297, 210]]
+  .some(([w, h]) => Math.abs(widthMm - w) <= 1.5 && Math.abs(heightMm - h) <= 1.5);
+
+/** A4 box in the orientation the print profile asked for (portrait 210x297). */
+const isA4MmOriented = (widthMm, heightMm, orientation) => {
+  const [w, h] = orientation === 'landscape' ? [297, 210] : [210, 297];
+  return Math.abs(widthMm - w) <= 1.5 && Math.abs(heightMm - h) <= 1.5;
+};
+
+/**
+ * Renders every printable document, writes its PDF (the Save-as-PDF path) and
+ * asserts that the on-screen page box and the PDF page are both A4.
+ */
+async function auditPrintGeometry(browser, permissions, outDir) {
+  const { server, port } = await serveRenderer();
+  const base = `http://127.0.0.1:${port}/`;
+  fs.mkdirSync(outDir, { recursive: true });
+  const rows = [];
+  const violations = [];
+  // Portrait first (the default profile shape), then a landscape pass over a
+  // subset: orientation is the one page-size dimension the A4-only policy keeps.
+  const passes = [
+    { suffix: '', orientation: 'portrait', profiles: null, routes: PRINT_ROUTES },
+    {
+      suffix: ' (landscape)',
+      orientation: 'landscape',
+      profiles: LANDSCAPE_PROFILES,
+      routes: PRINT_ROUTES.filter((r) => LANDSCAPE_KEYS.includes(r.key)),
+    },
+  ];
+
+  for (const pass of passes) {
+    const context = await browser.newContext({ viewport: { width: 1400, height: 1000 }, deviceScaleFactor: 1 });
+    await context.addInitScript(createBridgeSource(permissions, pass.profiles));
+    const page = await context.newPage();
+    // Errors are collected per route so a document that fails to render reports why
+    // (the print window shows an ErrorState card instead of .print-doc).
+    let errors = [];
+    page.on('pageerror', (err) => errors.push(err.message));
+    page.on('console', (msg) => { if (msg.type() === 'error') errors.push(msg.text()); });
+
+    for (const route of pass.routes) {
+      const key = `${route.key}${pass.suffix}`;
+      errors = [];
+      await page.goto(`${base}${route.hash}`, { waitUntil: 'load' });
+      const rendered = await page
+        .waitForSelector('.print-doc', { timeout: 20000 })
+        .then(() => true)
+        .catch(() => false);
+      if (!rendered) {
+        // On-screen reason first (ErrorState / lock notice), console+page errors second.
+        const shown = await page
+          .evaluate(() => (document.querySelector('.print-stage')?.textContent || '').replace(/\s+/g, ' ').trim().slice(0, 200))
+          .catch(() => '');
+        const detail = [shown, errors.join(' | ')].filter(Boolean).join(' — ') || 'no reason reported';
+        violations.push(`${key}: the print window rendered no document (.print-doc missing): ${detail}`);
+        rows.push({ key, label: route.label, orientation: pass.orientation, error: 'not rendered', detail });
+        continue;
+      }
+      await page.waitForTimeout(250);
+      const box = await page.evaluate(PAGE_BOX_PROBE);
+      const file = path.join(outDir, `${route.key}${pass.suffix ? '-landscape' : ''}.pdf`);
+      // preferCSSPageSize follows the document's own @page rule — the same rule
+      // Electron's printToPDF honours for "Save as PDF".
+      fs.writeFileSync(file, await page.pdf({ preferCSSPageSize: true, printBackground: true }));
+      const boxes = pdfPageBoxes(file);
+      const first = boxes[0] ?? null;
+      const expectPt = pass.orientation === 'landscape' ? A4_PT.landscape : A4_PT.portrait;
+      const isExpectedPt = first
+        && Math.abs(first.widthPt - expectPt[0]) <= 2 && Math.abs(first.heightPt - expectPt[1]) <= 2;
+      if (!first) {
+        violations.push(`${key}: the generated PDF has no /MediaBox page`);
+      } else if (!isA4Pt(first) || !isExpectedPt) {
+        violations.push(`${key}: PDF page is ${first.widthPt}x${first.heightPt}pt (${mm(first.widthPt)}x${mm(first.heightPt)}mm), not A4 ${pass.orientation}`);
+      }
+      if (!box.found || !isA4MmOriented(box.widthMm, box.minHeightMm, pass.orientation)) {
+        violations.push(`${key}: on-screen page box is ${box.widthMm}x${box.minHeightMm}mm, not A4 ${pass.orientation}`);
+      } else if (first && Math.abs(box.widthMm - mm(first.widthPt)) > 1.5) {
+        violations.push(`${key}: preview (${box.widthMm}mm) and PDF (${mm(first.widthPt)}mm) disagree`);
+      }
+      if ((box.overflowsX ?? 0) > 1) {
+        violations.push(`${key}: the document overflows its own page horizontally by ${box.overflowsX}px`);
+      }
+      if ((box.overflowsY ?? 0) > 1) {
+        violations.push(`${key}: the document overflows its own page vertically by ${box.overflowsY}px`);
+      }
+      rows.push({
+        key, label: route.label, orientation: pass.orientation,
+        screenWidthMm: box.widthMm, screenHeightMm: box.minHeightMm,
+        pdfPages: boxes.length, pdfWidthMm: first ? mm(first.widthPt) : null, pdfHeightMm: first ? mm(first.heightPt) : null,
+        paddingTopMm: box.paddingTopMm, paddingLeftMm: box.paddingLeftMm, file,
+      });
+    }
+
+    await context.close();
+  }
+  await browser.close();
+  server.close();
+
+  console.log('\n=== A4 print/PDF geometry (every printable document) ===');
+  for (const row of rows) {
+    if (row.error) { console.log(`x  ${row.key.padEnd(32)} ${row.error}`); continue; }
+    console.log(
+      `ok ${row.key.padEnd(32)} screen=${String(row.screenWidthMm).padStart(5)}x${String(row.screenHeightMm).padEnd(5)}mm ` +
+      `pdf=${String(row.pdfWidthMm).padStart(5)}x${String(row.pdfHeightMm).padEnd(5)}mm pages=${row.pdfPages} ` +
+      `margin=${row.paddingTopMm}/${row.paddingLeftMm}mm`,
+    );
+  }
+  if (violations.length) {
+    console.log('\n=== A4 violations ===');
+    for (const violation of violations) console.log(`x  ${violation}`);
+  }
+  if (JSON_OUT) {
+    fs.writeFileSync(JSON_OUT, JSON.stringify({ generatedAt: new Date().toISOString(), printRoutes: rows, violations }, null, 2));
+  }
+  const landscapeCount = rows.filter((r) => r.orientation === 'landscape').length;
+  console.log(
+    `\nA4 print/PDF violations: ${violations.length} ` +
+    `(in ${PRINT_ROUTES.length} printable documents${landscapeCount ? ` + ${landscapeCount} landscape views` : ''})`,
+  );
+  console.log(`PDFs written to ${outDir}`);
+  process.exit(violations.length ? 2 : 0);
+}
+
+
 /* ------------------------------------------------------------------- server */
 
 const MIME = {
@@ -643,6 +969,11 @@ async function main() {
     console.error('No usable Chromium for the layout harness:', err instanceof Error ? err.message : String(err));
     console.error('Set LAYOUT_BROWSER (and LAYOUT_BROWSER_LIBS if needed) to a Chromium/Chrome executable.');
     process.exit(1);
+  }
+
+  if (PDF_MODE) {
+    await auditPrintGeometry(browser, allPermissions(), PDF_DIR);
+    return;
   }
 
   const routes = ONLY ? ROUTES.filter((r) => r.key === ONLY || r.key.includes(ONLY)) : ROUTES;
@@ -763,6 +1094,46 @@ async function main() {
   await browser.close();
   server.close();
 
+  /* -------- required walk-in invoice arrangement (the reported defect) ----- */
+  const REQUIRED_ROWS = [
+    ['Item or procedure', 'Qty', 'Unit price (৳)'],
+    ['Discount (৳)', 'Line total (৳)'],
+  ];
+  const normalise = (label) => String(label).replace(/\*$/, '').trim();
+  const invoiceViolations = [];
+  for (const entry of invoiceMatrix) {
+    // Entries recorded after the saved-treatment picker carry only that probe.
+    if (!('geometry' in entry)) continue;
+    const g = entry.geometry ?? {};
+    const viewport = VIEWPORTS.find((v) => v.name === entry.viewport);
+    const supported = Boolean(viewport && viewport.supported);
+    const fail = (reason) => invoiceViolations.push({
+      route: 'quick-documents:invoice', viewport: entry.viewport, supported, reason,
+    });
+    if (!g.found) { fail('invoice line card is not rendered'); continue; }
+    const rows = (g.rows ?? []).map((r) => (r.labels ?? []).map(normalise));
+    if (rows.length !== REQUIRED_ROWS.length) {
+      fail(`expected ${REQUIRED_ROWS.length} field rows, found ${rows.length}: ${JSON.stringify(rows)}`);
+    } else {
+      for (let i = 0; i < rows.length; i += 1) {
+        if (rows[i].join(' | ') !== REQUIRED_ROWS[i].join(' | ')) {
+          fail(`row ${i + 1} is [${rows[i].join(' | ')}], required [${REQUIRED_ROWS[i].join(' | ')}]`);
+        }
+      }
+    }
+    if ((g.gridScroll ?? 0) > 1) fail(`line grid overflows by +${g.gridScroll}px`);
+    if ((g.cardOverflow ?? 0) > 1) fail(`line card overflows by +${g.cardOverflow}px`);
+    for (const f of g.fields ?? []) {
+      if (!f) continue;
+      if (f.insideCard === false) fail(`"${f.label}" extends outside its card`);
+      if (f.contentClipped !== null && f.contentClipped > 1) fail(`"${f.label}" value is clipped inside its box by ${f.contentClipped}px`);
+      if (f.inputWidth !== null && f.inputWidth < 40) fail(`"${f.label}" control is only ${f.inputWidth}px wide`);
+    }
+    if ((g.totalValueClipped ?? 0) > 1) fail(`Line total amount is clipped inside its box by ${g.totalValueClipped}px`);
+    if (!g.remove || !g.remove.visible) fail('the Remove action is not visible inside the card');
+    else if (g.remove.overlapsGrid) fail('the Remove action overlaps the field grid');
+  }
+
   const failures = results.filter((r) =>
     (r.docOverflow ?? 0) > 0 || (r.mainOverflow ?? 0) > 0 || (r.spilled ?? 0) > 0 ||
     (r.clippedCount ?? 0) > 0 || (r.fieldsBeyond ?? 0) > 0 || (r.hostScroll ?? 0) > 0 || r.missing);
@@ -777,6 +1148,11 @@ async function main() {
     );
   }
 
+  if (invoiceViolations.length) {
+    console.log('\n=== Walk-in invoice violations ===');
+    for (const v of invoiceViolations) console.log(`x ${v.route.padEnd(26)} ${String(v.viewport).padEnd(9)} ${v.reason}`);
+  }
+
   console.log('\n=== Walk-in invoice line geometry ===');
   for (const entry of invoiceMatrix) {
     const g = entry.geometry || {};
@@ -788,15 +1164,17 @@ async function main() {
       (a ? ` | afterTreatmentLine gridScroll+${a.gridScroll} overflow+${(entry.overflow && entry.overflow.docOverflow) || 0}` : ''),
     );
     if (g.fields) {
-      console.log(`           widths: ${g.fields.filter(Boolean).map((f) => `${f.label}=${f.width}(input ${f.inputWidth})`).join(' ')}`);
+      console.log(`           widths: ${g.fields.filter(Boolean).map((f) => `${f.label}=${f.width}(input ${f.inputWidth}, clipped ${f.contentClipped})`).join(' ')}`);
     }
   }
 
-  const summary = { generatedAt: new Date().toISOString(), viewports: VIEWPORTS.map((v) => v.name), results, invoiceMatrix };
+  const summary = { generatedAt: new Date().toISOString(), viewports: VIEWPORTS.map((v) => v.name), results, invoiceMatrix, invoiceViolations };
   if (JSON_OUT) fs.writeFileSync(JSON_OUT, JSON.stringify(summary, null, 2));
   console.log(`\nScreens: ${SCREENS ? SCREEN_DIR : '(disabled — pass --screens)'}`);
   console.log(`Violations: ${failures.length} of ${results.length} screen/viewport pairs`);
-  process.exit(failures.length ? 2 : 0);
+  const invoiceMeasurements = invoiceMatrix.filter((e) => 'geometry' in e).length;
+  console.log(`Walk-in invoice violations: ${invoiceViolations.length} (in ${invoiceMeasurements} measured panels)`);
+  process.exit(failures.length || invoiceViolations.length ? 2 : 0);
 }
 
 main().catch((err) => {

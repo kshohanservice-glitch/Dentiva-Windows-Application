@@ -78,6 +78,15 @@ retained across migrations 003/004.
 - Migration 004 adds `expired_at` (local-midnight expiry marker) and
   `planned_treatments` to existing appointments without rewriting old rows.
   Rescheduling retains the original appointment ID.
+- Migration 008 restates the `printProfiles` settings row for the A4-only
+  printing policy (4.3.0): every stored profile keeps its id, name, document
+  type, printer, orientation, margins, scale and copies, while the legacy
+  `paperSize` / `widthMm` / `heightMm` fields are dropped and profiles that
+  described another medium (A5, 80mm thermal roll, custom sheets) are removed and
+  replaced by the A4 profile of the same document type. It touches no clinical or
+  financial row, is idempotent, and records one `system.migrate` audit entry
+  naming the profiles it kept and the number it removed.
+  See `tests/integration/a4-only-printing.test.ts`.
 
 ### Prescriptions
 - `prescriptions` — patient_id, visit_id?, dentist_id, date, c_c, o_e, r_e, diagnosis,

@@ -439,10 +439,10 @@ function InvoiceFields({ form, set, treatments }: { form: any; set: (p: string[]
               <strong className="small">Line {index + 1}</strong>
               <Button size="sm" variant="ghost" ariaLabel={`Remove invoice line ${index + 1}`} onClick={() => set(['lines'], rows.filter((_, rowIndex) => rowIndex !== index))}>Remove</Button>
             </div>
-            {/* Narrow panels: row 1 = Item · Qty · Unit price, row 2 = Discount · Line total.
-                Wide panels: one row (see .quick-line-grid container queries). */}
+            {/* Fixed arrangement at every supported size (see .quick-line-grid):
+                row 1 = Item · Qty · Unit price, row 2 = Discount · Line total. */}
             <div className="quick-line-grid">
-              <Field label="Item or procedure" required className="quick-line-description quick-line-item">
+              <Field label="Item or procedure" required className="quick-line-item">
                 {(id) => <Input id={id} value={row.description} onChange={(value) => setRow(index, { description: value })} placeholder="e.g. Consultation, scaling" required />}
               </Field>
               <Field label="Qty" className="quick-line-qty">
