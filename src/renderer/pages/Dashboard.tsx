@@ -85,7 +85,7 @@ export function DashboardPage() {
         </div>
       )}
 
-      <div className="grid gap-4" style={{ gridTemplateColumns: '1.4fr 1fr', marginTop: 'var(--sp-4)' }}>
+      <div className="grid gap-4 dashboard-split mt-4">
         <div className="col gap-4">
           <Card title="Today's appointments" actions={<Button size="sm" variant="ghost" onClick={() => navigate('/appointments')}>View all</Button>}>
             {data.upcomingAppointments.length === 0 ? (

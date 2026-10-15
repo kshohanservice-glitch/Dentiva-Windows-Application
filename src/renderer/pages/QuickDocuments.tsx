@@ -439,17 +439,19 @@ function InvoiceFields({ form, set, treatments }: { form: any; set: (p: string[]
               <strong className="small">Line {index + 1}</strong>
               <Button size="sm" variant="ghost" ariaLabel={`Remove invoice line ${index + 1}`} onClick={() => set(['lines'], rows.filter((_, rowIndex) => rowIndex !== index))}>Remove</Button>
             </div>
+            {/* Narrow panels: row 1 = Item · Qty · Unit price, row 2 = Discount · Line total.
+                Wide panels: one row (see .quick-line-grid container queries). */}
             <div className="quick-line-grid">
-              <Field label="Item or procedure" required className="quick-line-description">
+              <Field label="Item or procedure" required className="quick-line-description quick-line-item">
                 {(id) => <Input id={id} value={row.description} onChange={(value) => setRow(index, { description: value })} placeholder="e.g. Consultation, scaling" required />}
               </Field>
-              <Field label="Qty">
+              <Field label="Qty" className="quick-line-qty">
                 {(id) => <Input id={id} type="number" min={1} step={1} value={String(row.qty)} onChange={(value) => setRow(index, { qty: value })} />}
               </Field>
-              <Field label="Unit price (৳)">
+              <Field label="Unit price (৳)" className="quick-line-unit-price">
                 {(id) => <Input id={id} type="number" min={0} step="0.01" value={String(row.unitPrice)} onChange={(value) => setRow(index, { unitPrice: value })} />}
               </Field>
-              <Field label="Discount (৳)">
+              <Field label="Discount (৳)" className="quick-line-discount">
                 {(id) => <Input id={id} type="number" min={0} step="0.01" value={String(row.discount)} onChange={(value) => setRow(index, { discount: value })} />}
               </Field>
               <Field label="Line total (৳)" labelFor={false} className="quick-line-total">
@@ -538,16 +540,16 @@ function VisitFields({ form, set, treatments }: { form: any; set: (p: string[], 
               <Button size="sm" variant="ghost" ariaLabel={`Remove procedure ${i + 1}`} onClick={() => set(['procedures'], rows.filter((_, x) => x !== i))}>Remove</Button>
             </div>
             <div className="quick-line-grid quick-procedure-grid">
-              <Field label="Tooth #">
+              <Field label="Tooth #" className="quick-procedure-tooth">
                 {(id) => <Input id={id} value={row.toothNumber} onChange={(v) => setRow(i, { toothNumber: v })} placeholder="Optional" />}
               </Field>
-              <Field label="Procedure">
+              <Field label="Procedure" className="quick-procedure-name">
                 {(id) => <Input id={id} value={row.treatmentName} onChange={(v) => setRow(i, { treatmentName: v })} placeholder="e.g. Scaling" />}
               </Field>
-              <Field label="Qty">
+              <Field label="Qty" className="quick-procedure-qty">
                 {(id) => <Input id={id} type="number" min={1} step={1} value={String(row.qty)} onChange={(v) => setRow(i, { qty: v })} />}
               </Field>
-              <Field label="Unit price (৳)">
+              <Field label="Unit price (৳)" className="quick-procedure-unit-price">
                 {(id) => <Input id={id} type="number" min={0} step="0.01" value={String(row.unitPrice)} onChange={(v) => setRow(i, { unitPrice: v })} />}
               </Field>
             </div>

@@ -1240,6 +1240,11 @@ tr.row-muted td { opacity: 0.55; }
 
 /* Patient profile */
 .profile-tabs { position: sticky; top: 0; z-index: 6; background: var(--surface-1); padding-top: var(--sp-2); }
+/* Overview tab: auto-fit tracks plus a full-width chart card and shrinkable
+   children, so the profile never forces horizontal scrolling of the page. */
+.patient-overview-grid { grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); align-items: start; }
+.patient-overview-grid > * { min-width: 0; }
+.patient-overview-grid .span-2 { grid-column: 1 / -1; }
 .mini-visit { border: 1px solid var(--line); border-radius: var(--r-sm); padding: var(--sp-3); background: var(--surface-1); }
 .mini-visit + .mini-visit { margin-top: var(--sp-2); }
 
@@ -1249,13 +1254,33 @@ tr.row-muted td { opacity: 0.55; }
 .report-totals { margin-top: var(--sp-3); font-weight: 700; }
 .report-total { display: flex; justify-content: space-between; padding: 6px 0; border-top: 2px solid var(--line-strong); }
 
-/* Invoice builder */
+/* Invoice builder.
+   The line layout follows the *available panel width* (container query on
+   .invoice-lines), not the window: the New-invoice dialog is capped at 860px
+   and can sit inside a much wider window, so window breakpoints alone let the
+   five fields exceed their panel and push the totals/remove action out of view.
+   Narrow panel  → row 1: Description · Qty · Unit price · Remove
+                   row 2: Line total
+   Wide panel    → single row: Description · Qty · Unit price · Line total · Remove */
+.invoice-lines {
+  container-type: inline-size;
+  min-width: 0;
+}
 .invoice-line {
   display: grid;
-  grid-template-columns: minmax(180px, 1.8fr) minmax(80px, 0.65fr) minmax(115px, 1fr) minmax(145px, 1.2fr) 36px;
+  grid-template-columns: minmax(0, 2fr) minmax(0, 0.85fr) minmax(0, 1.3fr) minmax(0, 36px);
+  grid-template-areas:
+    'description qty price remove'
+    'total total total total';
   gap: var(--sp-2);
   align-items: start;
 }
+.invoice-line-description { grid-area: description; min-width: 0; }
+.invoice-line-qty { grid-area: qty; min-width: 0; }
+.invoice-line-unit-price { grid-area: price; min-width: 0; }
+.invoice-line-total { grid-area: total; min-width: 0; }
+/* The remove control is the Button rendered as the last child of the line. */
+.invoice-line > .btn { grid-area: remove; align-self: end; }
 .invoice-line .field { min-width: 0; }
 .invoice-line > .field > label,
 .invoice-line > .field > .field-label {
@@ -1263,6 +1288,13 @@ tr.row-muted td { opacity: 0.55; }
   display: flex;
   align-items: flex-end;
   line-height: 1.2;
+}
+/* One row only when the panel genuinely fits every field (≥ 620px). */
+@container (min-width: 620px) {
+  .invoice-line {
+    grid-template-columns: minmax(180px, 1.8fr) minmax(80px, 0.65fr) minmax(115px, 1fr) minmax(145px, 1.2fr) 36px;
+    grid-template-areas: 'description qty price total remove';
+  }
 }
 
 .preset-chips { display: flex; flex-wrap: wrap; gap: 6px; }
@@ -1277,7 +1309,12 @@ tr.row-muted td { opacity: 0.55; }
 .rx-item + .rx-item { margin-top: var(--sp-2); }
 .rx-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: var(--sp-2); }
 
-/* Shared, responsive prescription and quick-document editors. */
+/* Shared, responsive prescription and quick-document editors.
+   Both grids are laid out from the width of their own card (container query),
+   because the Walk-in invoice panel is only ~430-630px wide inside a 1180-1500px
+   window (`.quick-grid` keeps two columns above 1180px). Window-only breakpoints
+   therefore missed the reported defect: five invoice fields were forced into one
+   row inside a 476px card, clipping Discount and Line total. */
 .medicine-entry-editor { min-width: 0; }
 .medicine-entry-card,
 .quick-line-card {
@@ -1286,13 +1323,15 @@ tr.row-muted td { opacity: 0.55; }
   border-radius: var(--r-md);
   padding: var(--sp-3);
   background: var(--surface-1);
+  /* The card measures itself; its own width never depends on the grid inside. */
+  container-type: inline-size;
 }
 .medicine-entry-heading,
 .quick-line-card-heading { align-items: center; margin-bottom: var(--sp-2); }
 
 /* Consistent field layout inside medicine and invoice grids:
    Labels get a fixed min-height so a two-line label does not push its input
-   below the neighbouring inputs. Hints are hidden from the layout flow by
+   below the neighbouring inputs; hints are hidden from the layout flow by
    keeping them compact; validation errors still display. */
 .medicine-entry-grid > .field > label,
 .medicine-entry-grid > .field > .field-label,
@@ -1306,11 +1345,18 @@ tr.row-muted td { opacity: 0.55; }
   line-height: 1.2;
 }
 
+/* Prescription medicine entry: 3 columns only when the card can hold them. */
 .medicine-entry-grid {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: minmax(0, 1fr);
   gap: var(--sp-3);
   align-items: start;
+}
+@container (min-width: 430px) {
+  .medicine-entry-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@container (min-width: 680px) {
+  .medicine-entry-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 }
 .medicine-entry-grid > .field,
 .quick-line-grid > .field { min-width: 0; }
@@ -1318,15 +1364,52 @@ tr.row-muted td { opacity: 0.55; }
 .medicine-entry-full-instruction > label,
 .medicine-entry-full-instruction > .field-label { min-height: auto; }
 .medicine-entry-conflict { margin-top: var(--sp-3); }
-.quick-line-grid {
+
+/* Walk-in invoice line. The required arrangement at narrow panel widths is:
+     row 1 → Item or procedure · Qty · Unit price (৳)
+     row 2 → Discount (৳) · Line total (৳)
+   The Remove action stays in the card heading above the grid, so it can never
+   overlap either row. One row is used only when the panel really fits it. */
+.quick-line-grid:not(.quick-procedure-grid) {
   display: grid;
-  grid-template-columns: minmax(180px, 1.8fr) minmax(80px, 0.65fr) minmax(115px, 1fr) minmax(120px, 1fr) minmax(145px, 1.2fr);
+  grid-template-columns: minmax(0, 1.8fr) minmax(0, 0.8fr) minmax(0, 1.2fr);
+  grid-template-areas:
+    'item qty price'
+    'discount total total';
   gap: var(--sp-3);
   align-items: start;
 }
+.quick-line-item { grid-area: item; }
+.quick-line-qty { grid-area: qty; }
+.quick-line-unit-price { grid-area: price; }
+.quick-line-discount { grid-area: discount; }
+.quick-line-total { grid-area: total; }
+@container (min-width: 690px) {
+  .quick-line-grid:not(.quick-procedure-grid) {
+    grid-template-columns: minmax(180px, 1.8fr) minmax(80px, 0.65fr) minmax(115px, 1fr) minmax(120px, 1fr) minmax(145px, 1.2fr);
+    grid-template-areas: 'item qty price discount total';
+  }
+}
+
+/* Walk-in visit-summary procedures: two columns, then one row when it fits. */
 .quick-procedure-grid {
-  grid-template-columns: minmax(115px, 0.75fr) minmax(170px, 1.5fr) minmax(80px, 0.65fr) minmax(120px, 1fr);
+  display: grid;
+  grid-template-columns: minmax(0, 0.75fr) minmax(0, 1.5fr);
+  grid-template-areas:
+    'tooth name'
+    'qty price';
+  gap: var(--sp-3);
   align-items: start;
+}
+.quick-procedure-tooth { grid-area: tooth; }
+.quick-procedure-name { grid-area: name; }
+.quick-procedure-qty { grid-area: qty; }
+.quick-procedure-unit-price { grid-area: price; }
+@container (min-width: 560px) {
+  .quick-procedure-grid {
+    grid-template-columns: minmax(115px, 0.75fr) minmax(170px, 1.5fr) minmax(80px, 0.65fr) minmax(120px, 1fr);
+    grid-template-areas: 'tooth name qty price';
+  }
 }
 .quick-line-total-value { display: flex; align-items: center; min-height: 36px; }
 .quick-invoice-summary {
@@ -1340,21 +1423,20 @@ tr.row-muted td { opacity: 0.55; }
 }
 .quick-invoice-summary > span { display: flex; justify-content: space-between; gap: var(--sp-2); }
 
-@media (max-width: 980px) {
-  .medicine-entry-grid,
-  .quick-line-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .quick-line-description { grid-column: 1 / -1; }
-  .invoice-line { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .invoice-line .field:first-child { grid-column: 1 / -1; }
-}
-@media (max-width: 680px) {
-  .medicine-entry-grid,
-  .quick-line-grid { grid-template-columns: minmax(0, 1fr); }
-  .medicine-entry-full-instruction,
-  .quick-line-description { grid-column: auto; }
-  .invoice-line { grid-template-columns: minmax(0, 1fr); }
-  .invoice-line .field:first-child { grid-column: auto; }
-  .invoice-line > .btn { justify-self: end; }
+/* The page-level splits below are window-driven on purpose: their width equals
+   the window minus the (fixed-width) sidebar, so the window is the panel. Each
+   track is minmax(0, …) and every child is allowed to shrink, so no track can
+   force horizontal overflow at any size. */
+.dashboard-split { grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr); align-items: start; }
+.reports-split { grid-template-columns: minmax(240px, 280px) minmax(0, 1fr); align-items: start; }
+.about-split { grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr); align-items: start; }
+.dashboard-split > *,
+.reports-split > *,
+.about-split > * { min-width: 0; }
+@media (max-width: 900px) {
+  .dashboard-split,
+  .reports-split,
+  .about-split { grid-template-columns: minmax(0, 1fr); }
 }
 
 /* Status pills in lists */

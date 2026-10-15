@@ -747,10 +747,12 @@ function ReferralFormModal(props: { patientId: number; initial?: ReferralRecord 
     </Modal>
   );
 }
+/* Two columns when the profile panel fits them; the latest-chart card spans the
+   full width and every child may shrink (see .patient-overview-grid). */
 function OverviewTab(props: { patient: PatientDetailDTO; onGoto: (t: ProfileTab) => void }) {
   const p = props.patient;
   return (
-    <div className="grid gap-4" style={{ gridTemplateColumns: '1fr 1fr' }}>
+    <div className="grid gap-4 patient-overview-grid">
       <Card title="Medical & dental history">
         <div className="kv-list">
           <div className="kv"><span className="k">Allergies</span><span className="v">{p.allergies || 'None recorded'}</span></div>
@@ -1739,23 +1741,28 @@ export function InvoiceFormModal(props: { patientId: number; visitId?: number | 
             </button>
           ))}
         </div>
-        {values.items.map((line, i) => (
-          <div className="invoice-line" key={i}>
-            <Field label="Description">
-              {(id) => <Input id={id} value={line.description} onChange={(v) => setItem(i, { description: v })} placeholder="Treatment or item" />}
-            </Field>
-            <Field label="Qty">
-              {(id) => <Input id={id} type="number" min={1} value={String(line.qty)} onChange={(v) => setItem(i, { qty: Math.max(1, Number(v) || 1) })} />}
-            </Field>
-            <Field label="Unit price (৳)">
-              {(id) => <Input id={id} type="number" min={0} step="0.01" value={String(line.unitPricePaisa / 100)} onChange={(v) => setItem(i, { unitPricePaisa: Math.round((Number(v) || 0) * 100) })} />}
-            </Field>
-            <Field label="Line total (৳)" labelFor={false}>
-              {() => <div className="input" style={{ display: 'flex', alignItems: 'center', minHeight: 34 }} aria-readonly="true"><Money paisa={line.qty * line.unitPricePaisa} /></div>}
-            </Field>
-            <Button variant="ghost" size="sm" onClick={() => set('items', values.items.filter((_, j) => j !== i))} title="Remove line">✕</Button>
-          </div>
-        ))}
+        {/* Layout follows the dialog/panel width (see .invoice-lines): narrow panels
+            show Description · Qty · Unit price with Remove on the first row and the
+            line total on its own second row, so nothing is clipped or overlapped. */}
+        <div className="invoice-lines">
+          {values.items.map((line, i) => (
+            <div className="invoice-line" key={i}>
+              <Field label="Description" className="invoice-line-description">
+                {(id) => <Input id={id} value={line.description} onChange={(v) => setItem(i, { description: v })} placeholder="Treatment or item" />}
+              </Field>
+              <Field label="Qty" className="invoice-line-qty">
+                {(id) => <Input id={id} type="number" min={1} value={String(line.qty)} onChange={(v) => setItem(i, { qty: Math.max(1, Number(v) || 1) })} />}
+              </Field>
+              <Field label="Unit price (৳)" className="invoice-line-unit-price">
+                {(id) => <Input id={id} type="number" min={0} step="0.01" value={String(line.unitPricePaisa / 100)} onChange={(v) => setItem(i, { unitPricePaisa: Math.round((Number(v) || 0) * 100) })} />}
+              </Field>
+              <Field label="Line total (৳)" labelFor={false} className="invoice-line-total">
+                {() => <div className="input" style={{ display: 'flex', alignItems: 'center', minHeight: 34 }} aria-readonly="true"><Money paisa={line.qty * line.unitPricePaisa} /></div>}
+              </Field>
+              <Button variant="ghost" size="sm" ariaLabel={`Remove invoice line ${i + 1}`} onClick={() => set('items', values.items.filter((_, j) => j !== i))} title="Remove line">✕</Button>
+            </div>
+          ))}
+        </div>
         <div className="row between mt-4">
           <span className="small muted">Gross subtotal <Money paisa={subtotal} /> · Invoice-wide discount <Money paisa={values.discountPaisa} /></span>
           <strong>Payable: <Money paisa={total} /></strong>

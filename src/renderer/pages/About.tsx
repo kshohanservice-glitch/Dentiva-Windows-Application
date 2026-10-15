@@ -17,7 +17,7 @@ export function AboutPage() {
         </div>
       </div>
 
-      <div className="grid gap-4" style={{ gridTemplateColumns: '1.2fr 1fr', alignItems: 'start' }}>
+      <div className="grid gap-4 about-split">
         <Card>
           <div className="row gap-3" style={{ alignItems: 'flex-start' }}>
             <div className="brand-mark" style={{ width: 64, height: 64, fontSize: 30, borderRadius: 18 }}>D</div>

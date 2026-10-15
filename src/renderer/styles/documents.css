@@ -31,6 +31,10 @@
   gap: var(--sp-4);
   align-items: start;
 }
+/* Grid items must be shrinkable, otherwise their min-content forces the track
+   wider than the page and the whole panel overflows horizontally. */
+.quick-grid > *,
+.customize-grid > * { min-width: 0; }
 
 /* ------------------------------------------------ customize documents tab */
 
