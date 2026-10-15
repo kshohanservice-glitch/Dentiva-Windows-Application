@@ -384,6 +384,7 @@ button, input, select, textarea {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
   gap: var(--sp-4);
+  align-items: start;
 }
 .form-grid .span-2 { grid-column: span 2; }
 @media (max-width: 700px) {
@@ -1249,11 +1250,20 @@ tr.row-muted td { opacity: 0.55; }
 .report-total { display: flex; justify-content: space-between; padding: 6px 0; border-top: 2px solid var(--line-strong); }
 
 /* Invoice builder */
-.invoice-line { display: grid; grid-template-columns: 1fr 70px 110px 90px 40px; gap: var(--sp-2); align-items: end; }
 .invoice-line {
+  display: grid;
   grid-template-columns: minmax(180px, 1.8fr) minmax(80px, 0.65fr) minmax(115px, 1fr) minmax(145px, 1.2fr) 36px;
+  gap: var(--sp-2);
+  align-items: start;
 }
 .invoice-line .field { min-width: 0; }
+.invoice-line > .field > label,
+.invoice-line > .field > .field-label {
+  min-height: 2.4em;
+  display: flex;
+  align-items: flex-end;
+  line-height: 1.2;
+}
 
 .preset-chips { display: flex; flex-wrap: wrap; gap: 6px; }
 .preset-chip {
@@ -1278,24 +1288,45 @@ tr.row-muted td { opacity: 0.55; }
   background: var(--surface-1);
 }
 .medicine-entry-heading,
-.quick-line-card-heading { align-items: center; }
+.quick-line-card-heading { align-items: center; margin-bottom: var(--sp-2); }
+
+/* Consistent field layout inside medicine and invoice grids:
+   Labels get a fixed min-height so a two-line label does not push its input
+   below the neighbouring inputs. Hints are hidden from the layout flow by
+   keeping them compact; validation errors still display. */
+.medicine-entry-grid > .field > label,
+.medicine-entry-grid > .field > .field-label,
+.quick-line-grid > .field > label,
+.quick-line-grid > .field > .field-label,
+.invoice-line > .field > label,
+.invoice-line > .field > .field-label {
+  min-height: 2.4em;
+  display: flex;
+  align-items: flex-end;
+  line-height: 1.2;
+}
+
 .medicine-entry-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: var(--sp-3);
+  align-items: start;
 }
 .medicine-entry-grid > .field,
 .quick-line-grid > .field { min-width: 0; }
 .medicine-entry-full-instruction { grid-column: 1 / -1; }
+.medicine-entry-full-instruction > label,
+.medicine-entry-full-instruction > .field-label { min-height: auto; }
 .medicine-entry-conflict { margin-top: var(--sp-3); }
 .quick-line-grid {
   display: grid;
   grid-template-columns: minmax(180px, 1.8fr) minmax(80px, 0.65fr) minmax(115px, 1fr) minmax(120px, 1fr) minmax(145px, 1.2fr);
   gap: var(--sp-3);
-  align-items: end;
+  align-items: start;
 }
 .quick-procedure-grid {
   grid-template-columns: minmax(115px, 0.75fr) minmax(170px, 1.5fr) minmax(80px, 0.65fr) minmax(120px, 1fr);
+  align-items: start;
 }
 .quick-line-total-value { display: flex; align-items: center; min-height: 36px; }
 .quick-invoice-summary {
@@ -1313,15 +1344,16 @@ tr.row-muted td { opacity: 0.55; }
   .medicine-entry-grid,
   .quick-line-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .quick-line-description { grid-column: 1 / -1; }
-  .invoice-line { grid-template-columns: minmax(145px, 1.5fr) minmax(72px, 0.65fr) minmax(105px, 1fr) minmax(130px, 1.2fr) 34px; }
+  .invoice-line { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .invoice-line .field:first-child { grid-column: 1 / -1; }
 }
 @media (max-width: 680px) {
   .medicine-entry-grid,
   .quick-line-grid { grid-template-columns: minmax(0, 1fr); }
   .medicine-entry-full-instruction,
   .quick-line-description { grid-column: auto; }
-  .invoice-line { grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; }
-  .invoice-line .field:first-child { grid-column: 1 / -1; }
+  .invoice-line { grid-template-columns: minmax(0, 1fr); }
+  .invoice-line .field:first-child { grid-column: auto; }
   .invoice-line > .btn { justify-self: end; }
 }
 

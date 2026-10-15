@@ -233,7 +233,7 @@ export function QuickDocumentsPage() {
             <Field label="Date" required>{(id) => <Input id={id} type="date" value={form.date} onChange={(v) => set(['date'], v)} />}</Field>
             {kind !== 'receipt' && (
               <>
-                <Field label="Dentist" hint="Chosen from the clinic's dentist list — prints with credentials">
+                <Field label="Dentist">
                   {(id) => (
                     <Select id={id} value={String(form.dentistId ?? '')} onChange={(v) => set(['dentistId'], v)} placeholder="Not selected"
                       options={(dentists.data ?? []).map((d) => ({ value: String(d.id), label: d.name }))} />
@@ -242,7 +242,6 @@ export function QuickDocumentsPage() {
                 <Field
                   label="Dentist name (typed)"
                   required={kind === 'prescription' && !form.dentistId}
-                  hint="Used when the dentist is not in the list; a prescription must name the dentist."
                 >
                   {(id) => <Input id={id} value={form.dentistName} onChange={(v) => set(['dentistName'], v)} disabled={!!form.dentistId} />}
                 </Field>
@@ -346,10 +345,7 @@ function PrescriptionFields({
         onApply={(body) => { if (!('items' in body)) set(['advice'], body.advice ?? ''); }}
       />
       <div className="form-grid mt-4">
-        <Field
-          label="C/C (chief complaint)"
-          hint="Choose a common entry, or select Other to type the patient's own words."
-        >
+        <Field label="C/C (chief complaint)">
           {(id) => (
             <Select
               id={id}
@@ -365,10 +361,7 @@ function PrescriptionFields({
             {(id) => <Input id={id} value={form.ccOther} onChange={(value) => set(['ccOther'], value)} placeholder="Write the chief complaint…" />}
           </Field>
         )}
-        <Field
-          label="O/E (on examination)"
-          hint="Choose a listed finding, or select Other to enter the clinician's own text."
-        >
+        <Field label="O/E (on examination)">
           {(id) => (
             <Select
               id={id}
@@ -384,12 +377,12 @@ function PrescriptionFields({
             {(id) => <Input id={id} value={form.oeOther} onChange={(value) => set(['oeOther'], value)} placeholder="Write the examination finding…" />}
           </Field>
         )}
-        <Field label="R/E (radiographic examination)">
+        <Field label="R/E">
           {(id) => <Input id={id} value={form.rE} onChange={(value) => set(['rE'], value)} />}
         </Field>
         <Field label="Diagnosis">{(id) => <Input id={id} value={form.diagnosis} onChange={(value) => set(['diagnosis'], value)} />}</Field>
-        <Field label="Treatment / procedure">{(id) => <Input id={id} value={form.treatment} onChange={(value) => set(['treatment'], value)} />}</Field>
-        <Field label="Follow-up date">{(id) => <Input id={id} type="date" value={form.followUp} onChange={(value) => set(['followUp'], value)} />}</Field>
+        <Field label="Treatment">{(id) => <Input id={id} value={form.treatment} onChange={(value) => set(['treatment'], value)} />}</Field>
+        <Field label="Follow-up">{(id) => <Input id={id} type="date" value={form.followUp} onChange={(value) => set(['followUp'], value)} />}</Field>
         <Field label="Advice" className="span-2">{(id) => <Textarea id={id} rows={2} value={form.advice} onChange={(value) => set(['advice'], value)} />}</Field>
       </div>
       <div className="mt-4">
@@ -450,13 +443,13 @@ function InvoiceFields({ form, set, treatments }: { form: any; set: (p: string[]
               <Field label="Item or procedure" required className="quick-line-description">
                 {(id) => <Input id={id} value={row.description} onChange={(value) => setRow(index, { description: value })} placeholder="e.g. Consultation, scaling" required />}
               </Field>
-              <Field label="Quantity">
+              <Field label="Qty">
                 {(id) => <Input id={id} type="number" min={1} step={1} value={String(row.qty)} onChange={(value) => setRow(index, { qty: value })} />}
               </Field>
-              <Field label="Unit price (৳)" hint="Price for one item or procedure.">
+              <Field label="Unit price (৳)">
                 {(id) => <Input id={id} type="number" min={0} step="0.01" value={String(row.unitPrice)} onChange={(value) => setRow(index, { unitPrice: value })} />}
               </Field>
-              <Field label="Line discount (৳)" hint="Optional; deducted from this line only.">
+              <Field label="Discount (৳)">
                 {(id) => <Input id={id} type="number" min={0} step="0.01" value={String(row.discount)} onChange={(value) => setRow(index, { discount: value })} />}
               </Field>
               <Field label="Line total (৳)" labelFor={false} className="quick-line-total">
@@ -468,19 +461,19 @@ function InvoiceFields({ form, set, treatments }: { form: any; set: (p: string[]
         {rows.length === 0 && <p className="small muted" style={{ margin: 0 }}>Add at least one invoice line.</p>}
       </div>
       <div className="form-grid mt-4">
-        <Field label="Invoice-wide discount (৳)" hint="Applied once after line discounts.">
+        <Field label="Invoice discount (৳)">
           {(id) => <Input id={id} type="number" min={0} step="0.01" value={String(form.invoiceDiscount)} onChange={(value) => set(['invoiceDiscount'], value)} />}
         </Field>
-        <Field label="Amount received now (৳)" hint="Used to calculate the balance due; it does not change the invoice total.">
+        <Field label="Amount received (৳)">
           {(id) => <Input id={id} type="number" min={0} step="0.01" value={String(form.amountReceived)} onChange={(value) => set(['amountReceived'], value)} />}
         </Field>
-        <Field label="Payment method" hint="Shown on the invoice when an amount is received">
+        <Field label="Payment method">
           {(id) => (
             <Select id={id} value={form.method || 'Cash'} onChange={(value) => set(['method'], value)}
               options={QUICK_PAYMENT_METHODS.map((method) => ({ value: method, label: method }))} />
           )}
         </Field>
-        <Field label="Note (printed on the invoice)">{(id) => <Input id={id} value={form.note} onChange={(value) => set(['note'], value)} />}</Field>
+        <Field label="Note">{(id) => <Input id={id} value={form.note} onChange={(value) => set(['note'], value)} />}</Field>
       </div>
       <div className="quick-invoice-summary mt-3 small" aria-label="Invoice calculation summary">
         <span>Gross subtotal <strong className="num"><Money paisa={totals.subtotalPaisa} /></strong></span>
@@ -497,7 +490,7 @@ function InvoiceFields({ form, set, treatments }: { form: any; set: (p: string[]
 function ReceiptFields({ form, set }: { form: any; set: (p: string[], v: unknown) => void }) {
   return (
     <div className="form-grid mt-4">
-      <Field label="Amount received" required hint="The amount this receipt acknowledges">
+      <Field label="Amount received" required>
         {(id) => <Input id={id} type="number" min={0} step="0.01" value={String(form.amount)} onChange={(v) => set(['amount'], v)} />}
       </Field>
       <Field label="Method">
@@ -506,7 +499,7 @@ function ReceiptFields({ form, set }: { form: any; set: (p: string[], v: unknown
             options={QUICK_PAYMENT_METHODS.map((m) => ({ value: m, label: m }))} />
         )}
       </Field>
-      <Field label="Payment reference" hint="Optional — mobile-wallet or bank reference">
+      <Field label="Payment reference">
         {(id) => <Input id={id} value={form.paymentReference} onChange={(v) => set(['paymentReference'], v)} />}
       </Field>
     </div>
@@ -545,16 +538,16 @@ function VisitFields({ form, set, treatments }: { form: any; set: (p: string[], 
               <Button size="sm" variant="ghost" ariaLabel={`Remove procedure ${i + 1}`} onClick={() => set(['procedures'], rows.filter((_, x) => x !== i))}>Remove</Button>
             </div>
             <div className="quick-line-grid quick-procedure-grid">
-              <Field label="Tooth number">
+              <Field label="Tooth #">
                 {(id) => <Input id={id} value={row.toothNumber} onChange={(v) => setRow(i, { toothNumber: v })} placeholder="Optional" />}
               </Field>
               <Field label="Procedure">
                 {(id) => <Input id={id} value={row.treatmentName} onChange={(v) => setRow(i, { treatmentName: v })} placeholder="e.g. Scaling" />}
               </Field>
-              <Field label="Quantity">
+              <Field label="Qty">
                 {(id) => <Input id={id} type="number" min={1} step={1} value={String(row.qty)} onChange={(v) => setRow(i, { qty: v })} />}
               </Field>
-              <Field label="Unit price (৳)" hint="Price for one procedure.">
+              <Field label="Unit price (৳)">
                 {(id) => <Input id={id} type="number" min={0} step="0.01" value={String(row.unitPrice)} onChange={(v) => setRow(i, { unitPrice: v })} />}
               </Field>
             </div>
@@ -569,7 +562,7 @@ function VisitFields({ form, set, treatments }: { form: any; set: (p: string[], 
 function AppointmentFields({ form, set }: { form: any; set: (p: string[], v: unknown) => void }) {
   return (
     <div className="form-grid mt-4">
-      <Field label="Time" required hint="24-hour clock">
+      <Field label="Time" required>
         {(id) => <Input id={id} type="time" value={form.time} onChange={(v) => set(['time'], v)} />}
       </Field>
       <Field label="Purpose">{(id) => <Input id={id} value={form.purpose} onChange={(v) => set(['purpose'], v)} placeholder="e.g. Scaling" />}</Field>

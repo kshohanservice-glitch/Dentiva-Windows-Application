@@ -225,7 +225,7 @@ function PatientFormModal(props: { open: boolean; initial?: (PatientDTO & Partia
         <Field label="Alternate phone">
           {(id) => <Input id={id} value={values.phone2 ?? ''} onChange={(v) => set('phone2', v)} />}
         </Field>
-        <Field label="WhatsApp Number" hint="Optional. Bangladesh or international format." error={errors.whatsappNumber}>
+        <Field label="WhatsApp Number" error={errors.whatsappNumber}>
           {(id) => (
             <Input
               id={id}
@@ -1475,7 +1475,6 @@ export function RxFormModal(props: { patientId: number; visitId?: number | null;
         <Field
           label={<>C/C <span className="muted">(chief complaint)</span></>}
           className="span-2"
-          hint="Choose a common entry, or select Other to type the patient's own words."
         >
           {(id) => (
             <Select
@@ -1495,7 +1494,6 @@ export function RxFormModal(props: { patientId: number; visitId?: number | null;
         <Field
           label={<>O/E <span className="muted">(on examination)</span></>}
           className="span-2"
-          hint="Choose a listed finding, or select Other to enter the clinician's own text."
         >
           {(id) => (
             <Select
@@ -1524,7 +1522,7 @@ export function RxFormModal(props: { patientId: number; visitId?: number | null;
         <Field label="Advice">
           {(id) => <Input id={id} value={values.advice} onChange={(v) => set('advice', v)} />}
         </Field>
-        <Field label="Follow-up date">
+        <Field label="Follow-up">
           {(id) => <Input id={id} type="date" value={values.followUp} onChange={(v) => set('followUp', v)} />}
         </Field>
       </div>
@@ -1540,7 +1538,7 @@ export function RxFormModal(props: { patientId: number; visitId?: number | null;
           formError={errors.items}
           showNameErrors={!!errors.items}
         />
-        <Field label="Save as template (optional name)" className="mt-4">
+        <Field label="Save as template" className="mt-4">
           {(id) => <Input id={id} value={values.saveAsTemplate} onChange={(v) => set('saveAsTemplate', v)} placeholder="e.g. Standard post-extraction" />}
         </Field>
       </div>
@@ -1702,7 +1700,7 @@ export function InvoiceFormModal(props: { patientId: number; visitId?: number | 
         <Field label="Invoice date" required>
           {(id) => <Input id={id} type="date" value={values.date} onChange={(v) => set('date', v)} />}
         </Field>
-        <Field label="Invoice-wide discount (৳)" hint="Applied once to the invoice after the line amounts are added." error={errors.discountPaisa}>
+        <Field label="Invoice discount (৳)" error={errors.discountPaisa}>
           {(id) => (
             <Input
               id={id} type="number" min={0}
@@ -1712,7 +1710,7 @@ export function InvoiceFormModal(props: { patientId: number; visitId?: number | 
             />
           )}
         </Field>
-        <Field label="Note (printed)" className="span-2">
+        <Field label="Note" className="span-2">
           {(id) => <Input id={id} value={values.note} onChange={(v) => set('note', v)} placeholder="optional footer note" />}
         </Field>
       </div>
@@ -1746,13 +1744,13 @@ export function InvoiceFormModal(props: { patientId: number; visitId?: number | 
             <Field label="Description">
               {(id) => <Input id={id} value={line.description} onChange={(v) => setItem(i, { description: v })} placeholder="Treatment or item" />}
             </Field>
-            <Field label="Quantity">
+            <Field label="Qty">
               {(id) => <Input id={id} type="number" min={1} value={String(line.qty)} onChange={(v) => setItem(i, { qty: Math.max(1, Number(v) || 1) })} />}
             </Field>
-            <Field label="Unit price (৳)" hint="Price for one item or procedure.">
+            <Field label="Unit price (৳)">
               {(id) => <Input id={id} type="number" min={0} step="0.01" value={String(line.unitPricePaisa / 100)} onChange={(v) => setItem(i, { unitPricePaisa: Math.round((Number(v) || 0) * 100) })} />}
             </Field>
-            <Field label="Line total (৳)" hint="Quantity × unit price; the invoice-wide discount is applied below." labelFor={false}>
+            <Field label="Line total (৳)" labelFor={false}>
               {() => <div className="input" style={{ display: 'flex', alignItems: 'center', minHeight: 34 }} aria-readonly="true"><Money paisa={line.qty * line.unitPricePaisa} /></div>}
             </Field>
             <Button variant="ghost" size="sm" onClick={() => set('items', values.items.filter((_, j) => j !== i))} title="Remove line">✕</Button>
