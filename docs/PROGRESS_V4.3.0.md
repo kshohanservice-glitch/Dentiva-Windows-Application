@@ -1,3 +1,6 @@
+> **Superseded.** Version 4.3.0 was never released. Its work (A4-only printing, walk-in invoice layout)
+> ships in **5.0.0** — see `docs/RELEASE_NOTES_5.0.0.md` and `docs/V5_PROGRESS.md`.
+
 # Dentiva Pro 4.3.0 — audit, refactor and release progress log
 
 Durable interruption-recovery record for the 4.3.0 effort. It is updated after every meaningful

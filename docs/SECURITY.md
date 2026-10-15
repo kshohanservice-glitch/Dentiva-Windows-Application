@@ -11,10 +11,17 @@ engineering (see §6 Activation honesty).
 
 ## 2. Authentication
 
-- Argon2id (via @node-rs/argon2, OWASP-recommended params: m=19MB? — use m=19456 KiB,
-  t=2, p=1 — tune to <100ms on target) with random 16-byte salt, PHC string storage.
-- Login: username+password → constant-time verify; failure counter `failed_attempts`;
-  after 5 failures → temporary lock 5 minutes (`locked_until`), logged in audit as failed login.
+- Argon2id via `@node-rs/argon2` with the OWASP baseline parameters m = 19,456 KiB,
+  t = 2, p = 1 (`src/main/core/passwords.ts`), random salt, PHC string storage.
+- Login: username + password → constant-time verify (a dummy verify runs for unknown users);
+  failure counter `failed_attempts`; after `maxFailedLogins` consecutive failures (setting,
+  default 5, clamped 3–20) the account is locked for 5 minutes (`locked_until`); every failure
+  is audited.
+- **Lock-screen unlock (v5, V5-001):** wrong unlock passwords are counted the same way; at
+  `maxFailedLogins` the session ends (full sign-in required, which carries the account
+  lockout) and the failure is recorded on the user row.
+- **Account status (v5, V5-002):** every IPC call re-reads the signed-in user; a disabled or
+  locked account is signed out on its next call (AUTH error → login screen).
 - No plaintext password ever stored, logged, audited, or echoed in errors.
 - Session lives in main process memory only; renderer receives non-sensitive profile info.
 - Manual **Lock** (Ctrl+L) and **Auto-lock** (5/10/15/30 min, default 10; disable only via
@@ -36,7 +43,14 @@ engineering (see §6 Activation honesty).
 - Financial permission (`finance.view`, `accounting.view`, `staff.salary.view`, …) checked
   in queries too: unauthorized roles receive redacted/absent values, including through
   global search and dashboard aggregates.
-- Overrides: per-user grant/revoke table applied on top of role.
+- Overrides (v5, V5-014): per-user grant/revoke rows on top of the role with **exact-set**
+  semantics — the saved set is exactly what the administrator ticked (grants = desired − role,
+  revokes = role − desired); clearing "Override" removes every override; changing a role never
+  carries the old role's permissions.
+- Account rules (v5, V5-015/016, decision D-8): nobody changes their own role, status or
+  overrides; only an Owner may modify or delete an Owner; the last active Owner can never be
+  demoted, disabled or deleted; a non-owner with `users.manage` / `roles.manage` can only
+  assign permission sets they hold themselves (privilege ceiling).
 
 ## 4. Data layer protections
 
@@ -84,8 +98,9 @@ engineering (see §6 Activation honesty).
 
 ## 7. Logging & privacy
 
-- Rotating file logs (5 × 2 MB), automatic cleanup; redaction filter for keys matching
-  password/token/secret/activation/code? (activation only).
+- Rotating file logs (5 × 2 MB), automatic cleanup; metadata keys matching
+  `/(password|passphrase|token|secret|activation|credential|otp)/i` are written as
+  `[redacted]` (`src/main/logger.ts`).
 - Notifications avoid exposing clinical/financial detail to unauthorized users.
 - No telemetry; no network sockets at runtime.
 
@@ -116,3 +131,27 @@ engineering (see §6 Activation honesty).
   are not masked.
 - Electron E2E, accessibility and physical print verification remain release gates;
   see `RELEASE_EXECUTION_JOURNAL.md`.
+
+## 11. v5 hardening summary (2026-10-15)
+
+Details, evidence and tests: `docs/audits/v5/SECURITY_AUDIT.md` and `ISSUE_REGISTER.md`.
+
+| Area | Control | Issue |
+| --- | --- | --- |
+| Lock screen | Unlock attempts limited; session ends at `maxFailedLogins` | V5-001 |
+| Sessions | Disabled/locked accounts lose their session on the next call | V5-002 |
+| Demo build | Read-only by **allow-list** — unknown or new channels are blocked by default | V5-003, D-11 |
+| Windows | Navigation allowed only to the packaged `index.html` (any hash) | V5-004 |
+| Save as PDF | Always exports the print window, never the focused window | V5-005 |
+| Clinic logo | The main process owns the path; only image files directly in `branding/` are served | V5-006 |
+| Upgrades | Verified pre-migration copy of the database (newest 3 kept) | V5-007 |
+| Billing / clinical links | `visitId` must exist and belong to the patient (invoices, prescriptions, chart); `treatmentId` must exist. A visit that already has an invoice keeps its first link (unchanged billing rule) | V5-008 |
+| Medicine templates | Items validated; missing template → NOT_FOUND | V5-009 |
+| Print window | Opening a document window requires that document's permission | V5-010 |
+| Crash handling | Handlers registered at module start; boot failures reach the fatal dialog | V5-011 |
+| Backups | `backup/run` requires `backup.create`; retention prunes only automatic backups | V5-013, V5-017 |
+| Accounts | Exact-set overrides, Owner protection, privilege ceiling, self guard | V5-014–016 |
+
+Open owner decision: the offline activation code is derivable from the public repository
+(test helper) — V5-018. Activation remains an honest soft gate (§6); it is not an access
+control for patient data.

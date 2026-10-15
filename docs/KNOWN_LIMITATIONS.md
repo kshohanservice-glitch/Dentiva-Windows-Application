@@ -123,3 +123,21 @@ label is a follow-up UI change, not a correctness fix.
   workflow, not a defect: registering the customer is a separate, deliberate action.
 * **Reports and exports** were reviewed for calculation correctness but were not restructured; no report
   formula changed in this release.
+
+## 5. v5 limitations and open decisions (2026-10-15)
+
+* **Physical printing is unverified.** v5 measured every document as A4 in Chromium-generated PDFs,
+  including multi-page output, but no Windows printer, driver or Electron `printToPDF` run was
+  observed in this environment. Check on a clinic printer with disposable data before release.
+* **Activation code exposure (V5-018, owner decision).** The offline activation code can be derived
+  from a test helper in the public repository. Activation is a soft gate, not patient-data access
+  control; changing the scheme changes who can activate and needs the owner's decision.
+* **Date input display (V5-033).** Native date inputs follow the Windows/Chromium locale and may show
+  mm/dd/yyyy; values are stored as ISO dates either way. Needs a device check.
+* **Window minimum (V5-036, owner decision).** The documented 1180 × 680 minimum is larger than a
+  1366 × 768 screen at 125 % scaling; the layouts themselves pass the harness down to 480 px.
+* **A second invoice for an already-invoiced visit** is still allowed (unchanged billing rule); the
+  visit keeps its first invoice link.
+* **Accessibility** was checked with an automated WCAG 2.1 AA scan (axe-core: 0 violations in both
+  themes over 24 screens and modals). Automated scans find only part of the WCAG issues; no manual
+  keyboard walk-through on Windows and no screen-reader session (NVDA/Narrator) was run.

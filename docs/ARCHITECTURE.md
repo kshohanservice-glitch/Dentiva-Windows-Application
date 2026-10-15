@@ -13,7 +13,7 @@
 | PDF/print | Chromium print engine: `webContents.print()` (Windows printer enumeration incl. network/BT/USB printers exposed by Windows) and `webContents.printToPDF()` (Save as PDF) |
 | Packaging | `electron-builder` → NSIS Windows installer (`DentivaPro-Setup-x.y.z.exe`) |
 | Tests | Vitest (unit + integration against real SQLite), Playwright `_electron` (E2E) |
-| CI | GitHub Actions: Linux job (lint/typecheck/unit/integration), Windows job (build/package/E2E), release job |
+| CI | GitHub Actions `CI` workflow, all on `windows-latest`: verify (production audit, typecheck, lint, vitest, build, marker gate), Electron E2E (Playwright), NSIS package + installed-artifact smoke test; publishing only on a version tag |
 
 ## 2. Why Electron (ADR-001)
 
@@ -34,8 +34,11 @@ automated CI (including on non-Windows runners for the majority of the logic).
 
 ### Trade-offs accepted
 
-- **Memory footprint** (~150–250 MB) vs. native WPF (~80 MB): mitigated by lazy route
-  loading, virtualized tables, WAL DB, and avoiding chart/UI libraries.
+- **Memory footprint** (~150–250 MB) vs. native WPF (~80 MB): mitigated by virtualized
+  tables, WAL DB, and avoiding chart/UI libraries. Routes are **not** lazy-loaded: the renderer
+  is one script (588 KB, 161 KB gzip) loaded from local disk — measured boot script 41 ms and
+  first paint 116 ms in headless Chromium (V5-031); splitting was not worth the added loading
+  states. Only the font subsets the UI renders are bundled (V5-032).
 - **Bundle size** (~120 MB installer incl. Chromium): acceptable for desktop clinic software distributed on USB/local install.
 - **Chromium in-app printing** delegates final paper geometry partly to the Windows driver;
   mitigated with `@page` CSS per profile + preview parity testing (docs/PRINTING.md).

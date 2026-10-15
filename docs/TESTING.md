@@ -13,10 +13,32 @@ This is a map of executable checks, **not** a claim that all device-level checks
   coverage, keyboard nav) and `tests/unit/branding.test.ts` +
   `tests/integration/branding.test.ts` (clinic identity on Login/dashboard, broken
   logo fallback, branding round-trip through backup/restore). Coverage includes v3.0.3 and v4.2.2 fixture upgrades (`tests/fixtures/v4.2.2/dentiva-v4.2.2.db`, rebuilt by `scripts/build-v422-fixture.mjs`, proves the A4-only print-profile rewrite on a database written by the published version), legacy Queue preservation, appointment expiry/reschedule, backup/restore tamper/rollback cases, money masking rules, RBAC, financial reconciliation, template permissions/validation, and a 20,000-patient synthetic query fixture. A passing 20k-patient fixture is **not** a benchmark for 60k visits or 100k invoices.
+- v5 suites (2026-10): `tests/integration/v5-security.test.ts` (account, session, backup, logo,
+  pre-migration and link-validation hardening), `tests/unit/access-policy.test.ts` (demo
+  allow-list, print-window permissions), `tests/integration/v5-local-dates.test.ts` (local-day
+  filters, `TZ=Asia/Dhaka`), `tests/integration/v5-print-chain.test.ts` (printed report totals,
+  multi-page rules, fonts), `tests/unit/v5-accessibility.test.ts` (WCAG contrast computed from
+  `tokens.css`, names/roles) and `tests/unit/ipc-surface.test.ts` (every IPC channel has exactly
+  one handler). Results per commit: `docs/audits/v5/TEST_RESULTS.md`.
 - `npm run build` compiles the main process and renderer.
 - `npm audit --omit=dev --audit-level=moderate` checks known production dependency advisories at the time of the run.
 
 Linux installation requires the documented `npm_config_nodedir=/usr/local npm ci --force` workaround for the Windows-only Argon2 dependency. Local `npm run test:e2e` cannot launch in this sandbox when the Electron binary cannot be downloaded; this does not count as an E2E pass.
+
+## Layout, print and accessibility harness (`scripts/layout-audit.mjs`)
+
+Runs the production renderer bundle (`npm run build:renderer`) in a Chromium with a stubbed bridge.
+Set `LAYOUT_BROWSER` (and `LAYOUT_BROWSER_LIBS` if the browser needs extra libraries).
+
+- default: 24 screens and modal scenarios × 8 viewports (2560 → 480 px) — overflow, clipping and
+  overlap checks; `--theme dark`; `--screens` writes screenshots to `layout-audit/` (git-ignored).
+- `--pdf <dir>`: every printable document rendered in the print window, page box measured, PDF
+  written and checked for A4 geometry; `--long` uses long fixtures for pagination checks.
+- `--axe <path to axe.min.js>`: axe-core WCAG 2.0/2.1 A + AA scan of every screen and modal
+  (axe-core is not a project dependency; install it separately). The app CSP stays enforced.
+
+The harness is evidence about the renderer in Chromium, not about Electron's print path, a
+Windows printer or a screen reader.
 
 ## Windows CI
 

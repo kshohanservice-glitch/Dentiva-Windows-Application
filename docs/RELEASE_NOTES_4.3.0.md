@@ -1,3 +1,6 @@
+> **Superseded.** Version 4.3.0 was never released. Its work (A4-only printing, walk-in invoice layout)
+> ships in **5.0.0** — see `docs/RELEASE_NOTES_5.0.0.md` and `docs/V5_PROGRESS.md`.
+
 # Dentiva Pro 4.3.0
 
 Dentiva Pro 4.3.0 is a printing-policy and layout release. Printed documents are now **A4 only** — the

@@ -146,8 +146,21 @@ retained across migrations 003/004.
 ## Migration policy
 
 - Forward-only numbered migrations in code (`001_init.ts`, …).
-- Startup: run pending inside transaction; for any future destructive migration take an
-  automatic pre-migration backup first.
+- Startup: pending migrations run inside a transaction.
+- **Pre-migration safety copy (v5, V5-007):** before pending migrations are applied to an
+  existing database, `openDatabase()` writes `data/pre-migration/dentiva-v<from>-<timestamp>.db`
+  with `VACUUM INTO`, opens the copy and checks it (`quick_check` = ok and `user_version` = the
+  pre-upgrade version) before migrating, and keeps the newest three copies
+  (`PRE_MIGRATION_KEEP`). If the copy cannot be written or verified, the partial file is removed
+  and the upgrade does not start — no data is changed and the user is told to free disk space or
+  fix folder permissions (fail closed). A new database or one that is already up to date gets
+  no copy. The copy is a restore point for the owner or support; the
+  app does not roll back automatically.
+- Migration 008 (v5, D-6) converts legacy non-A4 print profiles to A4 instead of deleting them;
+  the audit row keeps the pre-conversion profiles (`docs/PRINTING.md`).
+- Date semantics (v5, D-7): `payments.paid_at`, `audit_log.at` and other timestamps are UTC
+  instants filtered by the clinic's local day; `visits.datetime` is local wall-clock time
+  (the trailing `Z` is historical). No data migration was needed.
 - `PRAGMA integrity_check` on startup (quick_check) — failure routes to recovery flow.
 
 ## Indexes (principal)
