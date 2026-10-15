@@ -375,12 +375,11 @@ test('the prescription editor and the other document tabs stay inside their pane
 });
 
 test('the printed walk-in invoice carries the same total as the screen', async () => {
+  // Switching tabs clears the editor, so the invoice tab starts with one empty
+  // line: 1 × 1,200.00 − 200.00 line discount − 100.00 invoice discount = 900.00.
   await page.getByRole('tab', { name: /Quick invoice/i }).click();
-  await page.getByLabel('Customer name').fill('E2E Walk-in Layout Customer');
-  // Remove the saved-treatment line so the printed total is exactly one line:
-  // 1 × 1,200.00 − 200.00 line discount − 100.00 invoice discount = 900.00.
-  await page.locator('.quick-line-card').nth(1).getByRole('button', { name: 'Remove invoice line 2' }).click();
   await expect(page.locator('.quick-line-card')).toHaveCount(1);
+  await page.getByLabel('Customer name').fill('E2E Walk-in Layout Customer');
   const card = page.locator('.quick-line-card').first();
   await card.getByLabel('Item or procedure').fill('Extraction');
   await card.getByLabel('Qty').fill('1');
@@ -401,6 +400,7 @@ test('the printed walk-in invoice carries the same total as the screen', async (
   const printed = printWin.locator('.print-doc');
   await expect(printed).toBeVisible({ timeout: 60_000 });
   await expect(printed).toContainText('৳900.00');
+  await expect(printed).toContainText('Extraction');
   // Printed documents always show real amounts — never the on-screen mask.
   await expect(printed).not.toContainText('****');
   await printWin.close();
