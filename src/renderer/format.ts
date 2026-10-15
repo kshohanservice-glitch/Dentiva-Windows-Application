@@ -39,6 +39,21 @@ export function wallClockTime(value: string | null | undefined): string {
   return m ? `${m[1]}:${m[2]}` : '';
 }
 
+/**
+ * 12-hour clock for patient-facing print: "14:30" → "02:30 PM". The printed
+ * appointment card used to take this from the Windows language settings
+ * (02:30 PM on English (US), 14:30 on English (UK)). It is now fixed to the
+ * English (US) look, so the card never depends on the PC or on the app's
+ * pinned en-GB locale (V5-033). Returns '' for anything that isn't HH:MM.
+ */
+export function clockTime12(value: string | null | undefined): string {
+  const m = /^([01]\d|2[0-3]):([0-5]\d)/.exec(String(value ?? ''));
+  if (!m) return '';
+  const hour = Number(m[1]);
+  const hour12 = hour % 12 === 0 ? 12 : hour % 12;
+  return `${String(hour12).padStart(2, '0')}:${m[2]} ${hour >= 12 ? 'PM' : 'AM'}`;
+}
+
 /** yyyy-MM-ddTHH:mm for <input type="datetime-local"> */
 export function localDateTime(d: Date): string {
   const tz = d.getTimezoneOffset() * 60_000;

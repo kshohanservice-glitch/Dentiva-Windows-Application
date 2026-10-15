@@ -7,7 +7,7 @@ import { useApp } from '../state/app-context';
 import { Badge, Button, Card, EmptyState, ErrorState, Spinner, StatCard, useToast } from '../components/primitives';
 import { Icon } from '../components/shell';
 
-const time = (iso: string): string => new Date(iso).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
+const time = (iso: string): string => new Date(iso).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
 
 export function DashboardPage() {
   const { user, can, settings } = useApp();
@@ -31,7 +31,7 @@ export function DashboardPage() {
   const backupGo = async () => {
     try {
       const rec = await api['backup/run']();
-      toast.success('Backup created', `${rec.path.split(/[\\/]/).pop()} · ${rec.sizeBytes.toLocaleString()} bytes`);
+      toast.success('Backup created', `${rec.path.split(/[\\/]/).pop()} · ${rec.sizeBytes.toLocaleString('en-GB')} bytes`);
     } catch (err) {
       toast.error('Backup failed', err instanceof Error ? err.message : undefined);
     }

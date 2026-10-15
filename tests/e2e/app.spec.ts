@@ -580,3 +580,42 @@ test('adapts cleanly across 1280×720 and 1920×1080 viewports without horizonta
     }
   }
 });
+
+/**
+ * The editable parts Chromium draws inside a native date or time input, in
+ * on-screen order (for example Day,Month,Year or Month,Day,Year). They are read
+ * from the accessibility tree because navigator.language alone does not prove
+ * what the field shows: a locale override can change navigator.language while
+ * the field still reads mm/dd/yyyy (V5-033).
+ */
+async function nativeFieldOrder(selector: string): Promise<string[]> {
+  const cdp = await page.context().newCDPSession(page);
+  try {
+    const { result } = await cdp.send('Runtime.evaluate', { expression: `document.querySelector(${JSON.stringify(selector)})` });
+    if (!result.objectId) throw new Error(`No element matches ${selector}`);
+    const { nodes } = await cdp.send('Accessibility.queryAXTree', { objectId: result.objectId, role: 'spinbutton' });
+    return nodes.map((n) => String(n.name?.value ?? '').split(' ')[0]);
+  } finally {
+    await cdp.detach();
+  }
+}
+
+test('native date and time fields read dd/mm/yyyy and 24-hour like the rest of the app (V5-033)', async () => {
+  await page.getByRole('link', { name: 'Appointments', exact: true }).click();
+  await page.getByRole('button', { name: 'New appointment' }).first().click();
+  const modal = page.locator('.modal[role="dialog"]', { hasText: 'New appointment' });
+  await expect(modal).toBeVisible();
+
+  // Actual values go into the messages so a CI failure annotation shows them.
+  const date = await nativeFieldOrder('.modal[role="dialog"] input[type="date"]');
+  expect(date, `date field order: ${date.join(',')}`).toEqual(['Day', 'Month', 'Year']);
+  const time = await nativeFieldOrder('.modal[role="dialog"] input[type="time"]');
+  expect(time, `time field parts: ${time.join(',')}`).toEqual(['Hours', 'Minutes']);
+  const [language, clock] = await page.evaluate(() => [
+    navigator.language,
+    new Date(2026, 9, 15, 14, 30).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' }),
+  ]);
+  expect(`${language} ${clock}`, `renderer locale: ${language} ${clock}`).toBe('en-GB 14:30');
+
+  await page.keyboard.press('Escape');
+});

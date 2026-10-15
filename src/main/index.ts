@@ -265,6 +265,16 @@ process.on('unhandledRejection', (reason) => {
   logger.error('Unhandled rejection', { error: reason instanceof Error ? reason.message : String(reason) });
 });
 
+// On screen, Dentiva Pro shows dates as dd/mm/yyyy and times as 24-hour
+// HH:MM (formatDate, wallClockTime), and printouts use dd/mm/yyyy. Native
+// date and time fields don't use those helpers: Chromium draws them in its
+// own UI locale, which follows the Windows language settings. On an en-US PC
+// a date field showing 03/04/2026 meant 4 March, while the app's lists and
+// printouts use 03/04/2026 for 3 April. Pinning the UI locale to en-GB makes
+// the fields match the app (V5-033). It has to be set before the app is
+// ready. Side effect: the date picker's calendar starts weeks on Monday.
+app.commandLine.appendSwitch('lang', 'en-GB');
+
 const gotLock = app.requestSingleInstanceLock();
 if (!gotLock) {
   app.quit();

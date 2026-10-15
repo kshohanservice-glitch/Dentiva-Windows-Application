@@ -425,7 +425,7 @@ export function AppShell() {
         <div className="header-right">
           <div className="header-date">
             <div>{`${now.toLocaleDateString('en-GB', { weekday: 'short' }).replace(',', '')} ${formatDate(now)}`}</div>
-            <div className="num">{now.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })}</div>
+            <div className="num">{now.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}</div>
           </div>
           <MoneyRevealToggle />
           <NotificationBell />

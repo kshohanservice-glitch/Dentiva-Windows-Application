@@ -46,6 +46,25 @@ const CASES: { type: CustomizableDocumentType; renderer: string; sample: string 
 const render = (mod: Record<string, any>, name: string, data: unknown): string =>
   renderToStaticMarkup(createElement(mod[name] as FunctionComponent<any>, data));
 
+/**
+ * The frozen copy formats the appointment-card time with the machine's default
+ * locale ("10:30 AM" on English (US), "10:30" on English (UK)). v5 prints a
+ * fixed 12-hour time in the English (US) style (clockTime12, V5-033), so the
+ * frozen side is rendered with en-US. The comparison then doesn't depend on the
+ * test machine, and it checks that v5 prints what an English (US) PC printed.
+ */
+function renderLegacy(name: string, data: unknown): string {
+  const original = Date.prototype.toLocaleTimeString;
+  Date.prototype.toLocaleTimeString = function (this: Date, _locales?: string | string[], options?: Intl.DateTimeFormatOptions) {
+    return original.call(this, 'en-US', options);
+  };
+  try {
+    return render(legacy, name, data);
+  } finally {
+    Date.prototype.toLocaleTimeString = original;
+  }
+}
+
 const markersIn = (html: string): string[] =>
   Array.from(html.matchAll(/data-doc-el="([^"]+)"/g)).map((m) => m[1]);
 
@@ -53,7 +72,7 @@ describe('printable documents: default design is unchanged', () => {
   for (const { type, renderer, sample } of CASES) {
     it(`${type} renders identically to the pre-customization implementation`, () => {
       const data = DOCUMENT_SAMPLES[sample]();
-      const before = normalizeDocumentMarkup(render(legacy, renderer, data));
+      const before = normalizeDocumentMarkup(renderLegacy(renderer, data));
       const after = normalizeDocumentMarkup(render(current, renderer, data));
       // Markers are the only difference …
       expect(stripDocumentMarkers(after)).toBe(before);

@@ -683,6 +683,18 @@ const SCENARIOS = {
       },
     },
   ],
+  appointments: [
+    {
+      // Booking form: native date and time fields, drawn in the app's en-GB
+      // locale (dd/mm/yyyy, 24-hour) because the browser is launched in it.
+      key: 'new-appointment-modal',
+      selector: '.modal .form-grid',
+      run: async (page) => {
+        await page.getByRole('button', { name: 'New appointment' }).first().click({ timeout: 8000 });
+        await page.waitForSelector('.modal[role="dialog"]', { timeout: 10000 });
+      },
+    },
+  ],
   invoices: [
     {
       key: 'new-invoice-modal',
@@ -1049,8 +1061,17 @@ async function main() {
   try {
     browser = await chromium.launch({
       executablePath,
-      env: { ...process.env, ...(process.env.LAYOUT_BROWSER_LIBS ? { LD_LIBRARY_PATH: process.env.LAYOUT_BROWSER_LIBS } : {}) },
-      args: ['--no-sandbox', '--disable-gpu', '--disable-dev-shm-usage', '--font-render-hinting=none'],
+      // The app pins Chromium's UI locale to en-GB (src/main/index.ts, V5-033),
+      // which decides how native date and time fields are drawn. Use the same
+      // locale here so screenshots and widths match: --lang works on Windows
+      // and macOS, while Linux Chromium takes it from LANG/LANGUAGE.
+      env: {
+        ...process.env,
+        LANG: 'en_GB.UTF-8',
+        LANGUAGE: 'en_GB',
+        ...(process.env.LAYOUT_BROWSER_LIBS ? { LD_LIBRARY_PATH: process.env.LAYOUT_BROWSER_LIBS } : {}),
+      },
+      args: ['--no-sandbox', '--disable-gpu', '--disable-dev-shm-usage', '--font-render-hinting=none', '--lang=en-GB'],
     });
   } catch (err) {
     console.error('No usable Chromium for the layout harness:', err instanceof Error ? err.message : String(err));

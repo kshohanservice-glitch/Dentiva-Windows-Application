@@ -20,7 +20,7 @@
  * never altered by styling.
  */
 import React from 'react';
-import { formatDate } from '../format';
+import { clockTime12, formatDate } from '../format';
 import { FormattedMoney } from '../components/formatted-money';
 import { PrintMoney } from '../components/print-money';
 import { docEl, type CustomizableDocumentType } from '../../shared/document-styles';
@@ -387,7 +387,7 @@ export function appointmentCardDoc(data: any): React.ReactNode {
         <div><span className="k" {...docEl('appointment-card.body.infoLabel')}>Patient</span><span className="v" {...docEl('appointment-card.body.infoValue')}>{patient.name}</span></div>
         <div><span className="k" {...docEl('appointment-card.body.infoLabel')}>Phone</span><span className="v" {...docEl('appointment-card.body.infoValue')}>{patient.phone || '—'}</span></div>
         <div><span className="k" {...docEl('appointment-card.body.infoLabel')}>Date</span><span className="v" {...docEl('appointment-card.body.infoValue')}>{formatDate(start)}</span></div>
-        <div><span className="k" {...docEl('appointment-card.body.infoLabel')}>Time</span><span className="v" {...docEl('appointment-card.body.infoValue')}>{start.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })}</span></div>
+        <div><span className="k" {...docEl('appointment-card.body.infoLabel')}>Time</span><span className="v" {...docEl('appointment-card.body.infoValue')}>{clockTime12(appointment.time) || '—'}</span></div>
         <div><span className="k" {...docEl('appointment-card.body.infoLabel')}>Dentist</span><span className="v" {...docEl('appointment-card.body.infoValue')}>{appointment.dentistName || '—'}</span></div>
         <div><span className="k" {...docEl('appointment-card.body.infoLabel')}>Purpose</span><span className="v" {...docEl('appointment-card.body.infoValue')}>{appointment.purpose || '—'}</span></div>
       </div>
