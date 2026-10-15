@@ -263,6 +263,7 @@ test('a line added from saved treatments keeps the same layout', async () => {
   await page.getByRole('link', { name: 'Treatments' }).click();
   await page.getByRole('button', { name: 'New treatment' }).first().click();
   const modal = page.locator('.modal[role="dialog"]').last();
+  await modal.getByLabel('Code').fill('E2ELAYOUT');
   await modal.getByLabel('Name').fill('E2E Layout Treatment');
   await modal.getByLabel('Default price (৳)').fill('1250');
   await modal.getByRole('button', { name: 'Save', exact: true }).click();
