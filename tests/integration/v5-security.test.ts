@@ -14,7 +14,7 @@ import { AppError } from '../../src/main/errors';
 import { SessionManager } from '../../src/main/core/session';
 import { hashPassword } from '../../src/main/core/passwords';
 import { deleteUser, listUsers, resetPassword, saveRole, saveUser } from '../../src/main/services/users';
-import { loadPermissions } from '../../src/main/services/auth';
+import { completeSetup, loadPermissions } from '../../src/main/services/auth';
 import { createBackupService } from '../../src/main/services/backup';
 import { getSettings, resolveManagedLogoPath, saveSettings } from '../../src/main/services/settings';
 import { openDatabase, PRE_MIGRATION_DIR, PRE_MIGRATION_KEEP } from '../../src/main/db/database';
@@ -324,6 +324,23 @@ describe('V5-006 clinic logo path is owned by the main process', () => {
     expect(resolveManagedLogoPath(data, path.join('..', 'branding', 'logo.png'))).toBeNull();
     expect(resolveManagedLogoPath(data, path.resolve('/', 'tmp', 'branding', 'logo.png'))).toBeNull();
     expect(resolveManagedLogoPath(data, null)).toBeNull();
+  });
+
+  it('first-run setup ignores a renderer-supplied logo path', async () => {
+    const fresh = createTestEnv('v5-setup-logo', { seedOwner: false });
+    try {
+      await completeSetup(fresh.db, fresh.paths, {
+        clinic: { clinicName: 'Setup Clinic', phone: '01711111111', logoPath: 'dentiva.db' },
+        dentists: [{ name: 'Dr. Setup', qualifications: 'BDS' }],
+        admin: { username: 'owner', password: 'CorrectHorse9', passwordConfirm: 'CorrectHorse9', displayName: 'Owner User' },
+        preferences: { operatingHours: '10:00 – 20:00', autoLockMinutes: 10 },
+      } as any);
+      const stored = JSON.parse(String(fresh.db.prepare("SELECT value_json FROM settings WHERE key = 'clinic'").pluck().get()));
+      expect(stored.clinicName).toBe('Setup Clinic');
+      expect(stored.logoPath ?? null).toBeNull();
+    } finally {
+      cleanupEnv(fresh);
+    }
   });
 
   it('clearing the logo still works', () => {

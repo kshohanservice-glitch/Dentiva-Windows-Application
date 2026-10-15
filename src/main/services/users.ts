@@ -8,6 +8,7 @@ import { hashPassword } from '../core/passwords';
 import { loadPermissions } from './auth';
 import { nowISO } from '../../shared/currency';
 import { optString, pageParams, reqPassword, reqString, reqUsername, oneOf, escapeLike } from '../core/validate';
+import { instantRange } from '../core/dates';
 import { isPermissionKey, BUILTIN_ROLES } from '../../shared/permissions';
 
 function minPasswordLengthOf(ctx: Ctx): number {
@@ -426,8 +427,11 @@ export function listAudit(ctx: Ctx, filter: { page?: number; pageSize?: number; 
     }
   }
   if (filter.userId) { where.push('user_id = ?'); params.push(filter.userId); }
-  if (filter.from) { where.push('at >= ?'); params.push(`${filter.from}T00:00:00.000Z`); }
-  if (filter.to) { where.push('at <= ?'); params.push(`${filter.to}T23:59:59.999Z`); }
+  // audit_log.at is a UTC instant; the filter dates are the clinic's local days
+  // (same bounds as the audit report — V5-012).
+  const range = instantRange('at', filter.from, filter.to);
+  where.push(...range.conds);
+  params.push(...range.args);
   if (filter.query?.trim()) {
     const q = `%${escapeLike(filter.query.trim().toLowerCase())}%`;
     where.push("(LOWER(summary) LIKE ? ESCAPE '\\' OR LOWER(username) LIKE ? ESCAPE '\\' OR LOWER(action) LIKE ? ESCAPE '\\')");

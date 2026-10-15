@@ -13,6 +13,8 @@ import { runReport } from '../../src/main/services/reports';
 import { createPatient } from '../../src/main/services/patients';
 import { createVisit } from '../../src/main/services/visits';
 import { getDashboard } from '../../src/main/services/dashboard';
+import { listPayments } from '../../src/main/services/billing';
+import { listAudit } from '../../src/main/services/users';
 import { instantRange, localDateTimeLabel, localDayEndUtc, localDayStartUtc, localMonthOf } from '../../src/main/core/dates';
 import { todayISO } from '../../src/shared/currency';
 
@@ -72,6 +74,33 @@ describe('financial reports count by the clinic’s local day', () => {
 
     const methods = runReport(owner, 'payment_methods', { from: '2026-03-10', to: '2026-03-10' });
     expect(methods.rows[0]).toMatchObject({ method: 'cash', paid: '৳100.00', entries: 1 });
+  });
+});
+
+describe('list filters use the clinic’s local day', () => {
+  const at = (iso: string, minutes: number) => new Date(Date.parse(iso) + minutes * 60_000).toISOString();
+
+  it('payments "today" includes 01:00 local and excludes 23:30 yesterday', () => {
+    const owner = ownerCtx(env);
+    const p = createPatient(owner, { name: 'Early Payer', gender: 'female', ageYears: 30, phone: '01712345678' });
+    const dayStart = localDayStartUtc(todayISO());
+    addPayment(p.id, at(dayStart, 60), 1000); // 01:00 local today = 19:00 UTC yesterday
+    addPayment(p.id, at(dayStart, -30), 2000); // 23:30 local yesterday
+    const today = listPayments(owner, { range: 'today' });
+    expect(today.items.map((x) => x.amountPaisa)).toEqual([1000]);
+  });
+
+  it('the audit log date filter matches the audit report (local days)', () => {
+    const owner = ownerCtx(env);
+    const day = todayISO();
+    const dayStart = localDayStartUtc(day);
+    const insert = env.db.prepare(
+      "INSERT INTO audit_log (at, user_id, username, action, entity_type, entity_id, summary) VALUES (?, 1, 'owner', 'v5.probe', 'probe', ?, 'probe')",
+    );
+    insert.run(at(dayStart, 60), 'early-today'); // 01:00 local today
+    insert.run(at(dayStart, -30), 'late-yesterday'); // 23:30 local yesterday
+    const page = listAudit(owner, { action: 'v5.probe', from: day, to: day });
+    expect(page.items.map((e) => e.entityId)).toEqual(['early-today']);
   });
 });
 
