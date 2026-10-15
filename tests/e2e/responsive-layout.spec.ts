@@ -35,6 +35,10 @@ interface Box { label: string; left: number; right: number; top: number; bottom:
 
 interface LineGeometry {
   cardWidth: number;
+  cardLeft: number;
+  cardRight: number;
+  gridLeft: number;
+  gridRight: number;
   cardScrollOverflow: number;
   gridWidth: number;
   gridScrollOverflow: number;
@@ -79,6 +83,10 @@ async function measureLine(page: Page, index = 0): Promise<LineGeometry> {
     const totalValue = card.querySelector('.quick-line-total-value') as HTMLElement | null;
     return {
       cardWidth: cardRect.width,
+      cardLeft: cardRect.left,
+      cardRight: cardRect.right,
+      gridLeft: gridRect.left,
+      gridRight: gridRect.right,
       cardScrollOverflow: card.scrollWidth - card.clientWidth,
       gridWidth: gridRect.width,
       gridScrollOverflow: grid.scrollWidth - grid.clientWidth,
@@ -191,8 +199,11 @@ test('narrow panel keeps Item/Qty/Unit price on the first row and Discount/Line 
     expect(geometry.cardScrollOverflow).toBeLessThanOrEqual(1);
     expect(geometry.gridMinFieldWidth).toBeGreaterThanOrEqual(60);
     for (const field of geometry.fields) {
-      expect(field.left).toBeGreaterThanOrEqual(-0.5);
-      expect(field.right).toBeLessThanOrEqual(geometry.cardWidth + 48); // card padding is 12px each side
+      // Every field sits inside its grid, which sits inside the card.
+      expect(field.left).toBeGreaterThanOrEqual(geometry.gridLeft - 0.5);
+      expect(field.right).toBeLessThanOrEqual(geometry.gridRight + 0.5);
+      expect(field.left).toBeGreaterThanOrEqual(geometry.cardLeft - 0.5);
+      expect(field.right).toBeLessThanOrEqual(geometry.cardRight + 0.5);
       expect(field.inputWidth ?? 0).toBeGreaterThan(0);
     }
   }
@@ -369,7 +380,8 @@ test('the printed walk-in invoice carries the same total as the screen', async (
     page.getByRole('button', { name: /Preview & print/i }).click(),
   ]);
   await printWin.waitForLoadState('domcontentloaded');
-  expect(printWin.url()).toContain('#print/quick-invoice');
+  // The main process routes every walk-in document through `#print/quick/<token>`.
+  expect(printWin.url()).toContain('#print/quick/');
   const printed = printWin.locator('.print-doc');
   await expect(printed).toBeVisible({ timeout: 60_000 });
   await expect(printed).toContainText('৳900.00');

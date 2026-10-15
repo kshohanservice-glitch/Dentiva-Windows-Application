@@ -14,8 +14,13 @@ import { resolve } from 'node:path';
 
 const repoRoot = resolve(__dirname, '..', '..');
 
+/**
+ * Source text with line endings normalised to LF. Windows checkouts (and the
+ * Windows CI runner) materialise these files with CRLF, so every assertion in
+ * this file must be line-ending agnostic.
+ */
 function readSource(relativePath: string): string {
-  return readFileSync(resolve(repoRoot, relativePath), 'utf8');
+  return readFileSync(resolve(repoRoot, relativePath), 'utf8').replace(/\r\n/g, '\n');
 }
 
 describe('redundant helper text removed', () => {
