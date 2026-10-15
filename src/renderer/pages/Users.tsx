@@ -5,7 +5,7 @@ import { Badge, Button, Card, ConfirmDialog, EmptyState, ErrorState, Modal, Spin
 import { Field, Input, Select } from '../components/forms';
 import { DataTable, TableToolbar, type Column } from '../components/table';
 import { Icon } from '../components/shell';
-import { formatDate } from '../format';
+import { enumLabel, formatDate } from '../format';
 import { ALL_PERMISSIONS, PERMISSION_GROUPS, type PermissionKey } from '../../shared/permissions';
 import type { RoleDTO, UserDTO } from '../../shared/types';
 
@@ -379,7 +379,7 @@ export function UsersPage() {
     { key: 'username', label: 'Username', render: (u) => <span className="mono strong">{u.username}</span> },
     { key: 'display', label: 'Display name', render: (u) => u.displayName },
     { key: 'role', label: 'Role', render: (u) => <Badge tone="brand">{u.roleName}</Badge> },
-    { key: 'status', label: 'Status', render: (u) => <Badge tone={u.status === 'active' ? 'success' : u.status === 'locked' ? 'warning' : 'danger'}>{u.status}</Badge> },
+    { key: 'status', label: 'Status', render: (u) => <Badge tone={u.status === 'active' ? 'success' : u.status === 'locked' ? 'warning' : 'danger'}>{enumLabel(u.status)}</Badge> },
     { key: 'lastLogin', label: 'Last sign-in', render: (u) => (u.lastLoginAt ? `${formatDate(u.lastLoginAt)} ${new Date(u.lastLoginAt).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}` : <span className="muted">never</span>) },
     { key: 'mustPw', label: 'Flags', render: (u) => (u.mustChangePassword ? <Badge tone="warning">must change password</Badge> : null) },
     {

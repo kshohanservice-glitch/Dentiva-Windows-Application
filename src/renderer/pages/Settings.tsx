@@ -75,9 +75,9 @@ export function SettingsPage() {
     { key: 'notifications', label: 'Notifications' },
     { key: 'billing', label: 'Billing' },
     { key: 'prescription', label: 'Prescription' },
-    { key: 'templates', label: 'Message Templates' },
+    { key: 'templates', label: 'Message templates' },
     { key: 'print', label: 'Printing' },
-    { key: 'documents', label: 'Customize Documents' },
+    { key: 'documents', label: 'Customize documents' },
     { key: 'data', label: 'Data' },
     { key: 'shortcuts', label: 'Shortcuts' },
   ];

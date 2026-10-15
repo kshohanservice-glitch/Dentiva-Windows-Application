@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { formatDate } from '../format';
+import { enumLabel, formatDate } from '../format';
 import { Money } from '../components/money';
 import { useNavigate } from 'react-router-dom';
 import { api, useAsync, useInterval } from '../api';
@@ -71,17 +71,26 @@ export function DashboardPage() {
       )}
 
       <div className="grid stats-grid">
-        <StatCard label="Patients today" value={String(data.todayPatients)} foot="registered & revisits" onClick={() => navigate('/patients')} />
-        <StatCard label="Appointments today" value={String(data.todayAppointments)} foot="planned for today" onClick={() => navigate('/appointments')} />
-        <StatCard label="Completed visits" value={String(data.completedVisits)} foot="closed today" onClick={() => navigate('/reports')} />
+        <StatCard label="Patients today" value={String(data.todayPatients)} foot="New and returning patients" onClick={() => navigate('/patients')} />
+        <StatCard label="Appointments today" value={String(data.todayAppointments)} foot="Planned for today" onClick={() => navigate('/appointments')} />
+        <StatCard label="Completed visits" value={String(data.completedVisits)} foot="Closed today" onClick={() => navigate('/reports')} />
       </div>
 
-      {data.financial && canFinance && (
+      {((data.financial && canFinance) || data.inventory) && (
         <div className="grid stats-grid">
-          <StatCard label="Paid Today" value={<Money paisa={data.financial.todayRevenuePaisa} />} foot="Net payments received" onClick={() => navigate('/payments')} />
-          <StatCard label="Outstanding dues" value={<Money paisa={data.financial.outstandingDuePaisa} />} foot="across invoices" onClick={() => navigate('/invoices')} />
-          <StatCard label="Low-stock items" value={String(data.inventory?.lowStock ?? 0)} foot="at or below minimum" onClick={() => navigate('/inventory')} />
-          <StatCard label="Expiring ≤30 days" value={String(data.inventory?.expiringSoon ?? 0)} foot="batches" onClick={() => navigate('/inventory')} />
+          {data.financial && canFinance && (
+            <>
+              <StatCard label="Paid today" value={<Money paisa={data.financial.todayRevenuePaisa} />} foot="Net payments received" onClick={() => navigate('/payments')} />
+              <StatCard label="Outstanding dues" value={<Money paisa={data.financial.outstandingDuePaisa} />} foot="Across all invoices" onClick={() => navigate('/invoices')} />
+            </>
+          )}
+          {/* Stock KPIs follow inventory access, not finance access (V5-034). */}
+          {data.inventory && (
+            <>
+              <StatCard label="Low-stock items" value={String(data.inventory.lowStock ?? 0)} foot="At or below minimum" onClick={() => navigate('/inventory')} />
+              <StatCard label="Expiring ≤30 days" value={String(data.inventory.expiringSoon ?? 0)} foot="Batches" onClick={() => navigate('/inventory')} />
+            </>
+          )}
         </div>
       )}
 
@@ -99,7 +108,7 @@ export function DashboardPage() {
                       <strong>{a.patientName}</strong>
                       <div className="xsmall muted">{a.dentistName ?? 'Any dentist'} · {a.type || 'Consultation'}</div>
                     </span>
-                    <Badge tone={a.status === 'cancelled' ? 'danger' : a.status === 'completed' ? 'success' : 'brand'}>{a.status.replace('_', ' ')}</Badge>
+                    <Badge tone={a.status === 'cancelled' ? 'danger' : a.status === 'completed' ? 'success' : 'brand'}>{enumLabel(a.status)}</Badge>
                   </div>
                 ))}
               </div>
@@ -148,7 +157,7 @@ export function DashboardPage() {
           )}
 
           {data.financial && (
-          <Card title="Recent Payments" actions={<Button size="sm" variant="ghost" onClick={() => navigate('/payments')}>View all</Button>}>
+          <Card title="Recent payments" actions={<Button size="sm" variant="ghost" onClick={() => navigate('/payments')}>View all</Button>}>
             {data.financial.recentPayments.length === 0 ? (
               <EmptyState title="No payments yet" body="Payments received today will appear here." />
             ) : (

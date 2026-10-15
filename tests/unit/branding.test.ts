@@ -152,8 +152,13 @@ describe('branding stylesheet contract', () => {
     expect(name).toContain('white-space: nowrap');
   });
 
-  it('excludes the configured clinic name from the shell-wide title-case transform', () => {
-    expect(css).toContain('.shell .clinic-name');
+  it('renders the configured clinic name verbatim (no title-case transform anywhere in the shell, V5-030)', () => {
+    // v5 removed the shell-wide `text-transform: capitalize`, so no exclusion
+    // is needed: neither the shell nor the clinic name may be transformed.
+    for (const selector of ['.shell', '.auth-screen', '.setup-screen', '.lock-overlay', '.clinic-name']) {
+      const rules = [...css.matchAll(new RegExp(`(^|[},])\\s*${selector.replace('.', '\\.')}\\s*[,{][^}]*\\}`, 'g'))].map((m) => m[0]);
+      for (const rule of rules) expect(rule, rule).not.toMatch(/text-transform:\s*capitalize/);
+    }
   });
 
   it('lets the header brand column shrink instead of overflowing the header', () => {

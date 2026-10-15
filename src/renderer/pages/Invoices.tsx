@@ -7,7 +7,7 @@ import { Badge, Button, Card, ConfirmDialog, Modal, Pagination, useToast } from 
 import { Field, Input, Select, Textarea } from '../components/forms';
 import { DataTable, TableToolbar, type Column } from '../components/table';
 import { Icon } from '../components/shell';
-import { formatDate } from '../format';
+import { enumLabel, formatDate } from '../format';
 import { InvoiceFormModal } from './Patients';
 import type { InvoiceDTO, PaymentDTO } from '../../shared/types';
 import { hasPaymentDraftChanges } from '../../shared/unsaved';
@@ -202,7 +202,7 @@ function InvoiceDetailModal(props: { invoice: InvoiceDTO; onClose: () => void; o
       <div className="kv-list mb-4">
         <div className="kv"><span className="k">Patient</span><span className="v">{invoice.patientName} ({invoice.patientCode})</span></div>
         <div className="kv"><span className="k">Date</span><span className="v">{formatDate(invoice.date)}</span></div>
-        <div className="kv"><span className="k">Status</span><span className="v"><Badge tone={STATUS_TONE[invoice.status]}>{invoice.status}</Badge></span></div>
+        <div className="kv"><span className="k">Status</span><span className="v"><Badge tone={STATUS_TONE[invoice.status]}>{enumLabel(invoice.status)}</Badge></span></div>
         {invoice.voidReason && <div className="kv"><span className="k">Void reason</span><span className="v">{invoice.voidReason}</span></div>}
       </div>
 
@@ -248,7 +248,7 @@ function InvoiceDetailModal(props: { invoice: InvoiceDTO; onClose: () => void; o
           {pays!.items.map((p) => (
             <div className="list-row" key={p.id}>
               <span className="flex-1">
-                <strong className="num"><Money paisa={p.amountPaisa} /></strong> <Badge tone={p.type === 'refund' ? 'danger' : 'neutral'}>{p.type}</Badge>
+                <strong className="num"><Money paisa={p.amountPaisa} /></strong> <Badge tone={p.type === 'refund' ? 'danger' : 'neutral'}>{enumLabel(p.type)}</Badge>
                 <div className="xsmall muted">{formatDate(p.paidAt)} {new Date(p.paidAt).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })} · {p.method} {p.reference ? `· ${p.reference}` : ''} · by {p.receivedByName}</div>
               </span>
             </div>
@@ -391,7 +391,7 @@ export function InvoicesPage() {
     { key: 'total', label: 'Total', align: 'right', sortValue: (inv) => inv.totalPaisa, render: (inv) => <span className="num"><Money paisa={inv.totalPaisa} /></span> },
     { key: 'paid', label: 'Paid', align: 'right', render: (inv) => <span className="num success-text"><Money paisa={inv.paidPaisa} /></span> },
     { key: 'due', label: 'Due', align: 'right', sortValue: (inv) => inv.duePaisa, render: (inv) => <span className={`num ${inv.duePaisa > 0 ? 'danger-text strong' : 'muted'}`}><Money paisa={inv.duePaisa} /></span> },
-    { key: 'status', label: 'Status', render: (inv) => <Badge tone={STATUS_TONE[inv.status]}>{inv.status}</Badge> },
+    { key: 'status', label: 'Status', render: (inv) => <Badge tone={STATUS_TONE[inv.status]}>{enumLabel(inv.status)}</Badge> },
     {
       key: 'actions', label: '', align: 'right',
       render: (inv) => (
@@ -500,10 +500,10 @@ export function PaymentsPage() {
       key: 'amount', label: 'Amount', align: 'right', sortValue: (p) => p.amountPaisa,
       render: (p) => <span className={`num ${p.type === 'refund' ? 'danger-text' : 'success-text'}`}>{p.type === 'refund' ? '−' : ''}<Money paisa={p.amountPaisa} /></span>,
     },
-    { key: 'method', label: 'Method', render: (p) => <Badge tone="neutral">{p.method}</Badge> },
+    { key: 'method', label: 'Method', render: (p) => <Badge tone="neutral">{enumLabel(p.method)}</Badge> },
     { key: 'reference', label: 'Reference', render: (p) => <span className="mono">{p.reference ?? '—'}</span> },
     { key: 'receivedBy', label: 'Received by', render: (p) => p.receivedByName },
-    { key: 'type', label: 'Type', render: (p) => <Badge tone={p.type === 'refund' ? 'danger' : 'success'}>{p.type}</Badge> },
+    { key: 'type', label: 'Type', render: (p) => <Badge tone={p.type === 'refund' ? 'danger' : 'success'}>{enumLabel(p.type)}</Badge> },
     {
       key: 'actions', label: '', align: 'right',
       render: (p) => (

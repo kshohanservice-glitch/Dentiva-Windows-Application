@@ -159,7 +159,7 @@ export function BackupPage() {
                   </div>
                   {b.checksum && <div className="xsmall muted mono truncate" style={{ maxWidth: 520 }}>sha256: {b.checksum.slice(0, 24)}…</div>}
                 </span>
-                <Badge tone={b.status === 'ok' ? 'success' : 'danger'} title={b.error ?? undefined}>{b.status === 'ok' ? 'verified' : 'failed'}</Badge>
+                <Badge tone={b.status === 'ok' ? 'success' : 'danger'} title={b.error ?? undefined}>{b.status === 'ok' ? 'Verified' : 'Failed'}</Badge>
                 <div className="row gap-2">
                   <Button
                     size="sm" variant="secondary"

@@ -15,7 +15,7 @@ import { Field, Input, Select, Textarea, useForm } from '../components/forms';
 import { DataTable, TableToolbar, type Column } from '../components/table';
 import { Icon } from '../components/shell';
 import { ToothChart } from '../components/ToothChart';
-import { formatDate, isoDate, localDateTime, wallClockTime } from '../format';
+import { enumLabel, formatDate, isoDate, localDateTime, wallClockTime } from '../format';
 import type { DuplicateCandidate, PatientDTO, PatientFilters, PatientDetailDTO, PrescriptionDTO, TreatmentDTO, VisitDTO } from '../../shared/types';
 import type { PatientInputPayload, ReferralRecord, ReferralInput } from '../../shared/ipc';
 import { hasInvoiceDraftChanges } from '../../shared/unsaved';
@@ -429,7 +429,7 @@ export function PatientsPage() {
     { key: 'age', label: 'Age / Sex', sortValue: (r) => r.ageYears ?? 999, render: (r) => `${r.ageText ?? (r.ageYears != null ? `${r.ageYears}y` : '—')} · ${r.gender}` },
     { key: 'lastVisit', label: 'Last visit', sortValue: (r) => r.lastVisitAt ?? '', render: (r) => (r.lastVisitAt ? formatDate(r.lastVisitAt) : <span className="muted">never</span>) },
     { key: 'visits', label: 'Visits', align: 'right', sortValue: (r) => r.visitCount, render: (r) => <span className="num">{r.visitCount}</span> },
-    { key: 'status', label: 'Status', render: (r) => <Badge tone={r.status === 'active' ? 'success' : r.status === 'blocked' ? 'danger' : 'neutral'}>{r.status}</Badge> },
+    { key: 'status', label: 'Status', render: (r) => <Badge tone={r.status === 'active' ? 'success' : r.status === 'blocked' ? 'danger' : 'neutral'}>{enumLabel(r.status)}</Badge> },
     { key: 'city', label: 'Area', clip: true, render: (r) => r.city ?? r.address ?? '—' },
   ];
 
@@ -562,26 +562,26 @@ export function PatientProfilePage() {
         <div className="flex-1">
           <div className="row gap-2 wrap">
             <h1 className="page-title" style={{ fontSize: 22 }}>{patient.name}</h1>
-            <Badge tone={patient.status === 'active' ? 'success' : patient.status === 'blocked' ? 'danger' : 'neutral'}>{patient.status}</Badge>
+            <Badge tone={patient.status === 'active' ? 'success' : patient.status === 'blocked' ? 'danger' : 'neutral'}>{enumLabel(patient.status)}</Badge>
             {patient.tags.map((t) => <Badge key={t} tone="brand">{t}</Badge>)}
           </div>
           <div className="patient-meta">
             <span className="mono">{patient.code}</span>
-            <span>{patient.ageText ?? (patient.ageYears != null ? `${patient.ageYears} years` : 'age —')} · {patient.gender}</span>
+            <span>{patient.ageText ?? (patient.ageYears != null ? `${patient.ageYears} years` : 'Age —')} · {enumLabel(patient.gender)}</span>
             {patient.bloodGroup && <span>Blood {patient.bloodGroup}</span>}
-            <span>{patient.phone ?? 'no phone'}</span>
-            <span>{patient.city ?? patient.address ?? ''}</span>
+            <span>{patient.phone ?? 'No phone'}</span>
+            {(patient.city ?? patient.address) && <span>{patient.city ?? patient.address}</span>}
             <span>Registered {formatDate(patient.registrationDate)}</span>
             <span>{patient.visitCount} visit{patient.visitCount === 1 ? '' : 's'}</span>
             {patient.preferredDentistName && <span>Preferred: {patient.preferredDentistName}</span>}
           </div>
         </div>
-        <div className="col gap-2" style={{ alignItems: 'stretch' }}>
+        <div className="patient-actions">
           {can('clinical.visit.create') && <Button variant="primary" onClick={() => setVisitOpen(true)}>New visit</Button>}
           {can('clinical.prescription.create') && <Button variant="secondary" onClick={() => setRxOpen(true)}>New prescription</Button>}
           {can('appointments.manage') && <Button variant="secondary" onClick={() => navigate(`/appointments?patient=${patient.id}&new=1`)}>Book appointment</Button>}
           {can('billing.invoice.create') && <Button variant="secondary" onClick={() => setInvoiceOpen(true)}>Create invoice</Button>}
-          <div className="row gap-2">
+          <div className="patient-secondary-actions">
             {can('patients.edit') && <Button variant="ghost" size="sm" onClick={() => setEditOpen(true)}>Edit</Button>}
             {can('patients.delete') && patient.status !== 'archived' && (
               <Button variant="ghost" size="sm" onClick={() => setArchiveOpen(true)}>Archive</Button>
@@ -686,7 +686,7 @@ function ReferralsTab(props: { patientId: number; canManage: boolean; onCreate: 
             {rows.map((r) => (
               <div key={r.id} className="list-row">
                 <div className="flex-1">
-                  <div className="row gap-2"><strong>{r.direction === 'out' ? 'Outgoing' : 'Incoming'}</strong><Badge tone={r.status === 'completed' ? 'success' : r.status === 'cancelled' ? 'danger' : 'warning'}>{r.status}</Badge></div>
+                  <div className="row gap-2"><strong>{r.direction === 'out' ? 'Outgoing' : 'Incoming'}</strong><Badge tone={r.status === 'completed' ? 'success' : r.status === 'cancelled' ? 'danger' : 'warning'}>{enumLabel(r.status)}</Badge></div>
                   <div className="small">{r.person || r.clinic || 'Referral'}{r.specialty ? ' · ' + r.specialty : ''}</div>
                   <div className="xsmall muted">{formatDate(r.date)}{r.reason ? ' · ' + r.reason : ''}{r.follow_up ? ' · Follow-up ' + formatDate(r.follow_up) : ''}</div>
                 </div>
@@ -816,7 +816,7 @@ function VisitsTab(props: { patientId: number; refreshKey?: number; onCreate: ()
             <div className="row between wrap">
               <div>
                 <strong>{formatDate(v.datetime)} {wallClockTime(v.datetime)}</strong>{' '}
-                <Badge tone={v.status === 'open' ? 'warning' : 'neutral'}>{v.status}</Badge>
+                <Badge tone={v.status === 'open' ? 'warning' : 'neutral'}>{enumLabel(v.status)}</Badge>
                 <div className="small muted">{v.dentistName ?? 'Any dentist'} · {v.chiefComplaint || 'no complaint recorded'}</div>
               </div>
               <div className="row gap-2">
@@ -979,7 +979,7 @@ function InvoicesForPatient(props: { patientId: number; refreshKey?: number; onO
           <span className="mono strong">{inv.number}</span>
           <span className="flex-1 xsmall muted">{formatDate(inv.date)} · {inv.items.length} line(s)</span>
           <span className="num small"><Money paisa={inv.totalPaisa} /></span>
-          <Badge tone={inv.status === 'paid' ? 'success' : inv.status === 'voided' ? 'danger' : inv.status === 'partial' ? 'warning' : 'info'}>{inv.status}</Badge>
+          <Badge tone={inv.status === 'paid' ? 'success' : inv.status === 'voided' ? 'danger' : inv.status === 'partial' ? 'warning' : 'info'}>{enumLabel(inv.status)}</Badge>
         </div>
       ))}
     </div>

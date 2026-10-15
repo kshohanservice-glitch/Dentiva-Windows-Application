@@ -6,7 +6,7 @@ import { Badge, Button, Card, ConfirmDialog, Modal, Pagination, Tabs, useToast }
 import { Field, Input, Select, Textarea } from '../components/forms';
 import { DataTable, TableToolbar, type Column } from '../components/table';
 import { Icon } from '../components/shell';
-import { formatDate, isoDate } from '../format';
+import { enumLabel, formatDate, isoDate } from '../format';
 import type { ExpenseDTO, IncomeDTO } from '../../shared/types';
 
 function EntryModal(props: {
@@ -176,7 +176,7 @@ export function AccountingPage() {
     { key: 'date', label: 'Date', sortValue: (e) => e.date, render: (e) => formatDate(e.date) },
     { key: 'category', label: 'Category', render: (e) => e.categoryName },
     { key: 'amount', label: 'Amount', align: 'right', sortValue: (e) => e.amountPaisa, render: (e) => <span className="num danger-text"><Money paisa={e.amountPaisa} /></span> },
-    { key: 'method', label: 'Method', render: (e) => <Badge tone="neutral">{e.method}</Badge> },
+    { key: 'method', label: 'Method', render: (e) => <Badge tone="neutral">{enumLabel(e.method)}</Badge> },
     { key: 'reference', label: 'Reference', render: (e) => <span className="mono">{e.reference ?? '—'}</span> },
     { key: 'note', label: 'Note', clip: true, render: (e) => e.note ?? '—' },
     { key: 'by', label: 'Entered by', render: (e) => e.enteredByName },
@@ -194,7 +194,7 @@ export function AccountingPage() {
     { key: 'date', label: 'Date', sortValue: (i) => i.date, render: (i) => formatDate(i.date) },
     { key: 'category', label: 'Category', render: (i) => i.categoryName },
     { key: 'amount', label: 'Amount', align: 'right', sortValue: (i) => i.amountPaisa, render: (i) => <span className="num success-text"><Money paisa={i.amountPaisa} /></span> },
-    { key: 'method', label: 'Method', render: (i) => <Badge tone="neutral">{i.method}</Badge> },
+    { key: 'method', label: 'Method', render: (i) => <Badge tone="neutral">{enumLabel(i.method)}</Badge> },
     { key: 'reference', label: 'Reference', render: (i) => <span className="mono">{i.reference ?? '—'}</span> },
     { key: 'note', label: 'Note', clip: true, render: (i) => i.note ?? '—' },
     { key: 'by', label: 'Entered by', render: (i) => i.enteredByName },
@@ -233,7 +233,7 @@ export function AccountingPage() {
           {(categories ?? []).map((cat) => (
             <div key={cat.id} className="row gap-2" style={{ border: '1px solid var(--line)', borderRadius: 6, padding: '6px 8px' }}>
               <span className="small">{cat.name}</span>
-              <Badge tone="neutral">{cat.kind}</Badge>
+              <Badge tone="neutral">{enumLabel(cat.kind)}</Badge>
               {can('data.delete') && <Button size="sm" variant="danger" onClick={() => setDeletingCategory(cat)}>Delete</Button>}
             </div>
           ))}

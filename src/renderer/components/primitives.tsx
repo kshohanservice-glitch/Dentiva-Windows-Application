@@ -126,11 +126,19 @@ export function Card(props: { title?: React.ReactNode; actions?: React.ReactNode
 }
 
 export function StatCard(props: { label: string; value: React.ReactNode; foot?: React.ReactNode; tone?: 'accent' | 'warning' | 'danger' | 'success'; onClick?: () => void }) {
+  // A card that navigates exposes a real button (its label) whose hit area is
+  // stretched over the whole card, so it is reachable with Tab and activated
+  // with Enter/Space. Controls inside the value — the money reveal button —
+  // stay separately clickable; a button can never contain another button.
   return (
-    <div className={`stat-card ${props.tone ?? ''}`} onClick={props.onClick} style={props.onClick ? { cursor: 'pointer' } : undefined}>
-      <div className="stat-label">{props.label}</div>
-      <div className="stat-value">{props.value}</div>
-      {props.foot && <div className="stat-foot">{props.foot}</div>}
+    <div className={`stat-card ${props.tone ?? ''}${props.onClick ? ' interactive' : ''}`}>
+      {props.onClick ? (
+        <button type="button" className="stat-label stat-card-link" onClick={props.onClick}>{props.label}</button>
+      ) : (
+        <span className="stat-label">{props.label}</span>
+      )}
+      <span className="stat-value">{props.value}</span>
+      {props.foot && <span className="stat-foot">{props.foot}</span>}
     </div>
   );
 }

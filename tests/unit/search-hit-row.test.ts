@@ -161,9 +161,9 @@ describe('search stylesheet contract', () => {
     }
   });
 
-  it('excludes search results from the shell-wide title-case transform', () => {
-    const exclusion = /\.shell \.search-results/.exec(css);
-    expect(exclusion).not.toBeNull();
+  it('renders search results verbatim — no shell-wide title-case transform exists (V5-030)', () => {
+    expect(css).not.toMatch(/\.shell,\s*\.auth-screen,\s*\.setup-screen,\s*\.lock-overlay\s*\{[^}]*text-transform:\s*capitalize/);
+    expect(ruleBlock(css, '.search-hit')).not.toContain('capitalize');
   });
 
   it('keeps the search modal inside the viewport', () => {

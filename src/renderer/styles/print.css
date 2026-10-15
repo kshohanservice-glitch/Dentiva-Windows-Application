@@ -239,7 +239,10 @@
 }
 .print-doc .mono {
   font-variant-numeric: tabular-nums;
-  font-family: ui-monospace, 'Cascadia Mono', monospace;
+  /* The bundled Noto Sans Bengali sits before the generic family so the taka
+     sign (৳, U+09F3) in every printed amount always has a glyph; monospace
+     fonts do not contain it and OS fallback is not guaranteed (V5-025). */
+  font-family: ui-monospace, 'Cascadia Mono', Consolas, 'Noto Sans Bengali', monospace;
   white-space: nowrap;
 }
 

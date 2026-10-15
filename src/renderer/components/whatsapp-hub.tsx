@@ -4,7 +4,7 @@ import { useApp } from '../state/app-context';
 import { Badge, Button, Card, ConfirmDialog, EmptyState, ErrorState, Modal, Spinner, useToast } from './primitives';
 import { Field, Input, Select, Textarea } from './forms';
 import { Money } from './money';
-import { formatDate } from '../format';
+import { enumLabel, formatDate } from '../format';
 import { buildWhatsAppUrl, MAX_WHATSAPP_MESSAGE_LENGTH, normalizeWhatsAppNumber, TEMPLATE_CATEGORY_LABELS, type WhatsAppTemplateCategory } from '../../shared/whatsapp';
 import type { PatientDetailDTO, PatientDocumentDTO, WhatsAppMessageLogDTO, WhatsAppPrepareResult } from '../../shared/types';
 
@@ -174,7 +174,7 @@ export function WhatsAppHub(props: { patient: PatientDetailDTO; onPatientChanged
                   <div className="row gap-2 wrap">
                     <strong>{doc.typeLabel}</strong>
                     {doc.reference && <span className="mono small">{doc.reference}</span>}
-                    {doc.status && <Badge tone="neutral">{doc.status}</Badge>}
+                    {doc.status && <Badge tone="neutral">{enumLabel(doc.status)}</Badge>}
                   </div>
                   <div className="xsmall muted">
                     {formatDate(doc.date)}

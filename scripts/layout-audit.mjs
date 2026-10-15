@@ -274,10 +274,10 @@ const PRESCRIPTION = {
   ],
 };
 
+// prescriptions/list returns full PrescriptionDTOs (items included), exactly
+// like the service (listPrescriptions → hydrate); the list renders item names.
 const PRESCRIPTION_SUMMARY = {
-  id: 1, number: PRESCRIPTION.number, date: PRESCRIPTION.date, patientId: 1, patientName: patients[0].name,
-  patientCode: patients[0].code, dentistId: 1, dentistName: dentists[0].name, visitId: 1,
-  itemCount: PRESCRIPTION.items.length, createdAt: `${today}T09:00:00.000Z`,
+  ...PRESCRIPTION, patientName: patients[0].name, patientCode: patients[0].code,
 };
 
 const VISIT = {

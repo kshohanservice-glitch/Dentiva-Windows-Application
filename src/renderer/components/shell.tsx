@@ -85,9 +85,9 @@ const NAV: NavGroup[] = [
     title: 'Administration',
     entries: [
       { to: '/staff', label: 'Staff', icon: Icon.staff, permission: 'staff.view' },
-      { to: '/users', label: 'Users & Roles', icon: Icon.users, permission: 'users.manage' },
-      { to: '/audit', label: 'Audit Log', icon: Icon.audit, permission: 'audit.view' },
-      { to: '/backup', label: 'Backup & Restore', icon: Icon.backup, permission: 'backup.create' },
+      { to: '/users', label: 'Users & roles', icon: Icon.users, permission: 'users.manage' },
+      { to: '/audit', label: 'Audit log', icon: Icon.audit, permission: 'audit.view' },
+      { to: '/backup', label: 'Backup & restore', icon: Icon.backup, permission: 'backup.create' },
       { to: '/reports', label: 'Reports', icon: Icon.reports, permission: 'patients.view' },
       { to: '/settings', label: 'Settings', icon: Icon.settings, permission: 'settings.manage' },
       { to: '/about', label: 'About', icon: Icon.about },

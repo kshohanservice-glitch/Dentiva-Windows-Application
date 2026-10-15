@@ -66,6 +66,26 @@ export function formatBytes(bytes: number): string {
   return `${(bytes / (1024 * 1024 * 1024)).toFixed(2)} GB`;
 }
 
+const ENUM_LABELS: Record<string, string> = {
+  bkash: 'bKash', nagad: 'Nagad', rocket: 'Rocket', upay: 'Upay', cash: 'Cash', bank: 'Bank', card: 'Card', other: 'Other',
+  no_show: 'No-show', pre_restore: 'Pre-restore', ok: 'OK',
+};
+
+/**
+ * Display label for a stored enum value (status, payment method, kind):
+ * `no_show` → "No-show", `bkash` → "bKash", `partial` → "Partial". Only for
+ * values the application itself defines — never for patient or clinic data,
+ * which is always shown exactly as entered.
+ */
+export function enumLabel(value: string | null | undefined): string {
+  if (value == null) return '';
+  const raw = String(value);
+  const key = raw.trim().toLowerCase();
+  if (ENUM_LABELS[key]) return ENUM_LABELS[key];
+  const spaced = raw.replace(/[_-]+/g, ' ').trim();
+  return spaced ? spaced.charAt(0).toUpperCase() + spaced.slice(1) : raw;
+}
+
 /** Status badge tone mapping reused across lists. */
 export function statusTone(status: string): 'success' | 'warning' | 'danger' | 'info' | 'neutral' | 'brand' {
   switch (status) {

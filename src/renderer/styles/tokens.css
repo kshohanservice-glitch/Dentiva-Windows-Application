@@ -1,43 +1,97 @@
-/* Dentiva Pro design tokens — Premium Clinical Technology */
+/*
+ * Dentiva Pro v5 design tokens — "Premium Clinical": calm, precise, restrained.
+ *
+ * One source of truth for colour, type, space, shape, depth and motion.
+ * Components consume the semantic aliases (surface/text/border/brand/status);
+ * the raw scales below are only referenced from this file. Every token name
+ * used by earlier releases is kept as an alias, so no component has to change
+ * to pick up a refined value. Contrast targets: body and secondary text ≥ 7:1,
+ * tertiary text ≥ 4.5:1 on every surface (WCAG 2.1 AA for 12 px text).
+ */
 :root {
-  --brand-700: #0b5e7b;
-  --brand-800: #084b63;
-  --brand-600: #0d7192;
-  --brand-50: #e8f4f8;
+  /* ---- Brand scale (deep clinical teal-blue; #0B5E7B is the identity colour) ---- */
+  --brand-25: #f5fafc;
+  --brand-50: #eaf5f9;
   --brand-100: #d3ebf2;
+  --brand-200: #a9d5e4;
+  --brand-300: #74b8cf;
+  --brand-400: #3f97b5;
+  --brand-500: #1a7d9e;
+  --brand-600: #0e6c8b;
+  --brand-700: #0b5e7b;
+  --brand-800: #094b63;
+  --brand-900: #073a4d;
   --accent-600: #0e7c86;
   --accent-50: #e6f4f5;
 
-  --surface-0: #f6f8fa;
-  --surface-1: #ffffff;
-  --surface-2: #eef2f5;
-  --surface-3: #e4eaef;
+  /* ---- Neutral scale (slate with a cool undertone) ---- */
+  --neutral-0: #ffffff;
+  --neutral-25: #fbfcfd;
+  --neutral-50: #f5f7f9;
+  --neutral-100: #edf1f4;
+  --neutral-150: #e4e9ee;
+  --neutral-200: #d8e0e6;
+  --neutral-300: #c2ced7;
+  --neutral-400: #97a8b4;
+  --neutral-500: #6b7d89;
+  --neutral-600: #526470;
+  --neutral-700: #3b4b56;
+  --neutral-800: #24323c;
+  --neutral-900: #12212b;
 
-  --text-1: #12242e;
-  --text-2: #43565f;
-  --text-3: #6b7c85;
-  --text-invert: #ffffff;
+  /* ---- Semantic surfaces ---- */
+  --surface-canvas: var(--neutral-50);   /* app background */
+  --surface-raised: var(--neutral-0);    /* cards, header, sidebar, inputs */
+  --surface-sunken: var(--neutral-100);  /* wells, table headers, hover */
+  --surface-strong: var(--neutral-150);  /* pressed / selected neutral */
+  --surface-overlay: rgba(18, 33, 43, 0.48);
 
-  --line: #d9e2e8;
-  --line-strong: #c2cfd8;
+  /* ---- Semantic text ---- */
+  --text-primary: var(--neutral-900);
+  --text-secondary: var(--neutral-700);
+  --text-tertiary: #566874;              /* 5.3:1 on white, 5.0:1 on canvas */
+  --text-disabled: var(--neutral-400);
+  --text-on-brand: #ffffff;
+  --text-link: var(--brand-700);
 
-  --success: #1e7a4b;
-  --success-bg: #e7f5ee;
-  --warning: #b26b00;
-  --warning-bg: #fdf3e3;
+  /* ---- Semantic borders ---- */
+  --border-subtle: #e3e9ee;
+  --border-default: var(--neutral-200);
+  --border-strong: var(--neutral-300);
+
+  /* ---- Status (foreground / background / border) ---- */
+  --success: #17733f;
+  --success-bg: #ebf7f0;
+  --success-border: #b9e2c9;
+  --warning: #a34f05;
+  --warning-bg: #fdf4e7;
+  --warning-border: #f3d3a5;
   --danger: #b42318;
-  --danger-bg: #fdeceb;
+  --danger-hover: #93190f;
+  --danger-bg: #fdefee;
+  --danger-border: #f6c7c2;
   --info: #175cd3;
-  --info-bg: #eaf1fd;
+  --info-bg: #edf3fe;
+  --info-border: #c3d6fa;
 
-  --e1: 0 1px 2px rgba(16, 36, 46, 0.06), 0 1px 3px rgba(16, 36, 46, 0.08);
-  --e2: 0 4px 10px rgba(16, 36, 46, 0.08), 0 2px 4px rgba(16, 36, 46, 0.06);
-  --e3: 0 16px 40px rgba(16, 36, 46, 0.18), 0 4px 12px rgba(16, 36, 46, 0.10);
+  /* ---- Focus ---- */
+  --focus-color: var(--brand-600);
+  --focus-ring: 0 0 0 3px rgba(14, 108, 139, 0.24);
 
+  /* ---- Depth (three levels only; overlays use e3) ---- */
+  --e1: 0 1px 2px rgba(18, 33, 43, 0.05), 0 1px 1px rgba(18, 33, 43, 0.03);
+  --e2: 0 4px 12px -2px rgba(18, 33, 43, 0.08), 0 2px 4px -2px rgba(18, 33, 43, 0.05);
+  --e3: 0 24px 48px -12px rgba(18, 33, 43, 0.22), 0 8px 16px -8px rgba(18, 33, 43, 0.10);
+
+  /* ---- Shape ---- */
+  --r-xs: 4px;
   --r-sm: 6px;
   --r-md: 10px;
   --r-lg: 14px;
+  --r-xl: 18px;
+  --r-pill: 999px;
 
+  /* ---- Space (4-point grid) ---- */
   --sp-1: 4px;
   --sp-2: 8px;
   --sp-3: 12px;
@@ -48,7 +102,15 @@
   --sp-10: 40px;
   --sp-12: 48px;
 
-  --font-ui: 'Inter', 'Segoe UI', system-ui, -apple-system, 'Noto Sans', 'Noto Sans Bengali', sans-serif;
+  /* ---- Typography ----
+   * Latin UI text uses Inter; Bengali glyphs come from the bundled Noto Sans
+   * Bengali, listed second so it — not a Windows system font — always renders
+   * Bengali, in mixed lines too. Bengali needs extra line height for vowel
+   * signs above and below the head-line (see .text-bn / :lang(bn)). */
+  --font-ui: 'Inter', 'Noto Sans Bengali', 'Segoe UI', system-ui, -apple-system, sans-serif;
+  --font-bn: 'Noto Sans Bengali', 'Inter', 'Segoe UI', system-ui, sans-serif;
+  --font-mono: 'Cascadia Mono', 'Consolas', ui-monospace, 'SFMono-Regular', monospace;
+  --fs-2xs: 11px;
   --fs-xs: 12px;
   --fs-sm: 13px;
   --fs-md: 14px;
@@ -56,47 +118,103 @@
   --fs-xl: 18px;
   --fs-2xl: 22px;
   --fs-3xl: 28px;
+  --lh-tight: 1.25;
+  --lh-snug: 1.35;
+  --lh-normal: 1.5;
+  --lh-bn: 1.7;
+  --fw-regular: 400;
+  --fw-medium: 500;
+  --fw-semibold: 600;
+  --fw-bold: 700;
+  --tracking-caps: 0.06em;
 
+  /* ---- Layout ---- */
   --header-h: 56px;
   --sidebar-w: 240px;
   --sidebar-collapsed: 64px;
+  --control-h: 36px;
+  --control-h-sm: 30px;
+  --control-h-lg: 42px;
 
-  --motion: 150ms cubic-bezier(0.2, 0, 0.2, 1);
+  /* ---- Layers ---- */
+  --z-sidebar: 20;
+  --z-header: 30;
+  --z-dropdown: 60;
+  --z-modal: 100;
+  --z-toast: 200;
+
+  /* ---- Motion: short, functional, transform/opacity/colour only ---- */
+  --dur-fast: 120ms;
+  --dur-base: 160ms;
+  --ease-standard: cubic-bezier(0.2, 0, 0, 1);
+  --motion: var(--dur-base) var(--ease-standard);
+
+  /* ---- Legacy aliases (pre-v5 names; keep — used across components) ---- */
+  --surface-0: var(--surface-canvas);
+  --surface-1: var(--surface-raised);
+  --surface-2: var(--surface-sunken);
+  --surface-3: var(--surface-strong);
+  --text-1: var(--text-primary);
+  --text-2: var(--text-secondary);
+  --text-3: var(--text-tertiary);
+  --text-invert: var(--text-on-brand);
+  --muted: var(--text-tertiary);
+  --line: var(--border-default);
+  --line-strong: var(--border-strong);
 }
 
 [data-theme='dark'] {
-  --brand-700: #4fb3d4;
-  --brand-800: #79c7e2;
-  --brand-600: #2e9ec2;
-  --brand-50: #10242d;
-  --brand-100: #16323e;
+  --brand-25: #0d1d24;
+  --brand-50: #10252e;
+  --brand-100: #15323e;
+  --brand-200: #1c4656;
+  --brand-300: #2a6a80;
+  --brand-400: #3d8fab;
+  --brand-500: #4fa9c7;
+  --brand-600: #66b9d5;
+  --brand-700: #7cc7e0;
+  --brand-800: #9fd7ea;
+  --brand-900: #c3e7f3;
   --accent-600: #38b2b8;
   --accent-50: #0f2a2c;
 
-  --surface-0: #0e1720;
-  --surface-1: #15212b;
-  --surface-2: #1c2b37;
-  --surface-3: #243644;
+  --surface-canvas: #0d151c;
+  --surface-raised: #141f28;
+  --surface-sunken: #1a2833;
+  --surface-strong: #22333f;
+  --surface-overlay: rgba(2, 6, 10, 0.62);
 
-  --text-1: #e9f0f4;
-  --text-2: #b3c2cb;
-  --text-3: #8597a2;
+  --text-primary: #e8eff3;
+  --text-secondary: #b9c7d0;
+  --text-tertiary: #93a5b1;
+  --text-disabled: #5d6f7b;
+  --text-on-brand: #06212c;
+  --text-link: var(--brand-700);
 
-  --line: #263744;
-  --line-strong: #354a5b;
+  --border-subtle: #1f2e39;
+  --border-default: #273845;
+  --border-strong: #354a59;
 
-  --success: #4ade80;
-  --success-bg: #12301f;
-  --warning: #fbbf24;
-  --warning-bg: #332610;
-  --danger: #f87171;
-  --danger-bg: #351a18;
-  --info: #60a5fa;
-  --info-bg: #14243c;
+  --success: #5fd08f;
+  --success-bg: #11291c;
+  --success-border: #1f4d33;
+  --warning: #f2b34d;
+  --warning-bg: #2e2210;
+  --warning-border: #5a4218;
+  --danger: #f4837a;
+  --danger-hover: #f8a49d;
+  --danger-bg: #331716;
+  --danger-border: #5c2622;
+  --info: #79aef8;
+  --info-bg: #13233a;
+  --info-border: #24406a;
+
+  --focus-color: var(--brand-600);
+  --focus-ring: 0 0 0 3px rgba(102, 185, 213, 0.28);
 
   --e1: 0 1px 2px rgba(0, 0, 0, 0.4);
-  --e2: 0 4px 10px rgba(0, 0, 0, 0.45);
-  --e3: 0 16px 40px rgba(0, 0, 0, 0.6);
+  --e2: 0 6px 16px -4px rgba(0, 0, 0, 0.5);
+  --e3: 0 24px 48px -12px rgba(0, 0, 0, 0.7);
 }
 
 [data-density='compact'] {
@@ -104,16 +222,26 @@
   --sp-4: 12px;
   --sp-5: 16px;
   --sp-6: 20px;
+  --control-h: 32px;
+  --control-h-sm: 28px;
 }
 
-[data-motion='off'] * {
+/* Animations off (Settings → Appearance) and the OS reduced-motion preference
+   both remove every transition and animation, not just slow them. */
+[data-motion='off'] *,
+[data-motion='off'] *::before,
+[data-motion='off'] *::after {
   transition: none !important;
   animation: none !important;
+  scroll-behavior: auto !important;
 }
 
 @media (prefers-reduced-motion: reduce) {
-  * {
+  *,
+  *::before,
+  *::after {
     transition: none !important;
     animation: none !important;
+    scroll-behavior: auto !important;
   }
 }
