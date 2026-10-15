@@ -1,5 +1,10 @@
 # Dentiva Pro 4.2.3
 
+> **Released** as tag/release [`v4.2.3`](https://github.com/kshohanservice-glitch/Dentiva-Windows-Application/releases/tag/v4.2.3)
+> on 2026-10-15 (installer `DentivaPro-Setup-4.2.3.exe`, 100,055,216 bytes). This file is the record of
+> that release. Follow-up work — the width-independent two-row invoice line and the A4-only printing
+> policy — ships in **v4.3.0** (`docs/RELEASE_NOTES_4.3.0.md`).
+
 Dentiva Pro 4.2.3 is a responsive-layout release. It fixes the reported Walk-in /
 Quick Documents invoice layout defect, repairs the other layout defects found by
 a repository-wide responsive audit, and adds automated geometry tests so the

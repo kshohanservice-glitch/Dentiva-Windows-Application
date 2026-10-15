@@ -1365,11 +1365,19 @@ tr.row-muted td { opacity: 0.55; }
 .medicine-entry-full-instruction > .field-label { min-height: auto; }
 .medicine-entry-conflict { margin-top: var(--sp-3); }
 
-/* Walk-in invoice line. The required arrangement at narrow panel widths is:
+/* Walk-in invoice line. The arrangement is fixed for every supported size:
      row 1 → Item or procedure · Qty · Unit price (৳)
      row 2 → Discount (৳) · Line total (৳)
+   The panel that contains this grid is only ~450–650px wide inside a
+   1366–1920px window, because `.quick-grid` shows the document preview beside
+   the form and its tracks are `minmax(340px,1fr) minmax(380px,1.05fr)`. Five
+   fields cannot share that width — a five-column row needs ≈690px including
+   gaps — so no breakpoint is used at all and every track is `minmax(0, …)`:
+   a long description or a large amount shrinks its own cell instead of pushing
+   Discount/Line total outside the card. The Line total read-out spans two
+   tracks (widest cell in the row) because it carries the largest amount.
    The Remove action stays in the card heading above the grid, so it can never
-   overlap either row. One row is used only when the panel really fits it. */
+   overlap either row. */
 .quick-line-grid:not(.quick-procedure-grid) {
   display: grid;
   grid-template-columns: minmax(0, 1.8fr) minmax(0, 0.8fr) minmax(0, 1.2fr);
@@ -1384,12 +1392,6 @@ tr.row-muted td { opacity: 0.55; }
 .quick-line-unit-price { grid-area: price; }
 .quick-line-discount { grid-area: discount; }
 .quick-line-total { grid-area: total; }
-@container (min-width: 690px) {
-  .quick-line-grid:not(.quick-procedure-grid) {
-    grid-template-columns: minmax(180px, 1.8fr) minmax(80px, 0.65fr) minmax(115px, 1fr) minmax(120px, 1fr) minmax(145px, 1.2fr);
-    grid-template-areas: 'item qty price discount total';
-  }
-}
 
 /* Walk-in visit-summary procedures: two columns, then one row when it fits. */
 .quick-procedure-grid {
@@ -1411,7 +1413,22 @@ tr.row-muted td { opacity: 0.55; }
     grid-template-areas: 'tooth name qty price';
   }
 }
-.quick-line-total-value { display: flex; align-items: center; min-height: 36px; }
+/* Money read-out of a line. It is a fixed-height box like its neighbouring
+   inputs, so a long amount must never wrap (the box would grow past its track
+   or paint outside it) and never paint outside the card. Realistic clinic
+   amounts fit the cell at the narrowest supported panel width — asserted by the
+   layout harness and the Electron E2E spec — and the ellipsis below is only the
+   last-resort guard for a value beyond the documented range; the exact amount is
+   always available in the invoice summary and on the printed document. */
+.quick-line-total-value {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
 .quick-invoice-summary {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));

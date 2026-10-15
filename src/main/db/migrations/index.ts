@@ -6,6 +6,7 @@ import { migration004 } from './004_appointment_lifecycle';
 import { migration005 } from './005_clinical_templates';
 import { migration006 } from './006_whatsapp';
 import { migration007 } from './007_prescription_medicine_instruction';
+import { migration008 } from './008_a4_only_printing';
 
 export interface Migration {
   version: number;
@@ -51,5 +52,10 @@ export const MIGRATIONS: Migration[] = [
     version: migration007.version,
     name: migration007.name,
     up: migration007.up,
+  },
+  {
+    version: migration008.version,
+    name: migration008.name,
+    up: migration008.up,
   },
 ];

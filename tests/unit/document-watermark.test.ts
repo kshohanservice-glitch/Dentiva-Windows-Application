@@ -25,11 +25,13 @@ describe('document watermark settings and geometry', () => {
     });
   });
 
-  it('uses physical page dimensions and correctly swaps landscape axes', () => {
-    expect(pageSizeFromProfile({ paperSize: 'a5', orientation: 'landscape' })).toEqual({ widthMm: 210, heightMm: 148 });
+  it('uses the A4 physical page and correctly swaps landscape axes', () => {
+    // A4 is the only document page size: the orientation is the only geometry a
+    // profile can influence (see src/shared/print-page.ts).
+    expect(pageSizeFromProfile({ orientation: 'landscape' })).toEqual({ widthMm: 297, heightMm: 210 });
     expect(pageSizeForDocument([
-      { documentType: 'prescription', paperSize: 'a5', orientation: 'portrait' },
-    ], 'quick-prescription')).toEqual({ widthMm: 148, heightMm: 210 });
+      { documentType: 'prescription', orientation: 'landscape' },
+    ], 'quick-prescription')).toEqual({ widthMm: 297, heightMm: 210 });
     expect(watermarkImageBounds({ widthMm: 210, heightMm: 297 }, 40)).toEqual({ maxWidthMm: 84, maxHeightMm: 84 });
   });
 
@@ -211,9 +213,9 @@ describe('watermark setting normalization edge cases', () => {
     }
   });
 
-  it('keeps the page box inside the physical page for odd profile input', () => {
-    expect(pageSizeFromProfile({ paperSize: 'custom', widthMm: 0, heightMm: -5 })).toEqual({ widthMm: 210, heightMm: 297 });
-    expect(pageSizeFromProfile({ paperSize: 'A5', orientation: 'portrait' })).toEqual({ widthMm: 148, heightMm: 210 });
+  it('keeps the page box on the physical A4 page for odd profile input', () => {
+    expect(pageSizeFromProfile({ orientation: 'landscape' })).toEqual({ widthMm: 297, heightMm: 210 });
+    expect(pageSizeFromProfile({ orientation: 'A5' })).toEqual({ widthMm: 210, heightMm: 297 });
     expect(pageSizeFromProfile(null)).toEqual({ widthMm: 210, heightMm: 297 });
     // A square box on the shorter edge: A4's short edge is 210mm, 50% of it.
     expect(watermarkImageBounds({ widthMm: 0, heightMm: 0 }, 50)).toEqual({ maxWidthMm: 105, maxHeightMm: 105 });

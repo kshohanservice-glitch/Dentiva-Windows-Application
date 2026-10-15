@@ -306,10 +306,14 @@ export interface ClinicSettings {
   currency: string; timezone?: string;
 }
 
+/**
+ * A saved printing setup. The page size is deliberately absent: A4 is the only
+ * supported document size (`src/shared/print-page.ts`), so a profile describes
+ * only the printer, orientation, margins, scale and copies.
+ */
 export interface PrintProfile {
   id: string; name: string; documentType: 'prescription' | 'invoice' | 'report' | 'receipt';
-  printerName: string; paperSize: 'a4' | 'a5' | 'custom';
-  widthMm: number; heightMm: number; orientation: 'portrait' | 'landscape';
+  printerName: string; orientation: 'portrait' | 'landscape';
   margins: { top: number; right: number; bottom: number; left: number };
   scale: number; copies: number;
 }

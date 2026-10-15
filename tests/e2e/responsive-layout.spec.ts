@@ -2,17 +2,17 @@
  * Responsive layout regression — Walk-in / Quick Documents invoice lines.
  *
  * This spec asserts *rendered geometry* in the real Electron window, not CSS
- * class names. It pins the arrangement the clinic asked for at narrow panel
- * widths and the invariants that keep the line editor usable:
+ * class names. It pins the arrangement the clinic asked for at every supported
+ * window size — the arrangement is deliberately width-independent:
  *
- *   narrow panel  → row 1: Item or procedure · Qty · Unit price (৳)
- *                   row 2: Discount (৳) · Line total (৳)
- *   wide panel    → one row, only while every field still fits
+ *   every panel → row 1: Item or procedure · Qty · Unit price (৳)
+ *                 row 2: Discount (৳) · Line total (৳)
  *
- * The window is 1180px minimum (src/main/index.ts), but the invoice panel is
- * much narrower than the window whenever `.quick-grid` shows the document
- * preview beside the form — that is exactly the reported defect (the panel was
- * 476px wide inside a 1366px window while five fields needed ~690px).
+ * The window minimum is 1180×720 (src/main/index.ts), but the invoice panel is
+ * much narrower than the window at 1366px and above because `.quick-grid` shows
+ * the document preview beside the form — that is exactly the reported defect
+ * (the panel was 476px wide inside a 1366px window while five fields in one row
+ * needed ~690px, so Discount and Line total were pushed outside the card).
  *
  * Financial expectations are hard-coded integer arithmetic so the test also
  * proves the invoice maths did not change with the layout:
@@ -178,10 +178,8 @@ test('narrow panel keeps Item/Qty/Unit price on the first row and Discount/Line 
   }
   await page.getByLabel('Invoice discount (৳)').fill('100');
 
-  // Every line must use the required two-row arrangement in this panel.
-  const panelWidth = (await measureLine(page, 0)).gridWidth;
-  expect(panelWidth).toBeLessThan(690);
-
+  // Every line must use the required two-row arrangement in this panel, whatever
+  // width the panel happens to have.
   for (let i = 0; i < 3; i += 1) {
     const geometry = await measureLine(page, i);
     expect(labelSet(geometry, 0)).toEqual(['Item or procedure', 'Qty', 'Unit price (৳)']);
@@ -315,30 +313,42 @@ test('validation and keyboard access still work in the invoice editor', async ()
   await expect(card.getByLabel('Item or procedure')).toHaveAttribute('required', '');
 });
 
-test('the widest supported panel may use one row, and it still fits', async () => {
-  // 1180×720 is the smallest supported window: the preview and the form stack,
-  // so the invoice panel is at its widest and the compact single row is used.
-  const size = await resizeWindow(app, page, 1180, 720);
-  expect(size.innerWidth).toBeLessThanOrEqual(1185);
+test('every supported window size keeps the required two-row arrangement', async () => {
+  // A large amount so the read-only Line total carries the widest realistic
+  // value in this assertion: 1234 × 1,234,567.89 − 99.99 = 1,523,456,676.27.
+  const card = page.locator('.quick-line-card').first();
+  await card.getByLabel('Qty').fill('1234');
+  await card.getByLabel('Unit price (৳)').fill('1234567.89');
+  await card.getByLabel('Discount (৳)').fill('99.99');
+  await revealAmounts(page);
+  await expect(card.locator('.quick-line-total-value')).toContainText('৳1,523,456,676.27');
 
-  const geometry = await measureLine(page, 0);
-  expect(geometry.gridScrollOverflow).toBeLessThanOrEqual(1);
-  expect(geometry.cardScrollOverflow).toBeLessThanOrEqual(1);
-  expect(geometry.remove?.visible).toBe(true);
-  expect(geometry.remove?.insideCard).toBe(true);
+  // Minimum window, the reported defect size, and a large desktop: the panel
+  // width varies from ~850px to ~450px across these, and the arrangement must
+  // not change with it.
+  for (const [width, height] of [[1180, 720], [1366, 768], [1920, 1080]]) {
+    const size = await resizeWindow(app, page, width, height);
+    expect(size.innerWidth).toBeLessThanOrEqual(width + 5);
 
-  const labels = geometry.fields.map((f) => f.label);
-  if (geometry.rows.length === 1) {
-    // Single row: every field present and none squeezed below its minimum.
-    expect(labels).toEqual(['Item or procedure', 'Qty', 'Unit price (৳)', 'Discount (৳)', 'Line total (৳)']);
-    const minimums: Record<string, number> = { 'Qty': 80, 'Unit price (৳)': 115, 'Discount (৳)': 120, 'Line total (৳)': 145, 'Item or procedure': 180 };
-    for (const field of geometry.fields) expect(field.width).toBeGreaterThanOrEqual(minimums[field.label] - 1);
-  } else {
+    const geometry = await measureLine(page, 0);
     expect(labelSet(geometry, 0)).toEqual(['Item or procedure', 'Qty', 'Unit price (৳)']);
     expect(labelSet(geometry, 1)).toEqual(['Discount (৳)', 'Line total (৳)']);
-    expect(geometry.gridWidth).toBeLessThan(690);
+    expect(geometry.rows).toHaveLength(2);
+    expect(geometry.gridScrollOverflow).toBeLessThanOrEqual(1);
+    expect(geometry.cardScrollOverflow).toBeLessThanOrEqual(1);
+    // The Line total read-out is the widest cell of the second row: a
+    // 13-digit amount must be readable without clipping at every size.
+    expect(geometry.totalValueClipped).toBeLessThanOrEqual(1);
+    for (const field of geometry.fields) {
+      expect(field.right).toBeLessThanOrEqual(geometry.cardRight + 0.5);
+      expect(field.left).toBeGreaterThanOrEqual(geometry.cardLeft - 0.5);
+      expect(field.inputWidth ?? 0).toBeGreaterThan(0);
+    }
+    expect(geometry.remove?.visible).toBe(true);
+    expect(geometry.remove?.insideCard).toBe(true);
+    expect(geometry.remove?.overlapsGrid).toBe(false);
+    expect((await pageOverflow(page)).main).toBe(0);
   }
-  expect((await pageOverflow(page)).main).toBe(0);
 });
 
 test('the prescription editor and the other document tabs stay inside their panel', async () => {
