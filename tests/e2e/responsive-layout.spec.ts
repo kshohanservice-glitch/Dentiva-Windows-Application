@@ -284,17 +284,28 @@ test('a line added from saved treatments keeps the same layout', async () => {
 });
 
 test('validation and keyboard access still work in the invoice editor', async () => {
-  await page.locator('.quick-line-card').first().getByLabel('Item or procedure').fill('');
-  await page.getByRole('button', { name: /Preview & print/i }).click();
+  const card = page.locator('.quick-line-card').first();
 
+  // Required-field validation is unchanged: an incomplete document is refused
+  // and the reason is shown in the form's alert.
+  await page.getByLabel('Customer name').fill('');
+  await page.getByRole('button', { name: /Preview & print/i }).click();
   const alert = page.locator('.callout[role="alert"]');
   await expect(alert).toBeVisible();
-  await expect(alert).toContainText(/item|line|complete/i);
+  await expect(alert).toContainText(/Customer name is required/i);
 
-  // Accessible names and number-input behaviour are unchanged: focus the Qty
-  // field by label and type a value; the line total updates from the keyboard.
-  const card = page.locator('.quick-line-card').first();
+  // Financial guard: a line discount larger than its line amount is refused.
+  await page.getByLabel('Customer name').fill('E2E Walk-in Layout Customer');
   await card.getByLabel('Item or procedure').fill('Filling');
+  await card.getByLabel('Qty').fill('1');
+  await card.getByLabel('Unit price (৳)').fill('10');
+  await card.getByLabel('Discount (৳)').fill('50');
+  await page.getByRole('button', { name: /Preview & print/i }).click();
+  await expect(alert).toContainText(/Line #1 discount exceeds the line total/i);
+
+  // Keyboard entry still drives the calculation: type into Qty, then the line
+  // total follows the same integer arithmetic as the invoice form.
+  await card.getByLabel('Discount (৳)').fill('0');
   await card.getByLabel('Qty').click();
   await page.keyboard.press('Control+a');
   await page.keyboard.type('3');
@@ -366,6 +377,10 @@ test('the prescription editor and the other document tabs stay inside their pane
 test('the printed walk-in invoice carries the same total as the screen', async () => {
   await page.getByRole('tab', { name: /Quick invoice/i }).click();
   await page.getByLabel('Customer name').fill('E2E Walk-in Layout Customer');
+  // Remove the saved-treatment line so the printed total is exactly one line:
+  // 1 × 1,200.00 − 200.00 line discount − 100.00 invoice discount = 900.00.
+  await page.locator('.quick-line-card').nth(1).getByRole('button', { name: 'Remove invoice line 2' }).click();
+  await expect(page.locator('.quick-line-card')).toHaveCount(1);
   const card = page.locator('.quick-line-card').first();
   await card.getByLabel('Item or procedure').fill('Extraction');
   await card.getByLabel('Qty').fill('1');
