@@ -2,6 +2,7 @@ import { BrowserWindow, dialog, app, type WebContents } from 'electron';
 import path from 'node:path';
 import fs from 'node:fs';
 import { AppError } from './errors';
+import { asA4PageSize } from '../shared/print-page';
 
 export interface PrintDocRef {
   type: import('../shared/ipc').PrintDocKind;
@@ -148,12 +149,14 @@ export async function executePrint(opts: PrintExecuteOptions): Promise<PrintResu
           margins: { marginType: 'none' },
           pagesPerSheet: 1,
           scaleFactor: opts.scale ? Math.max(25, Math.min(200, Math.round(opts.scale))) : 100,
-          ...(opts.widthMm && opts.heightMm
-            ? { pageSize: {
-                width: Math.max(353, Math.round(Number(opts.widthMm) * 1000)),
-                height: Math.max(353, Math.round(Number(opts.heightMm) * 1000)),
-              } }
-            : {}),
+          // A4 is the only document size (4.3.0): the requested box is resolved
+          // to A4 here too, so a stale or tampered renderer cannot print another
+          // medium even though it controls widthMm/heightMm.
+          pageSize: (() => {
+            const page = asA4PageSize(opts.widthMm, opts.heightMm);
+            // 1/1000 mm, the unit Electron's pageSize expects.
+            return { width: Math.round(page.widthMm * 1000), height: Math.round(page.heightMm * 1000) };
+          })(),
         },
         (success, failureReason) => {
           if (success) resolve(true);
@@ -191,9 +194,12 @@ export async function saveAsPdf(opts: PdfOptions): Promise<PdfResult> {
   if (save.canceled || !save.filePath) return { ok: false, cancelled: true, error: 'Save cancelled.' };
 
   try {
-    // Electron printToPDF uses inches (1 inch = 25.4 mm) for pageSize.
-    const widthIn = Math.max(1.5, mmToInches(opts.widthMm || 210));
-    const heightIn = Math.max(2.0, mmToInches(opts.heightMm || 297));
+    // Electron printToPDF uses inches (1 inch = 25.4 mm) for pageSize. The
+    // requested box is resolved to the A4 policy, so Save-as-PDF cannot produce
+    // a page that the A4-only document model does not describe.
+    const page = asA4PageSize(opts.widthMm, opts.heightMm);
+    const widthIn = mmToInches(page.widthMm);
+    const heightIn = mmToInches(page.heightMm);
     const data = await win.webContents.printToPDF({
       pageSize: { width: widthIn, height: heightIn },
       // width/height already include the selected orientation; CSS @page is the source of truth.

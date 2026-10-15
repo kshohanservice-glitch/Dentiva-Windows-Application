@@ -15,7 +15,7 @@ vi.mock('electron', () => ({
 }));
 
 import { buildPrintHash, marginsMmToPrintMargins, mmToInches } from '../../src/main/print';
-import { a4PageCss, a4PageSize } from '../../src/shared/print-page';
+import { A4_SIZE_TOLERANCE_MM, a4PageCss, a4PageSize, asA4PageSize } from '../../src/shared/print-page';
 
 describe('A4 page geometry (@page rules)', () => {
   it('A4 portrait → 210×297 mm with zero native page margin', () => {
@@ -40,6 +40,22 @@ describe('A4 page geometry (@page rules)', () => {
     expect(a4PageSize.length).toBeLessThanOrEqual(1);
     expect(a4PageSize('portrait')).toEqual({ widthMm: 210, heightMm: 297 });
     expect(a4PageSize('landscape')).toEqual({ widthMm: 297, heightMm: 210 });
+  });
+
+  it('resolves any requested page box to A4 (the print/PDF boundary)', () => {
+    // An A4 box keeps its orientation (this is what the print window sends).
+    expect(asA4PageSize(210, 297)).toEqual({ widthMm: 210, heightMm: 297 });
+    expect(asA4PageSize(297, 210)).toEqual({ widthMm: 297, heightMm: 210 });
+    // A borderline request inside the tolerance still counts as A4.
+    expect(asA4PageSize(210 + A4_SIZE_TOLERANCE_MM, 297)).toEqual({ widthMm: 210, heightMm: 297 });
+    // Legacy mediums, junk and missing values all resolve to A4 portrait:
+    // the main process never prints or exports another page size.
+    for (const [w, h] of [[148, 210], [80, 200], [216, 279], [148, 210], [0, 0], [-1, 5]]) {
+      expect(asA4PageSize(w, h), `${w}x${h}`).toEqual({ widthMm: 210, heightMm: 297 });
+    }
+    expect(asA4PageSize(undefined, undefined)).toEqual({ widthMm: 210, heightMm: 297 });
+    expect(asA4PageSize('junk', 297)).toEqual({ widthMm: 210, heightMm: 297 });
+    expect(asA4PageSize(210, NaN)).toEqual({ widthMm: 210, heightMm: 297 });
   });
 
   it('converts mm to inches for Electron printToPDF (ISS-036)', () => {

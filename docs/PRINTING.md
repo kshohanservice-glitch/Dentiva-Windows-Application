@@ -27,6 +27,13 @@ thermal-roll or custom page size anywhere in the product.
   is audited. A clinic that upgrades from 4.2.2 cannot be left with a page size that
   breaks document rendering. See `docs/DATABASE.md` and
   `tests/integration/a4-only-printing.test.ts`.
+- The policy is enforced at the IPC boundary too, not only in the renderer: `executePrint()`
+  and `saveAsPdf()` in `src/main/print.ts` resolve whatever `widthMm`/`heightMm` they are
+  given through `asA4PageSize()` (`src/shared/print-page.ts`), so an A4 box keeps its
+  orientation and anything else — a legacy A5/thermal request from an older or tampered
+  renderer, junk, or a missing value — becomes A4 portrait. A source-level gate test
+  (`tests/integration/a4-only-printing.test.ts`) fails if either path stops using the helper
+  or feeds raw millimetres to Electron.
 - A source-level gate test fails if a `paperSize` field, a retired page-size literal, a
   non-A4 `@page` size or a non-A4 hard-coded millimetre value is reintroduced anywhere in
   `src/`.

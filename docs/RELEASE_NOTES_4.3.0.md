@@ -24,6 +24,10 @@ width-independent two-row arrangement. No patient, clinical or financial behavio
   a profile remains the only removal path.
 - **Settings.** The print-profile table shows a static `A4 · 210 × 297 mm` size column; the page-size
   picker is gone.
+- **Enforced at the boundary.** The main-process print and Save-as-PDF calls resolve the page box they
+  are given through the shared A4 helper, so a stale or tampered renderer cannot print or export an
+  A5/thermal/Letter page: a non-A4 request becomes A4 portrait. A source-level test fails if either
+  print path stops using that helper.
 - **WYSIWYG unchanged in spirit and stricter in fact.** The preview page, `@page size` rule, the
   main-process print call and the Save-as-PDF call all use the same A4 box and the same orientation, so
   what is on screen is the sheet that is printed.
@@ -57,10 +61,10 @@ contains it is 450–630 px wide in every supported window (1180×720 and above)
 ## Verification for this version
 
 - Typecheck (main + renderer), ESLint and `npm run build`: clean.
-- Vitest: **570 tests in 50 files pass**, including the 37 layout-contract tests
+- Vitest: **572 tests in 50 files pass**, including the 37 layout-contract tests
   (`tests/integration/ui-layout-regressions.test.ts`), the 13-test A4-only policy suite
   (`tests/integration/a4-only-printing.test.ts`: source gate, fresh-install defaults, upgrade migration,
-  legacy-profile detection, write-path rejection) and a 6-test upgrade suite that runs the migration on
+  legacy-profile detection, write-path rejection, main-process boundary enforcement) and a 6-test upgrade suite that runs the migration on
   a database written by the **real v4.2.2 code** (`tests/fixtures/v4.2.2/dentiva-v4.2.2.db`, rebuilt by
   `scripts/build-v422-fixture.mjs`): patients, appointments, visits, prescriptions (including the
   v4.2.2 medicine instruction), invoices and payments are untouched, the A4 profiles survive with their

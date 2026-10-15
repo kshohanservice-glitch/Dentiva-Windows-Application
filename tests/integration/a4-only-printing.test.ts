@@ -279,3 +279,22 @@ describe('migration 008 converts an upgrading installation', () => {
     expect(after.n).toBe(before.n);
   });
 });
+
+describe('print/PDF boundary enforcement (source gate)', () => {
+  const read = (rel: string) => fs.readFileSync(path.join(__dirname, '..', '..', rel), 'utf8');
+
+  it('routes both main-process print paths through asA4PageSize', () => {
+    const print = read('src/main/print.ts');
+    // The requested box may only be resolved through the shared A4 helper: a
+    // raw widthMm/heightMm must never reach Electron's pageSize directly.
+    expect(print).toContain("import { asA4PageSize } from '../shared/print-page';");
+    expect(print.match(/asA4PageSize\(/g)?.length).toBeGreaterThanOrEqual(2);
+    const execute = print.slice(print.indexOf('export async function executePrint'), print.indexOf('export interface PdfOptions'));
+    const pdf = print.slice(print.indexOf('export async function saveAsPdf'));
+    for (const [name, body] of [['executePrint', execute], ['saveAsPdf', pdf]] as const) {
+      expect(body, name).toContain('asA4PageSize(');
+      expect(body, name).not.toMatch(/mmToInches\(opts\.(widthMm|heightMm)/);
+      expect(body, name).not.toMatch(/pageSize:\s*\{\s*width:\s*Math\.(max|round)\(Number\(opts\.(widthMm|heightMm)/);
+    }
+  });
+});

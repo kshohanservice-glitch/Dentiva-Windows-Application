@@ -35,6 +35,30 @@ export function a4PageSize(orientation: 'portrait' | 'landscape' = 'portrait'): 
     : { widthMm: A4_WIDTH_MM, heightMm: A4_HEIGHT_MM };
 }
 
+/** How far a requested page box may deviate from A4 and still count as A4 (mm). */
+export const A4_SIZE_TOLERANCE_MM = 1;
+
+/**
+ * Resolve a *requested* page box to the A4 policy.
+ *
+ * The main-process print and Save-as-PDF calls take their geometry from the
+ * renderer, so this is the boundary where the policy is enforced: an A4
+ * portrait or landscape box keeps its orientation, and anything else — a
+ * legacy A5/thermal request from an older or tampered renderer, junk, or no
+ * value at all — prints A4 portrait. The document's own `@page` rule comes from
+ * the same module, so the CSS and the native page box always agree.
+ */
+export function asA4PageSize(widthMm?: unknown, heightMm?: unknown): DocumentPageGeometry {
+  const width = Number(widthMm);
+  const height = Number(heightMm);
+  const near = (a: number, b: number) => Math.abs(a - b) <= A4_SIZE_TOLERANCE_MM;
+  if (Number.isFinite(width) && Number.isFinite(height)) {
+    if (near(width, A4_WIDTH_MM) && near(height, A4_HEIGHT_MM)) return a4PageSize('portrait');
+    if (near(width, A4_HEIGHT_MM) && near(height, A4_WIDTH_MM)) return a4PageSize('landscape');
+  }
+  return a4PageSize('portrait');
+}
+
 /**
  * The single `@page` rule for every printable document. The document element
  * carries the profile margins as padding, so the page itself has zero native
