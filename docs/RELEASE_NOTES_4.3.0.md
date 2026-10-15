@@ -20,8 +20,9 @@ width-independent two-row arrangement. No patient, clinical or financial behavio
   margins, scale and copies survive — page-size keys are stripped, and any document type left without a
   profile is re-seeded with its A4 default (`Prescription A4`, `Invoice A4`, `Receipt A4`,
   `Report A4`). The migration is idempotent, writes one append-only audit entry, and does not touch
-  patient, clinical or financial rows. Legacy profiles that cannot be mapped to A4 are removed; deleting
-  a profile remains the only removal path.
+  patient, clinical or financial rows. Legacy profiles that cannot be mapped to A4 are removed; a later
+  save that omits an extra profile is the only way to drop one, and the four document types always keep
+  an A4 profile (the settings interface edits orientation, scale and copies only).
 - **Settings.** The print-profile table shows a static `A4 · 210 × 297 mm` size column; the page-size
   picker is gone.
 - **Enforced at the boundary.** The main-process print and Save-as-PDF calls resolve the page box they
