@@ -13,7 +13,10 @@ export default defineConfig(({ mode }) => ({
     outDir: path.resolve(__dirname, 'dist/renderer'),
     emptyOutDir: true,
     target: 'chrome128',
-    chunkSizeWarningLimit: 900,
+    // Vite's default 500 kB chunk-size warning is left on (v5): the renderer is one
+    // ~588 kB chunk loaded from local disk. Splitting was measured and declined
+    // (V5-031, docs/audits/v5/ISSUE_REGISTER.md), so the warning is expected and
+    // documented in docs/audits/v5/TEST_RESULTS.md instead of being hidden.
     // `--mode e2e` (npm run test:e2e): readable identifiers + inline source maps
     // so Playwright pageerror stacks point at real TypeScript sources.
     sourcemap: mode === 'e2e' ? 'inline' : false,

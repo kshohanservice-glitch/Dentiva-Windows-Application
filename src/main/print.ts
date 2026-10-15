@@ -150,7 +150,7 @@ export async function executePrint(opts: PrintExecuteOptions): Promise<PrintResu
           margins: { marginType: 'none' },
           pagesPerSheet: 1,
           scaleFactor: opts.scale ? Math.max(25, Math.min(200, Math.round(opts.scale))) : 100,
-          // A4 is the only document size (4.3.0): the requested box is resolved
+          // A4 is the only document size (since 5.0.0): the requested box is resolved
           // to A4 here too, so a stale or tampered renderer cannot print another
           // medium even though it controls widthMm/heightMm.
           pageSize: (() => {

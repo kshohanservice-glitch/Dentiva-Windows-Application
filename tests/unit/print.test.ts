@@ -1,7 +1,7 @@
 /**
  * Print pipeline unit tests.
  *
- * Dentiva Pro 4.3.0 supports exactly one document page size: A4. These tests pin
+ * Dentiva Pro 5.0.0 supports exactly one document page size: A4. These tests pin
  * that policy at the unit level (one `@page` rule, orientation only), while the
  * window/print paths are covered by the packaged E2E (the print window opens
  * with the document content).

@@ -1,12 +1,12 @@
 /**
- * Upgrade path from the released v4.2.2 database (schema 7) to 4.3.0 (schema 8).
+ * Upgrade path from the released v4.2.2 database (schema 7) to 5.0.0 (schema 8).
  *
  * tests/fixtures/v4.2.2/dentiva-v4.2.2.db is produced by the REAL v4.2.2 schema
  * code (see scripts/build-v422-fixture.mjs) and seeded with the rows a clinic of
  * that version would have, including the historic print profiles — A4, A5 and a
  * 80mm thermal receipt — and one hand-added custom-millimetre profile.
  *
- * The 4.3.0 changes that this test is about:
+ * The 5.0.0 changes that this test is about (prepared as 4.3.0, never released):
  *   - migration 008 `a4-only-printing` rewrites `settings.printProfiles` so no
  *     stored profile carries a page size any more;
  *   - nothing clinical or financial is touched, and the rewrite is audited.

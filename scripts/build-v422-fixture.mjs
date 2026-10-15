@@ -10,7 +10,7 @@
  * items and a payment, and the historic print profiles (A4 + A5 + 80mm thermal)
  * plus one hand-added custom profile with an explicit millimetre size.
  *
- * It exists so `tests/integration/migration-v422.test.ts` can prove the 4.3.0
+ * It exists so `tests/integration/migration-v422.test.ts` can prove the 5.0.0
  * upgrade on a database that was really written by the published version —
  * including the A4-only print-profile rewrite. Synthetic data only; the user row
  * has no usable credential.
