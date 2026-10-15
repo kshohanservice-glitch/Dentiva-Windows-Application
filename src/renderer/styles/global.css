@@ -1281,6 +1281,7 @@ tr.row-muted td { opacity: 0.55; }
 .medicine-entry-editor { min-width: 0; }
 .medicine-entry-card,
 .quick-line-card {
+  container-type: inline-size;
   min-width: 0;
   border: 1px solid var(--line);
   border-radius: var(--r-md);
@@ -1355,6 +1356,32 @@ tr.row-muted td { opacity: 0.55; }
   .invoice-line { grid-template-columns: minmax(0, 1fr); }
   .invoice-line .field:first-child { grid-column: auto; }
   .invoice-line > .btn { justify-self: end; }
+}
+
+/* Walk-in invoice lines respond to the card width, not the app window. */
+@container (max-width: 620px) {
+  .quick-line-grid {
+    grid-template-columns: minmax(0, 1.5fr) minmax(52px, 0.65fr) minmax(0, 1fr);
+    grid-template-areas:
+      "description qty price"
+      "discount total total";
+  }
+  .quick-line-description { grid-area: description; grid-column: auto; }
+  .quick-line-grid > .field:nth-child(2) { grid-area: qty; }
+  .quick-line-grid > .field:nth-child(3) { grid-area: price; }
+  .quick-line-grid > .field:nth-child(4) { grid-area: discount; }
+  .quick-line-total { grid-area: total; }
+}
+
+@container (max-width: 360px) {
+  .quick-line-grid {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    grid-template-areas:
+      "description description"
+      "qty price"
+      "discount total";
+  }
+  .quick-line-description { grid-column: auto; }
 }
 
 /* Status pills in lists */
