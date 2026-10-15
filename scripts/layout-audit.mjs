@@ -55,6 +55,8 @@ const EXTRA_SIZES = args.filter((a) => /^\d+x\d+$/.test(a)).map((a) => {
   return { name: a, width, height };
 });
 const SCREENS = flag('--screens');
+/** `--theme dark` renders every screen with the dark theme (default: light). */
+const THEME = value('--theme', 'light') === 'dark' ? 'dark' : 'light';
 const JSON_OUT = value('--json');
 /**
  * `--pdf [directory]` switches the harness to the A4 print/PDF audit: every
@@ -63,6 +65,12 @@ const JSON_OUT = value('--json');
  * `layout-audit/pdf` (git-ignored together with the screenshots).
  */
 const PDF_MODE = flag('--pdf');
+/**
+ * `--long` (with `--pdf`): documents carry enough content to flow onto several
+ * A4 sheets — a 70-line invoice, a 30-medicine prescription and a 150-row
+ * report — so pagination, per-page margins and clipping can be inspected.
+ */
+const LONG = flag('--long');
 const PDF_DIR = value('--pdf', path.join(ROOT, 'layout-audit', 'pdf'));
 
 /**
@@ -145,7 +153,7 @@ const settings = {
   invoice: { nextNumber: 'INV-000123', footerNote: 'Thank you.' },
   security: { autoLockMinutes: 15, minPasswordLength: 8, maxFailedLogins: 5 },
   backup: { autoFrequencyDays: 7, destination: null, retention: 10 },
-  appearance: { theme: 'light', density: 'comfortable', animations: true, sidebarCollapsed: false },
+  appearance: { theme: THEME, density: 'comfortable', animations: true, sidebarCollapsed: false },
   notifications: { appointments: true, lowStock: true, dues: true, backup: true },
   whatsapp: { timezone: 'Asia/Dhaka', greetingRanges: [] },
   paymentMethods: ['Cash', 'bKash', 'Card'],
@@ -199,12 +207,17 @@ const invoices = Array.from({ length: 6 }, (_, i) => ({
   createdAt: `${today}T09:00:00.000Z`,
   voidedAt: null,
   voidReason: null,
-  items: [
-    {
-      id: 1, description: 'Root canal treatment — molar, single visit with rotary instrumentation',
-      qty: 1, unitPricePaisa: 1250000, discountPaisa: 0, totalPaisa: 1250000, treatmentId: 3,
-    },
-  ],
+  items: LONG && i === 0
+    ? Array.from({ length: 70 }, (_, n) => ({
+        id: n + 1, description: `Procedure line ${n + 1} — scaling, polishing and review of quadrant ${(n % 4) + 1}`,
+        qty: 1, unitPricePaisa: 150000 + n * 1000, discountPaisa: 0, totalPaisa: 150000 + n * 1000, treatmentId: 3,
+      }))
+    : [
+        {
+          id: 1, description: 'Root canal treatment — molar, single visit with rotary instrumentation',
+          qty: 1, unitPricePaisa: 1250000, discountPaisa: 0, totalPaisa: 1250000, treatmentId: 3,
+        },
+      ],
 }));
 
 const appointments = [
@@ -271,6 +284,13 @@ const PRESCRIPTION = {
   items: [
     { id: 1, seq: 1, medicineName: 'Amoxicillin 500mg', generic: 'Amoxicillin', form: 'Capsule', strength: '500mg', dosage: '1 capsule', frequency: '3 times daily', duration: '5 days', qty: '15', timing: 'after', instruction: 'After food', medicineInstruction: 'Take after meals with water.' },
     { id: 2, seq: 2, medicineName: 'Ibuprofen 400mg', generic: 'Ibuprofen', form: 'Tablet', strength: '400mg', dosage: '1 tablet', frequency: 'Twice daily', duration: '3 days', qty: '6', timing: 'after', instruction: 'Only if pain', medicineInstruction: null },
+    ...(LONG
+      ? Array.from({ length: 28 }, (_, n) => ({
+          id: n + 3, seq: n + 3, medicineName: `Medicine ${n + 3} 250mg`, generic: `Generic ${n + 3}`, form: 'Tablet',
+          strength: '250mg', dosage: '1 tablet', frequency: 'Twice daily', duration: `${(n % 10) + 3} days`, qty: '10',
+          timing: n % 2 ? 'before' : 'after', instruction: 'With water', medicineInstruction: null,
+        }))
+      : []),
   ],
 };
 
@@ -348,6 +368,7 @@ function createBridgeSource(permissions, printProfiles) {
   const effectiveSettings = printProfiles ? { ...settings, printProfiles } : settings;
   return `
     const SESSION = ${JSON.stringify(session)};
+    const LONG_REPORT = ${JSON.stringify(LONG)};
     const SETTINGS = ${JSON.stringify(effectiveSettings)};
     const VERSION = ${JSON.stringify(pkg.version)};
     const TODAY = ${JSON.stringify(today)};
@@ -411,7 +432,14 @@ function createBridgeSource(permissions, printProfiles) {
       'staff/list': () => [],
       'users/list': () => [],
       'roles/list': () => [],
-      'reports/run': () => ({ title: 'Synthetic report', scope: '', columns: [{ key: 'a', label: 'Label' }], rows: [], generatedAt: TODAY + 'T10:00:00.000Z' }),
+      'reports/run': () => (LONG_REPORT
+        ? {
+            title: 'Collection report', scope: 'Synthetic long range',
+            columns: [{ key: 'time', label: 'Time' }, { key: 'patient', label: 'Patient' }, { key: 'method', label: 'Method' }, { key: 'amount', label: 'Amount', align: 'right' }],
+            rows: Array.from({ length: 150 }, (_, n) => ({ time: TODAY + ' 10:' + String(n % 60).padStart(2, '0'), patient: 'Report row ' + (n + 1), method: 'Cash', amount: '৳' + (1000 + n) + '.00' })),
+            totals: { 'Net total': '৳161,175.00' }, generatedAt: TODAY + 'T10:00:00.000Z',
+          }
+        : { title: 'Synthetic report', scope: '', columns: [{ key: 'a', label: 'Label' }], rows: [], generatedAt: TODAY + 'T10:00:00.000Z' }),
       'audit/list': () => emptyPage(),
       'backups/list': () => [],
       'notifications/list': () => [],
@@ -1085,7 +1113,7 @@ async function main() {
       }
 
       if (SCREENS) {
-        await page.screenshot({ path: path.join(SCREEN_DIR, `${route.key}-${viewport.name}.png`), fullPage: false });
+        await page.screenshot({ path: path.join(SCREEN_DIR, `${route.key}-${viewport.name}${THEME === 'dark' ? '-dark' : ''}.png`), fullPage: false });
       }
     }
     await context.close();

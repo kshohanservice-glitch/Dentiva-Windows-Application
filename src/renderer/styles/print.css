@@ -48,6 +48,12 @@
     /* Width, height and padding are set inline from the selected profile so
        physical output uses the exact same geometry as the screen preview. */
     border-radius: 0 !important;
+    /* Multi-page documents (v5, V5-026): the profile margins are the document's
+       padding, so every sheet must repeat it — not only the top of page 1 and
+       the bottom of the last page. Without this a continuation page starts at
+       the paper edge, inside the printer's unprintable area. */
+    -webkit-box-decoration-break: clone;
+    box-decoration-break: clone;
   }
   .page-break {
     break-after: page;
@@ -433,8 +439,23 @@
 .print-doc h2 {
   page-break-after: avoid;
 }
-.print-doc table {
+/* Pagination (v5, V5-026). A long table flows across sheets with its header
+   repeated on each one; a single row, list item or medicine never splits.
+   Only blocks that always fit on one sheet are kept whole: keeping a whole
+   long table together pushed it to page 2 and left page 1 almost blank. */
+.print-doc thead { display: table-header-group; }
+/* A footer row is a grand total: print it once, after the last row — never
+   repeated at the bottom of every sheet (Chromium repeats table footers). */
+.print-doc tfoot { display: table-row-group; }
+.print-doc tr,
+.print-doc li,
+.print-doc .prescription-medication,
+.print-doc .print-kv,
+.print-doc .totals,
+.print-doc .sig-block,
+.print-doc .print-footer {
   break-inside: avoid;
+  page-break-inside: avoid;
 }
 .print-doc .grand td {
   color: var(--print-accent);
@@ -818,9 +839,10 @@
 }
 
 @media print {
+  /* The medicine list may be longer than one sheet, so the prescription body
+     itself may break between medicines (each medicine stays whole, above). */
   .prescription-header,
-  .prescription-patient-strip,
-  .prescription-body {
+  .prescription-patient-strip {
     break-inside: avoid;
     page-break-inside: avoid;
   }

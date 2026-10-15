@@ -488,6 +488,10 @@ export function visitToDoc(v: any) {
 
 export function reportDoc(data: any): React.ReactNode {
   const r = data.report;
+  const columnKeys = new Set<string>((r.columns ?? []).map((c: any) => String(c.key)));
+  const totalEntries = (r.totals && typeof r.totals === 'object' ? Object.entries(r.totals) : []) as [string, string | number | null][];
+  const hasColumnTotals = totalEntries.some(([key]) => columnKeys.has(key));
+  const labelledTotals = totalEntries.filter(([key]) => !columnKeys.has(key));
   return (
     <>
       <Header scope="report" clinic={data.clinic} right={<>
@@ -511,7 +515,7 @@ export function reportDoc(data: any): React.ReactNode {
             </tr>
           ))}
         </tbody>
-        {r.totals && (
+        {r.totals && hasColumnTotals && (
           <tfoot>
             <tr>
               {r.columns.map((c: any, i: number) => (
@@ -524,6 +528,22 @@ export function reportDoc(data: any): React.ReactNode {
           </tfoot>
         )}
       </table>
+      {/* Report services key their totals by label ("Net collection",
+          "Total outstanding" …), exactly as the Reports screen shows them; those
+          are printed as a summary under the table (V5-027). Totals keyed by a
+          column id keep the original per-column footer row above. */}
+      {labelledTotals.length > 0 && (
+        <table className="totals report-summary">
+          <tbody>
+            {labelledTotals.map(([label, value]) => (
+              <tr key={label}>
+                <td className="muted" {...docEl('report.tables.totalsLabel')}>{label}</td>
+                <td className="right mono" {...docEl('report.tables.totalsValue')}><FormattedMoney value={value} printable /></td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
       <Footer scope="report" text={`${r.rows.length} rows`} />
     </>
   );
