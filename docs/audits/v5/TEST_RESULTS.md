@@ -55,6 +55,7 @@ One test changed meaning on purpose: the ISS-010 case in `audit-regressions` now
 | 38748781825 | `5eda3af` | ✔ | ✔ | ✔ | fonts, headings, accessibility |
 | 38750058064 | `dc1534b` | ✔ | ✔ | ✔ | audit-log filter, IPC surface test. Artifact `DentivaPro-Windows-NSIS` (99,409,033 B, zip digest `sha256:5cceca4b51e54e6894d02e51e23edfcba8a0867097a34cd01cc61223fdac59b9`) |
 | 38751182873 | `56ea4cb` (RC) | ✔ | ✔ | ✔ | **release candidate.** Artifact `DentivaPro-Windows-NSIS` (99,409,026 B, zip digest `sha256:9282efa1d636a38567588fcdee046a07b69deac2cfa3e249bf3145edb9e36c48`, expires 2026-11-14). Publish step skipped (branch) |
+| 38752546753 | PR #43 merge ref (`338a6b8` into `main` `303712e`) | ✔ | ✔ | ✔ | `pull_request` event on draft PR #43. Same code as the RC; the merge with `main` is clean |
 
 Steps in a green run (38750058064), from the jobs API:
 - **verify:** production audit, typecheck for main and for renderer plus tests, lint, vitest, build, marker gate.

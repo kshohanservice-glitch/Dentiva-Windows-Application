@@ -125,6 +125,7 @@ There is no open P0 or P1.
 - **Harness:** layout 0/192 in light and dark; A4 0 violations in 16 normal and 16 long PDFs; axe 0/0.
 - **Windows CI:** green on `c7869bf`, `5eda3af` and `dc1534b`, and on the **release candidate `56ea4cb`** (run
   38751182873: verify, Electron E2E, NSIS and installed smoke all ✔; publish skipped).
+- **Draft PR #43** (merge with `main`): run 38752546753 all ✔. It is not merged.
 
 ## 11. Failures
 

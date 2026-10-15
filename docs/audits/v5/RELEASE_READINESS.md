@@ -53,6 +53,10 @@ Publishing was skipped (branch). CI artifact: `DentivaPro-Windows-NSIS`, 99,409,
 `sha256:9282efa1d636a38567588fcdee046a07b69deac2cfa3e249bf3145edb9e36c48`, retained until 2026-11-14. This is a
 branch build for verification, **not** a release asset.
 
+Draft PR [#43](https://github.com/kshohanservice-glitch/Dentiva-Windows-Application/pull/43) runs the same
+workflow on the merge with `main`: run 38752546753 is all green. The PR is a draft and must not be merged without
+authorization.
+
 ## 4. Release procedure (after authorization only)
 
 1. Do the device checks in §2.5 with disposable data, and record the results in TEST_RESULTS.md.
